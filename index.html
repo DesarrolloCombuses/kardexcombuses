@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ingresar — Kardex Dotación</title>
+  <meta name="theme-color" content="#0b1f3a" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="login-body">
+  <div class="login-shell">
+    <aside class="login-brand">
+      <div class="login-brand-top">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="brand-name">COMBUSES <strong>SA</strong></span>
+      </div>
+      <div class="login-brand-body">
+        <h1>Kardex de Dotación</h1>
+        <p>Plataforma interna para el control de entradas y salidas de uniformes y elementos de dotación.</p>
+        <ul class="login-features">
+          <li><svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Trazabilidad completa por empleado</li>
+          <li><svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Firma electrónica y evidencia fotográfica</li>
+          <li><svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Inventario en tiempo real por talla</li>
+        </ul>
+      </div>
+      <div class="login-brand-footer">© <span id="login-year"></span> Combuses SA</div>
+    </aside>
+
+    <main class="login-panel">
+      <div class="login-mobile-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Kardex Dotación · Combuses SA</span>
+      </div>
+      <div class="login-card">
+        <h2>Iniciar sesión</h2>
+        <p class="login-subtitle">Ingresa con tu cuenta corporativa para continuar</p>
+        <form id="login-form" class="form">
+          <label>
+            Correo corporativo
+            <input type="email" id="login-email" placeholder="nombre@combuses.com" required autocomplete="username" />
+          </label>
+          <label>
+            Contraseña
+            <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" />
+          </label>
+          <button type="submit" class="btn-block">
+            <span>Ingresar</span>
+          </button>
+          <p id="login-msg" class="form-msg"></p>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.getElementById('login-year').textContent = new Date().getFullYear();
+
+    Auth.redirectIfAuthenticated().catch(() => {});
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const msg = document.getElementById('login-msg');
+      msg.textContent = '';
+      msg.className = 'form-msg';
+      submitBtn.disabled = true;
+      try {
+        await Auth.signIn(email, password);
+        window.location.href = 'app.html';
+      } catch (err) {
+        msg.textContent = 'No fue posible iniciar sesión: ' + err.message;
+        msg.className = 'form-msg error';
+        submitBtn.disabled = false;
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
