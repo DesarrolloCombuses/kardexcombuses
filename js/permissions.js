@@ -6,7 +6,7 @@
 // tiene que moverse a políticas RLS en el momento en que se necesite.
 const AUTHORIZED_USERS = {
   'kardex@combuses.com.co': 'admin',
-  'vinculaciones@combuses.com.co': 'viewer',
+  'vinculaciones@combuses.com.co': 'admin',
   'analistafacturacion@combuses.com.co': 'viewer',
   'contabilidad@combuses.com.co': 'viewer',
 };
