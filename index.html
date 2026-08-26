@@ -64,6 +64,10 @@
           </button>
           <p id="login-msg" class="form-msg"></p>
         </form>
+        <button type="button" class="btn-secondary login-install-btn hidden" data-install-btn>
+          <svg viewBox="0 0 20 20" fill="none"><rect x="4.5" y="2.5" width="11" height="15" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5v5M10 11.5l-2.2-2.2M10 11.5l2.2-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Instalar app en este dispositivo
+        </button>
       </div>
     </main>
   </div>
@@ -100,5 +104,6 @@
       navigator.serviceWorker.register('service-worker.js').catch(() => {});
     }
   </script>
+  <script src="js/pwa-install.js"></script>
 </body>
 </html>
