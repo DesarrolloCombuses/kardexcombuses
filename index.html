@@ -75,11 +75,20 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/permissions.js"></script>
   <script src="js/auth.js"></script>
   <script>
     document.getElementById('login-year').textContent = new Date().getFullYear();
 
     Auth.redirectIfAuthenticated().catch(() => {});
+
+    const loginMsg = document.getElementById('login-msg');
+    const storedError = sessionStorage.getItem('kardex_auth_error');
+    if (storedError) {
+      sessionStorage.removeItem('kardex_auth_error');
+      loginMsg.textContent = storedError;
+      loginMsg.className = 'form-msg error';
+    }
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -91,7 +100,14 @@
       msg.className = 'form-msg';
       submitBtn.disabled = true;
       try {
-        await Auth.signIn(email, password);
+        const { session } = await Auth.signIn(email, password);
+        if (!Permissions.getRole(session.user.email)) {
+          await Auth.signOutSilently();
+          msg.textContent = 'No está permitido el ingreso con una cuenta distinta a las autorizadas.';
+          msg.className = 'form-msg error';
+          submitBtn.disabled = false;
+          return;
+        }
         window.location.href = 'app.html';
       } catch (err) {
         msg.textContent = 'No fue posible iniciar sesión: ' + err.message;

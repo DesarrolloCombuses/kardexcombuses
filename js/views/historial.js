@@ -228,7 +228,7 @@ Router.register('historial', {
 
     const anuladoHtml = m.anulado
       ? `<p class="view-error" style="margin-top:1rem">Este movimiento fue <strong>anulado</strong>${m.anulado_at ? ' el ' + new Date(m.anulado_at).toLocaleString('es-CO') : ''}${m.anulado_por_nombre ? ' por ' + m.anulado_por_nombre : ''}. El stock ya fue revertido.</p>`
-      : `<button type="button" id="modal-anular-btn" class="btn-secondary" style="margin-top:1.2rem;color:var(--danger-text)">Anular este movimiento</button>`;
+      : (window.APP_ROLE === 'admin' ? `<button type="button" id="modal-anular-btn" class="btn-secondary" style="margin-top:1.2rem;color:var(--danger-text)">Anular este movimiento</button>` : '');
 
     document.getElementById('modal-body').innerHTML = `
       <div class="modal-header">

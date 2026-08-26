@@ -25,6 +25,15 @@ const Router = {
     const name = (location.hash.replace('#/', '') || 'dashboard').split('?')[0];
     if (!this.views[name]) return;
 
+    // Defensa extra además de ocultar los enlaces del menú: si alguien
+    // escribe a mano el hash de una sección que su cuenta no tiene
+    // permitida (ej. #/salida con una cuenta de solo consulta), lo manda
+    // de vuelta al panel en vez de montar esa vista.
+    if (window.APP_ROLE && !Permissions.canAccessView(window.APP_ROLE, name)) {
+      this.navigate('dashboard');
+      return;
+    }
+
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.classList.toggle('active', el.dataset.view === name);
     });

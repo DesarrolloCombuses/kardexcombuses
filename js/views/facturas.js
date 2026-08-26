@@ -2,6 +2,9 @@ Router.register('facturas', {
   title: 'Facturas',
 
   async onEnter() {
+    if (window.APP_ROLE !== 'admin') {
+      document.getElementById('factura-form').classList.add('hidden');
+    }
     if (!this._bound) {
       document.getElementById('factura-form').addEventListener('submit', (e) => this._submit(e));
       document.getElementById('factura-archivo-input').addEventListener('change', () => this._updateArchivoLabel());
@@ -36,7 +39,7 @@ Router.register('facturas', {
           : `<span class="muted" title="${f.archivo_nombre ? 'Era: ' + f.archivo_nombre : ''}">Sin archivo</span>`}</td>
         <td>${f.observaciones || ''}</td>
         <td>${f.creado_por_nombre || '—'}</td>
-        <td><button type="button" class="linea-remove factura-eliminar">Eliminar</button></td>
+        <td>${window.APP_ROLE === 'admin' ? '<button type="button" class="linea-remove factura-eliminar">Eliminar</button>' : ''}</td>
       </tr>
     `).join('');
 
