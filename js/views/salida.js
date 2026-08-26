@@ -4,10 +4,8 @@ Router.register('salida', {
     this._categories = await DB.getCategories();
     this._employees = await DB.getEmployees({ onlyActive: true });
 
-    const empleadoSel = document.getElementById('salida-empleado');
-    empleadoSel.innerHTML = this._employees
-      .map((e) => `<option value="${e.id}">${e.nombre} — ${e.cedula}</option>`)
-      .join('');
+    document.getElementById('salida-empleado').value = '';
+    document.getElementById('salida-empleado-search').value = '';
     this._updateEmpleadoInfo();
 
     const lineasContainer = document.getElementById('salida-lineas');
@@ -18,7 +16,7 @@ Router.register('salida', {
     if (!this._bound) {
       document.getElementById('salida-add-linea').addEventListener('click', () => this._addLinea());
       document.getElementById('salida-form').addEventListener('submit', (e) => this._submit(e));
-      document.getElementById('salida-empleado').addEventListener('change', () => this._updateEmpleadoInfo());
+      this._setupEmpleadoCombobox();
       this._bindWizardNav();
 
       this._signatureReceptor = new SignaturePad(document.getElementById('firma-receptor'));
@@ -50,6 +48,73 @@ Router.register('salida', {
       `Vas a registrar esta entrega como: <strong>${nombreEntrega}</strong>`;
 
     this._goToStep(1);
+  },
+
+  // Buscador de empleado: con 200+ empleados activos, un <select> plano
+  // era impracticable (había que desplazarse a mano). Esto filtra por
+  // nombre o cédula a medida que se escribe; el <input type="hidden">
+  // #salida-empleado sigue siendo la fuente de verdad para el resto del
+  // wizard (validación, envío), igual que antes con el <select>.
+  _setupEmpleadoCombobox() {
+    const search = document.getElementById('salida-empleado-search');
+    const hidden = document.getElementById('salida-empleado');
+    const list = document.getElementById('salida-empleado-list');
+    const MAX_RESULTADOS = 40;
+
+    const renderLista = (query) => {
+      const q = query.trim().toLowerCase();
+      const matches = q
+        ? this._employees.filter((e) => e.nombre.toLowerCase().includes(q) || e.cedula.includes(q))
+        : this._employees;
+
+      if (matches.length === 0) {
+        list.innerHTML = '<li class="combobox-empty">Sin resultados.</li>';
+      } else {
+        const visibles = matches.slice(0, MAX_RESULTADOS);
+        list.innerHTML = visibles.map((e) => `
+          <li data-id="${e.id}">${e.nombre} <span class="combobox-cedula">· CC ${e.cedula}</span></li>
+        `).join('');
+        if (matches.length > visibles.length) {
+          list.innerHTML += `<li class="combobox-empty">Y ${matches.length - visibles.length} más… sigue escribiendo para acotar.</li>`;
+        }
+      }
+      list.classList.remove('hidden');
+    };
+
+    const seleccionar = (empleado) => {
+      hidden.value = empleado.id;
+      search.value = `${empleado.nombre} — CC ${empleado.cedula}`;
+      list.classList.add('hidden');
+      this._updateEmpleadoInfo();
+    };
+
+    search.addEventListener('focus', () => {
+      search.select();
+      renderLista('');
+    });
+    search.addEventListener('input', () => {
+      hidden.value = '';
+      this._updateEmpleadoInfo();
+      renderLista(search.value);
+    });
+    search.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const primero = list.querySelector('li[data-id]');
+      if (primero) primero.click();
+    });
+    search.addEventListener('blur', () => {
+      // El click en un <li> dispara blur antes que click; sin este pequeño
+      // margen, la lista se esconde antes de que el click llegue a alcanzarlo.
+      setTimeout(() => list.classList.add('hidden'), 150);
+    });
+
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-id]');
+      if (!li) return;
+      const empleado = this._employees.find((emp) => emp.id === li.dataset.id);
+      if (empleado) seleccionar(empleado);
+    });
   },
 
   // ---- Asistente paso a paso: un fieldset visible a la vez, y no se

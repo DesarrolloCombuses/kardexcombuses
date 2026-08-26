@@ -251,6 +251,34 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   .form-wide .fieldset-grid { grid-template-columns: 1fr; gap: 1.1rem; }
 }
 
+.combobox { position: relative; }
+.combobox-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+}
+.combobox-list li {
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+.combobox-list li:hover { background: var(--blue-50); }
+.combobox-list li .combobox-cedula { color: var(--slate-500); font-size: 0.8rem; }
+.combobox-list li.combobox-empty { cursor: default; color: var(--slate-500); font-size: 0.85rem; }
+.combobox-list li.combobox-empty:hover { background: transparent; }
+
 .employee-info {
   margin: -0.15rem 0 0;
   font-size: 0.82rem;

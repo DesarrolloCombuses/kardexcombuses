@@ -333,10 +333,12 @@
             <div class="wizard-panel" data-step="1">
               <fieldset>
                 <legend>Empleado que recibe</legend>
-                <label>
-                  Empleado
-                  <select id="salida-empleado" required></select>
-                </label>
+                <label for="salida-empleado-search">Empleado</label>
+                <div class="combobox">
+                  <input type="text" id="salida-empleado-search" placeholder="Busca por nombre o cédula…" autocomplete="off" />
+                  <input type="hidden" id="salida-empleado" />
+                  <ul id="salida-empleado-list" class="combobox-list hidden"></ul>
+                </div>
                 <p id="salida-empleado-info" class="employee-info hidden"></p>
               </fieldset>
               <p class="wizard-msg form-msg error hidden"></p>
