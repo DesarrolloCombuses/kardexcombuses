@@ -66,6 +66,10 @@
           <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10.5L12.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Historial
         </a>
+        <a href="#/ayuda" data-nav="ayuda">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M7.7 7.8a2.3 2.3 0 014.4 1c0 1.4-2.1 1.7-2.1 3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.4" r="0.9" fill="currentColor"/></svg>
+          Ayuda
+        </a>
       </nav>
 
       <div class="sidebar-footer">
@@ -272,33 +276,64 @@
 
         <!-- ================= SALIDA / ENTREGA ================= -->
         <section data-view="salida" class="view">
-          <p class="view-intro">Registra la entrega de dotación a un empleado con firma y evidencia fotográfica. Sigue los pasos:</p>
-          <form id="salida-form" class="form panel-card form-wide">
+          <p class="view-intro">Registra la entrega de dotación a un empleado con firma y evidencia fotográfica. Un paso a la vez:</p>
+          <form id="salida-form" class="form panel-card form-wide wizard">
 
-            <fieldset>
-              <legend><span class="step-num">1</span> Empleado que recibe</legend>
-              <label>
-                Empleado
-                <select id="salida-empleado" required></select>
-              </label>
-              <p id="salida-empleado-info" class="employee-info hidden"></p>
-            </fieldset>
+            <ol class="wizard-progress" id="salida-progress">
+              <li data-step="1"><span class="wizard-dot">1</span><span class="wizard-label">Empleado</span></li>
+              <li data-step="2"><span class="wizard-dot">2</span><span class="wizard-label">Prendas</span></li>
+              <li data-step="3"><span class="wizard-dot">3</span><span class="wizard-label">Firma</span></li>
+              <li data-step="4"><span class="wizard-dot">4</span><span class="wizard-label">Foto</span></li>
+              <li data-step="5"><span class="wizard-dot">5</span><span class="wizard-label">Bodega</span></li>
+              <li data-step="6"><span class="wizard-dot">6</span><span class="wizard-label">Confirmar</span></li>
+            </ol>
+            <p id="salida-msg" class="form-msg"></p>
 
-            <fieldset>
-              <legend><span class="step-num">2</span> Prendas a entregar</legend>
-              <div id="salida-lineas"></div>
-              <button type="button" id="salida-add-linea" class="btn-secondary">+ Agregar prenda</button>
-            </fieldset>
-
-            <div class="fieldset-grid">
+            <div class="wizard-panel" data-step="1">
               <fieldset>
-                <legend><span class="step-num">3</span> Firma de quien recibe</legend>
+                <legend>Empleado que recibe</legend>
+                <label>
+                  Empleado
+                  <select id="salida-empleado" required></select>
+                </label>
+                <p id="salida-empleado-info" class="employee-info hidden"></p>
+              </fieldset>
+              <p class="wizard-msg form-msg error hidden"></p>
+              <div class="wizard-nav">
+                <span></span>
+                <button type="button" class="wizard-next">Siguiente</button>
+              </div>
+            </div>
+
+            <div class="wizard-panel" data-step="2" hidden>
+              <fieldset>
+                <legend>Prendas a entregar</legend>
+                <div id="salida-lineas"></div>
+                <button type="button" id="salida-add-linea" class="btn-secondary">+ Agregar prenda</button>
+              </fieldset>
+              <p class="wizard-msg form-msg error hidden"></p>
+              <div class="wizard-nav">
+                <button type="button" class="wizard-back btn-secondary">Atrás</button>
+                <button type="button" class="wizard-next">Siguiente</button>
+              </div>
+            </div>
+
+            <div class="wizard-panel" data-step="3" hidden>
+              <fieldset>
+                <legend>Firma de quien recibe</legend>
                 <canvas id="firma-receptor" class="signature-canvas"></canvas>
                 <button type="button" class="btn-secondary" data-clear-signature="firma-receptor">Limpiar firma</button>
               </fieldset>
+              <p class="wizard-msg form-msg error hidden"></p>
+              <div class="wizard-nav">
+                <button type="button" class="wizard-back btn-secondary">Atrás</button>
+                <button type="button" class="wizard-next">Siguiente</button>
+              </div>
+            </div>
 
+            <div class="wizard-panel" data-step="4" hidden>
               <fieldset>
-                <legend><span class="step-num">4</span> Foto de quien recibe</legend>
+                <legend>Foto de quien recibe</legend>
                 <label class="file-picker" for="foto-receptor-input">
                   <svg viewBox="0 0 20 20" fill="none"><path d="M4 7h2.5l1-2h5l1 2H16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="11.5" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
                   Tomar / adjuntar foto
@@ -306,27 +341,43 @@
                 <input type="file" id="foto-receptor-input" accept="image/*" capture="environment" class="hidden" />
                 <img id="foto-receptor-preview" class="photo-preview hidden" alt="Foto del receptor" />
               </fieldset>
+              <p class="wizard-msg form-msg error hidden"></p>
+              <div class="wizard-nav">
+                <button type="button" class="wizard-back btn-secondary">Atrás</button>
+                <button type="button" class="wizard-next">Siguiente</button>
+              </div>
             </div>
 
-            <fieldset>
-              <legend><span class="step-num">5</span> Entregado por (bodega)</legend>
-              <label>
-                Nombre de quien entrega
-                <input type="text" id="salida-entregado-por" required />
-              </label>
-              <canvas id="firma-entrega" class="signature-canvas"></canvas>
-              <button type="button" class="btn-secondary" data-clear-signature="firma-entrega">Limpiar firma</button>
-            </fieldset>
+            <div class="wizard-panel" data-step="5" hidden>
+              <fieldset>
+                <legend>Entregado por (bodega)</legend>
+                <label>
+                  Nombre de quien entrega
+                  <input type="text" id="salida-entregado-por" required />
+                </label>
+                <canvas id="firma-entrega" class="signature-canvas"></canvas>
+                <button type="button" class="btn-secondary" data-clear-signature="firma-entrega">Limpiar firma</button>
+              </fieldset>
+              <p class="wizard-msg form-msg error hidden"></p>
+              <div class="wizard-nav">
+                <button type="button" class="wizard-back btn-secondary">Atrás</button>
+                <button type="button" class="wizard-next">Siguiente</button>
+              </div>
+            </div>
 
-            <fieldset>
-              <legend><span class="step-num">6</span> Confirmar entrega</legend>
-              <label>
-                Observaciones
-                <textarea id="salida-observaciones" rows="2"></textarea>
-              </label>
-              <button type="submit">Registrar entrega</button>
-              <p id="salida-msg" class="form-msg"></p>
-            </fieldset>
+            <div class="wizard-panel" data-step="6" hidden>
+              <fieldset>
+                <legend>Confirmar entrega</legend>
+                <label>
+                  Observaciones
+                  <textarea id="salida-observaciones" rows="2"></textarea>
+                </label>
+              </fieldset>
+              <div class="wizard-nav">
+                <button type="button" class="wizard-back btn-secondary">Atrás</button>
+                <button type="submit">Registrar entrega</button>
+              </div>
+            </div>
           </form>
         </section>
 
@@ -364,6 +415,167 @@
           <div id="historial-list" class="movement-list"></div>
         </section>
 
+        <!-- ================= AYUDA / MANUAL ================= -->
+        <section data-view="ayuda" class="view">
+          <p class="view-intro">Manual de uso del Kardex: qué botón usar en cada caso, qué queda registrado y cómo corregir un error sin perder el rastro.</p>
+
+          <nav id="ayuda-quicklinks" class="help-quicklinks">
+            <a href="#" data-jump="ayuda-que-es">Qué es el Kardex</a>
+            <a href="#" data-jump="ayuda-panel">Panel</a>
+            <a href="#" data-jump="ayuda-inventario">Inventario</a>
+            <a href="#" data-jump="ayuda-estadisticas">Estadísticas</a>
+            <a href="#" data-jump="ayuda-agregar-prenda">Agregar prenda</a>
+            <a href="#" data-jump="ayuda-entrada">Entrada</a>
+            <a href="#" data-jump="ayuda-entrega">Entrega (Salida)</a>
+            <a href="#" data-jump="ayuda-empleados">Empleados</a>
+            <a href="#" data-jump="ayuda-historial">Historial y auditoría</a>
+            <a href="#" data-jump="ayuda-instalar">Instalar en el celular</a>
+            <a href="#" data-jump="ayuda-preguntas">Preguntas frecuentes</a>
+          </nav>
+
+          <div class="help-block" id="ayuda-que-es">
+            <h2>Qué es el Kardex</h2>
+            <p class="prose-p">Un kardex es el registro clásico de bodega: cada vez que algo entra o sale, queda una línea con fecha, cantidad y responsable. Esta aplicación hace lo mismo con la dotación de Combuses SA — camisas, botas, chalecos, etc. — pero en el celular o el computador, en tiempo real y sin papel.</p>
+            <div class="callout tip">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 9v4.2M10 6.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <div><strong>Regla de oro</strong>Nada se edita ni se borra a mano. Todo lo que cambia el stock queda como un movimiento — una entrada o una salida — con fecha y responsable. Si algo se registró mal, se <em>anula</em> ese movimiento (ver «Historial y auditoría») y se vuelve a registrar bien.</div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-panel">
+            <h2>Panel</h2>
+            <p class="prose-p">La primera pantalla al entrar: un vistazo rápido a cómo está la bodega hoy, con la tabla de últimos movimientos debajo.</p>
+          </div>
+
+          <div class="help-block" id="ayuda-inventario">
+            <h2>Inventario</h2>
+            <p class="prose-p">El stock actual de cada prenda por talla, siempre al día — se actualiza solo apenas alguien registra una entrada o una salida.</p>
+            <div class="help-fields">
+              <div class="help-field"><span class="help-field-name">Buscar por prenda o talla</span><span class="help-field-desc">Escribe cualquier parte del nombre — por ejemplo "bota" o "38" — y la tabla se filtra al instante.</span></div>
+              <div class="help-field"><span class="help-field-name">Descargar Excel</span><span class="help-field-desc">Genera un archivo .xlsx con lo que esté visible en pantalla (respeta el filtro de búsqueda activo).</span></div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-estadisticas">
+            <h2>Estadísticas</h2>
+            <p class="prose-p">La misma información del Inventario, en forma de gráficas, para ver de un vistazo qué prendas se están acabando.</p>
+            <div class="swatch-row">
+              <span><span class="swatch critico"></span> Crítico — 2 unidades o menos</span>
+              <span><span class="swatch alerta"></span> Alerta — 3 a 5 unidades</span>
+              <span><span class="swatch ok"></span> Más de 5 — no aparece en la lista</span>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-agregar-prenda">
+            <h2>Agregar prenda</h2>
+            <p class="prose-p">Para dar de alta en el catálogo una prenda que no existe todavía, o una talla nueva de una que ya tienes. No necesitas pedirle esto a soporte: lo haces tú mismo.</p>
+            <ol class="help-steps">
+              <li><span class="step-num">1</span><div><strong>Nombre de la prenda</strong><p>Empieza a escribir el nombre. La pantalla te muestra si esa prenda ya existe (con sus tallas y stock actual) o si es nueva. Revisa esto siempre antes de seguir.</p></div></li>
+              <li><span class="step-num">2</span><div><strong>Tallas y cantidad inicial</strong><p>Agrega una fila por cada talla nueva. Si una talla ya existe para esa prenda, el campo se pone en rojo y avisa. Si todavía no vas a entregar nada, deja la cantidad en 0.</p></div></li>
+            </ol>
+            <div class="callout ok">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div><strong>Sobre la cantidad inicial</strong>Si registras una cantidad mayor a 0, se crea automáticamente una <span class="tag entrada" style="margin:0 0.15rem">entrada</span> en el Historial, con tu usuario y la fecha — el stock inicial también queda auditado.</div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-entrada">
+            <h2>Entrada</h2>
+            <p class="prose-p">Para sumar stock a una talla que <strong>ya existe</strong> en el catálogo — por ejemplo, cuando llega un pedido nuevo del proveedor.</p>
+            <div class="help-fields">
+              <div class="help-field"><span class="help-field-name">Categoría / Talla</span><span class="help-field-desc">La prenda y la talla a las que les va a entrar stock.</span></div>
+              <div class="help-field"><span class="help-field-name">Cantidad</span><span class="help-field-desc">Cuántas unidades entraron.</span></div>
+              <div class="help-field"><span class="help-field-name">Observaciones</span><span class="help-field-desc">Opcional — por ejemplo el número de factura o el proveedor.</span></div>
+            </div>
+            <h3>¿Entrada o Agregar prenda?</h3>
+            <div class="compare-grid">
+              <div class="compare-card">
+                <h4><span class="tag entrada">Entrada</span></h4>
+                <p>La prenda y la talla ya están en el catálogo. Solo estás sumando unidades a lo que ya existe.</p>
+                <p class="use-when"><strong>Úsala cuando:</strong> llega mercancía nueva de algo que ya manejas.</p>
+              </div>
+              <div class="compare-card">
+                <h4>Agregar prenda</h4>
+                <p>La prenda o la talla todavía no existen en el catálogo — hay que crearlas primero.</p>
+                <p class="use-when"><strong>Úsala cuando:</strong> es una prenda nueva, o una talla nunca antes manejada.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-entrega">
+            <h2>Entrega (Salida)</h2>
+            <p class="prose-p">El formulario más largo, porque también sirve como comprobante: queda con firma y foto del empleado que recibió.</p>
+            <ol class="help-steps">
+              <li><span class="step-num">1</span><div><strong>Empleado que recibe</strong><p>Búscalo en la lista. Si es conductor con número interno y ruta asignados, aparecen debajo del nombre.</p></div></li>
+              <li><span class="step-num">2</span><div><strong>Prendas a entregar</strong><p>Agrega una línea por cada prenda/talla y cantidad. Si pides más de lo disponible, el campo se marca en rojo y no deja continuar.</p></div></li>
+              <li><span class="step-num">3</span><div><strong>Firma de quien recibe</strong><p>El empleado firma con el dedo o el mouse sobre el recuadro.</p></div></li>
+              <li><span class="step-num">4</span><div><strong>Foto de quien recibe</strong><p>Evidencia de que la entrega fue en persona.</p></div></li>
+              <li><span class="step-num">5</span><div><strong>Entregado por (bodega)</strong><p>Tu nombre y tu firma, como responsable de la entrega.</p></div></li>
+              <li><span class="step-num">6</span><div><strong>Confirmar entrega</strong><p>Observaciones opcionales y el botón Registrar entrega. El stock baja automáticamente.</p></div></li>
+            </ol>
+          </div>
+
+          <div class="help-block" id="ayuda-empleados">
+            <h2>Empleados</h2>
+            <p class="prose-p">La lista de personas a las que se les puede entregar dotación, administrada desde aquí sin tocar la base de datos.</p>
+            <p class="prose-p">Haz clic sobre una fila para editarla. La columna <strong>Estado</strong> muestra si sigue activo — un empleado inactivo no aparece como opción al registrar una entrega nueva.</p>
+          </div>
+
+          <div class="help-block" id="ayuda-historial">
+            <h2>Historial y auditoría</h2>
+            <p class="prose-p">Todos los movimientos de la bodega, del más reciente al más antiguo — con tipo (<span class="tag entrada">Entrada</span> / <span class="tag salida">Salida</span>), fecha y quién lo registró. Haz clic en cualquiera para ver el detalle completo.</p>
+            <h3>¿Alguien se equivocó?</h3>
+            <p class="prose-p">Un movimiento nunca se edita ni se borra directamente. La manera correcta:</p>
+            <ol class="prose-ol">
+              <li>Abre el movimiento con el error y toca <strong>Anular este movimiento</strong>.</li>
+              <li>Confirma — el stock se revierte automáticamente al instante.</li>
+              <li>Queda visible con la etiqueta <span class="tag anulado-tag">Anulado</span>, junto con quién y cuándo — nunca desaparece.</li>
+              <li>Registra de nuevo el movimiento, con los datos correctos.</li>
+            </ol>
+            <div class="callout danger">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l8.2 14.2a1 1 0 01-.87 1.5H2.67a1 1 0 01-.87-1.5L10 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.3" r="0.9" fill="currentColor"/></svg>
+              <div><strong>Anular no se puede deshacer.</strong>La aplicación pide confirmación antes de anular porque es un paso sin vuelta atrás.</div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-instalar">
+            <h2>Instalar en el celular o tablet</h2>
+            <p class="prose-p">El Kardex se puede "instalar" para tener un ícono propio y abrirse a pantalla completa, sin barra del navegador.</p>
+            <h3>Android (Chrome)</h3>
+            <p class="prose-p">Menú de tres puntos (⋮) → <strong>Instalar app</strong> (o <strong>Agregar a pantalla de inicio</strong>).</p>
+            <h3>iPhone / iPad (Safari)</h3>
+            <p class="prose-p">Botón de compartir (□↑) → <strong>Agregar a pantalla de inicio</strong>.</p>
+            <div class="callout tip">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 9v4.2M10 6.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <div><strong>¿No ves algo nuevo que te dijeron que ya estaba listo?</strong>Cierra por completo la app y ábrela de nuevo. Ver «Preguntas frecuentes».</div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-preguntas">
+            <h2>Preguntas frecuentes</h2>
+            <div class="faq-item">
+              <div class="faq-q"><span class="q-mark">?</span> Me dijeron que hay una función nueva y no la veo.</div>
+              <div class="faq-a">Cierra por completo la aplicación o todas las ventanas del navegador y ábrela de nuevo.</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><span class="q-mark">?</span> Registré una entrega o entrada con datos equivocados.</div>
+              <div class="faq-a">No la borres ni la edites. Ve a Historial, ábrela y usa <strong>Anular este movimiento</strong>; luego vuelve a registrarla bien.</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><span class="q-mark">?</span> ¿Cuál es la diferencia entre Entrada y Agregar prenda?</div>
+              <div class="faq-a">Entrada suma stock a una prenda/talla que ya existe. Agregar prenda crea una prenda o talla que todavía no está en el catálogo.</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><span class="q-mark">?</span> No tengo cuenta, o se me olvidó la contraseña.</div>
+              <div class="faq-a">Ninguna de las dos se resuelve sola desde la app — pídele al administrador del sistema que te cree la cuenta o te restablezca la contraseña.</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><span class="q-mark">?</span> ¿Puedo usar el Kardex sin conexión a internet?</div>
+              <div class="faq-a">La app se abre sin internet una vez instalada, pero para consultar o guardar información necesita conexión.</div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -392,6 +604,7 @@
   <script src="js/views/salida.js"></script>
   <script src="js/views/empleados.js"></script>
   <script src="js/views/historial.js"></script>
+  <script src="js/views/ayuda.js"></script>
   <script src="js/pwa-update.js"></script>
   <script src="js/app.js"></script>
 </body>

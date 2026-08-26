@@ -19,6 +19,7 @@ Router.register('salida', {
       document.getElementById('salida-add-linea').addEventListener('click', () => this._addLinea());
       document.getElementById('salida-form').addEventListener('submit', (e) => this._submit(e));
       document.getElementById('salida-empleado').addEventListener('change', () => this._updateEmpleadoInfo());
+      this._bindWizardNav();
 
       this._signatureReceptor = new SignaturePad(document.getElementById('firma-receptor'));
       this._signatureEntrega = new SignaturePad(document.getElementById('firma-entrega'));
@@ -50,6 +51,85 @@ Router.register('salida', {
         document.getElementById('salida-entregado-por').value = nombre;
       }
     } catch { /* opcional, no bloquea el flujo */ }
+
+    this._goToStep(1);
+  },
+
+  // ---- Asistente paso a paso: un fieldset visible a la vez, y no se
+  // puede avanzar al siguiente sin pasar la validación del actual. Volver
+  // hacia atrás siempre es libre; los pasos ya completados quedan
+  // marcados y se puede saltar directo a ellos desde la barra de arriba.
+  _bindWizardNav() {
+    document.querySelectorAll('.wizard-next').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const panel = btn.closest('.wizard-panel');
+        const step = parseInt(panel.dataset.step, 10);
+        const error = this._validateStep(step);
+        const stepMsg = panel.querySelector('.wizard-msg');
+        if (error) {
+          stepMsg.textContent = error;
+          stepMsg.classList.remove('hidden');
+          return;
+        }
+        stepMsg.classList.add('hidden');
+        this._goToStep(step + 1);
+      });
+    });
+
+    document.querySelectorAll('.wizard-back').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const step = parseInt(btn.closest('.wizard-panel').dataset.step, 10);
+        this._goToStep(step - 1);
+      });
+    });
+
+    document.getElementById('salida-progress').addEventListener('click', (e) => {
+      const li = e.target.closest('li');
+      if (!li || !li.classList.contains('done')) return;
+      this._goToStep(parseInt(li.dataset.step, 10));
+    });
+  },
+
+  _validateStep(step) {
+    if (step === 1) {
+      if (!document.getElementById('salida-empleado').value) {
+        return 'Selecciona el empleado que recibe.';
+      }
+    }
+    if (step === 2) {
+      const lineas = this._collectLineas();
+      if (lineas.length === 0 || lineas.some((l) => !l.item_variant_id || !l.cantidad || l.cantidad <= 0)) {
+        return 'Agrega al menos una prenda con cantidad válida.';
+      }
+      const sinStock = lineas.find((l) => l.cantidad > l.stockDisponible);
+      if (sinStock) {
+        return `Stock insuficiente para una de las prendas seleccionadas (disponible: ${sinStock.stockDisponible}). Corrige la cantidad marcada en rojo.`;
+      }
+    }
+    if (step === 3 && this._signatureReceptor.isEmpty()) {
+      return 'Falta la firma de quien recibe.';
+    }
+    if (step === 4 && !this._camera.hasPhoto()) {
+      return 'Falta la foto de quien recibe.';
+    }
+    if (step === 5) {
+      if (this._signatureEntrega.isEmpty()) return 'Falta la firma de quien entrega.';
+      if (!document.getElementById('salida-entregado-por').value.trim()) return 'Indica el nombre de quien entrega.';
+    }
+    return null;
+  },
+
+  _goToStep(n) {
+    this._step = n;
+    document.querySelectorAll('.wizard-panel').forEach((panel) => {
+      panel.hidden = parseInt(panel.dataset.step, 10) !== n;
+    });
+    document.querySelectorAll('#salida-progress li').forEach((li) => {
+      const s = parseInt(li.dataset.step, 10);
+      li.classList.toggle('active', s === n);
+      li.classList.toggle('done', s < n);
+    });
+    document.getElementById('salida-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
 
   _updateEmpleadoInfo() {
