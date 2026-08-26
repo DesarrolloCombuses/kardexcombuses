@@ -11,8 +11,15 @@ class SignaturePad {
   }
 
   _resize() {
-    const ratio = window.devicePixelRatio || 1;
     const rect = this.canvas.getBoundingClientRect();
+    // Si el paso de firma está oculto (otro paso del asistente activo), el
+    // canvas mide 0x0. Redimensionar igual borraría la firma ya dibujada
+    // (canvas.width = 0) aunque hasStroke siga en true, y luego toBlob()
+    // devolvería null al enviar. El resize real ya se dispara al entrar
+    // al paso 3 (ver _goToStep en salida.js), así que aquí basta con
+    // ignorar los resize mientras esté oculto.
+    if (rect.width === 0 || rect.height === 0) return;
+    const ratio = window.devicePixelRatio || 1;
     const prev = this.hasStroke ? this.toDataURL() : null;
     this.canvas.width = rect.width * ratio;
     this.canvas.height = rect.height * ratio;

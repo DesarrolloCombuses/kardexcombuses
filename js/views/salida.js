@@ -337,6 +337,10 @@ Router.register('salida', {
       const session = await Auth.getSession();
 
       const firmaReceptorBlob = await this._signatureReceptor.toBlob();
+      if (!firmaReceptorBlob) {
+        throw new Error('No se pudo capturar la firma (inténtalo de nuevo desde el paso 3 — Firma).');
+      }
+
       const [firmaReceptorPath, fotoPath] = await Promise.all([
         DB.uploadToBucket('firmas', firmaReceptorBlob, 'png'),
         DB.uploadToBucket('fotos-entrega', this._camera.getFile(), (this._camera.getFile().name.split('.').pop() || 'jpg')),
