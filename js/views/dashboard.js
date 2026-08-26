@@ -38,7 +38,7 @@ Router.register('dashboard', {
     const container = document.getElementById('dashboard-recent');
     const items = recent;
     if (items.length === 0) {
-      container.innerHTML = '<p style="padding:1rem;color:var(--text-muted)">Sin movimientos todavía.</p>';
+      container.innerHTML = '<p class="muted" style="padding:1rem">Sin movimientos todavía.</p>';
       return;
     }
     container.innerHTML = `
@@ -46,9 +46,12 @@ Router.register('dashboard', {
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Empleado</th><th>Líneas</th></tr></thead>
         <tbody>
           ${items.map((m) => `
-            <tr>
+            <tr class="${m.anulado ? 'anulado-row' : ''}">
               <td>${new Date(m.fecha).toLocaleString('es-CO')}</td>
-              <td><span class="tag ${m.tipo}">${m.tipo}</span></td>
+              <td>
+                <span class="tag ${m.tipo}">${m.tipo}</span>
+                ${m.anulado ? '<span class="tag anulado-tag">Anulado</span>' : ''}
+              </td>
               <td>${m.employees ? m.employees.nombre : '—'}</td>
               <td>${m.kardex_movement_items.length}</td>
             </tr>

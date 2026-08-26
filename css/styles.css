@@ -721,6 +721,9 @@ tbody tr:hover { background: var(--slate-50); }
 .movement-card.anulado { opacity: 0.6; }
 .movement-card.anulado .movement-card-fecha { text-decoration: line-through; }
 
+tr.anulado-row { opacity: 0.6; }
+tr.anulado-row td:first-child { text-decoration: line-through; }
+
 .pagination {
   display: flex;
   align-items: center;
