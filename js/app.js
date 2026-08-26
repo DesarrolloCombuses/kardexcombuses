@@ -18,5 +18,17 @@
   });
   sidebarBackdrop.addEventListener('click', closeSidebar);
 
+  // Modal compartido (detalle de movimiento en Historial, alta de prenda en
+  // Inventario, etc.): el cierre se maneja acá una sola vez para toda la
+  // app, en vez de que cada vista registre su propio listener sobre los
+  // mismos elementos.
+  const modalBackdrop = document.getElementById('modal-backdrop');
+  modalBackdrop.querySelector('#modal-close').addEventListener('click', () => {
+    modalBackdrop.classList.add('hidden');
+  });
+  modalBackdrop.addEventListener('click', (e) => {
+    if (e.target === modalBackdrop) modalBackdrop.classList.add('hidden');
+  });
+
   Router.init('dashboard');
 })();

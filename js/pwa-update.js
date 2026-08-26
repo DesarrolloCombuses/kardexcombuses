@@ -39,6 +39,11 @@
     try {
       const registration = await navigator.serviceWorker.register('service-worker.js');
 
+      // Forzar el chequeo de versión nueva apenas carga la página, en vez
+      // de esperar a que el navegador lo haga por su cuenta (puede tardar
+      // hasta 24h) o a que la pestaña recupere el foco.
+      registration.update();
+
       // Respaldo: revisar version.json al recuperar el foco de la ventana,
       // por si el navegador tardó en chequear el service worker por su cuenta.
       let knownVersion = window.APP_CONFIG.APP_VERSION;

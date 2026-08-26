@@ -2,12 +2,13 @@ Router.register('salida', {
   title: 'Entrega (Salida)',
   async onEnter() {
     this._categories = await DB.getCategories();
-    const employees = await DB.getEmployees({ onlyActive: true });
+    this._employees = await DB.getEmployees({ onlyActive: true });
 
     const empleadoSel = document.getElementById('salida-empleado');
-    empleadoSel.innerHTML = employees
+    empleadoSel.innerHTML = this._employees
       .map((e) => `<option value="${e.id}">${e.nombre} — ${e.cedula}</option>`)
       .join('');
+    this._updateEmpleadoInfo();
 
     const lineasContainer = document.getElementById('salida-lineas');
     lineasContainer.innerHTML = '';
@@ -17,6 +18,7 @@ Router.register('salida', {
     if (!this._bound) {
       document.getElementById('salida-add-linea').addEventListener('click', () => this._addLinea());
       document.getElementById('salida-form').addEventListener('submit', (e) => this._submit(e));
+      document.getElementById('salida-empleado').addEventListener('change', () => this._updateEmpleadoInfo());
 
       this._signatureReceptor = new SignaturePad(document.getElementById('firma-receptor'));
       this._signatureEntrega = new SignaturePad(document.getElementById('firma-entrega'));
@@ -48,6 +50,23 @@ Router.register('salida', {
         document.getElementById('salida-entregado-por').value = nombre;
       }
     } catch { /* opcional, no bloquea el flujo */ }
+  },
+
+  _updateEmpleadoInfo() {
+    const info = document.getElementById('salida-empleado-info');
+    const empleadoId = document.getElementById('salida-empleado').value;
+    const empleado = this._employees.find((e) => e.id === empleadoId);
+
+    if (!empleado || !empleado.numero_interno) {
+      info.classList.add('hidden');
+      info.textContent = '';
+      return;
+    }
+
+    const partes = [`Vehículo interno: <strong>${empleado.numero_interno}</strong>`];
+    if (empleado.ruta) partes.push(`Ruta: <strong>${empleado.ruta}</strong>`);
+    info.innerHTML = partes.join(' · ');
+    info.classList.remove('hidden');
   },
 
   _addLinea() {

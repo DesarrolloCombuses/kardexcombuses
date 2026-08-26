@@ -32,7 +32,16 @@ const Router = {
       el.classList.toggle('active', el.dataset.nav === name);
     });
 
-    if (this.current && this.current !== name) {
+    // Evita re-montar la misma vista dos veces seguidas: al cargar la app
+    // sin hash todavía en la URL, fijar location.hash dispara "hashchange"
+    // de forma asíncrona, pero _render() ya se había llamado de forma
+    // síncrona justo antes para esa misma vista (ver init() más abajo).
+    // Sin este guard, onEnter() se ejecuta dos veces y cosas como la
+    // suscripción a Realtime truenan al intentar suscribirse dos veces
+    // al mismo canal.
+    if (this.current === name) return;
+
+    if (this.current) {
       const prevView = this.views[this.current];
       if (prevView && prevView.onLeave) prevView.onLeave();
     }

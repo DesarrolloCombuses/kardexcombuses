@@ -32,7 +32,10 @@ create table if not exists employees (
   cargo text,
   area text,
   activo boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  numero_interno text,
+  vehiculo_asociado text,
+  ruta text
 );
 
 -- Perfil del usuario del sistema (1:1 con auth.users). Si este proyecto ya
@@ -82,6 +85,14 @@ create table if not exists kardex_movement_items (
 alter table kardex_movements add column if not exists anulado boolean not null default false;
 alter table kardex_movements add column if not exists anulado_at timestamptz;
 alter table kardex_movements add column if not exists anulado_por uuid references auth.users(id);
+
+-- Numero interno de vehiculo (y ruta) asociado al empleado, relevante sobre
+-- todo para conductores. Se ve en la Entrega para confirmar que se le
+-- entrega la dotacion al conductor correcto. Datos cargados por separado
+-- desde sql/update_conductores_vehiculo.sql (mismo CSV de empleados).
+alter table employees add column if not exists numero_interno text;
+alter table employees add column if not exists vehiculo_asociado text;
+alter table employees add column if not exists ruta text;
 
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
@@ -138,12 +149,20 @@ create trigger trg_apply_kardex_movement_item
 -- Anular movimiento: revierte el stock de cada línea y marca el movimiento
 -- como anulado (no lo borra, para conservar el rastro de que existió/se
 -- corrigió). Útil para pruebas o errores de captura.
+--
+-- security definer a propósito: kardex_movements/kardex_movement_items solo
+-- permiten SELECT + INSERT por RLS (ver más abajo) -- nadie puede editar ni
+-- borrar un movimiento ya creado, ni por error ni manipulando la API a
+-- mano. La ÚNICA forma de "corregir" uno es por esta función, que además
+-- deja registrado quién y cuándo (anulado_por/anulado_at, tomados de
+-- auth.uid()/now() -- no se pueden falsificar porque no son parámetros).
+-- Por eso necesita bypasear esa RLS para poder hacer su propio update.
 -- ----------------------------------------------------------------------------
 
 create or replace function anular_movimiento(p_movement_id uuid)
 returns void
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
@@ -246,13 +265,26 @@ drop policy if exists "authenticated_update_own" on profiles;
 create policy "authenticated_update_own" on profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
+-- Solo SELECT + INSERT: una vez creado, un movimiento no se puede editar ni
+-- borrar directamente por RLS (ni por error desde la app, ni por alguien
+-- manipulando la API a mano). La única forma de "corregir" uno es
+-- anular_movimiento() (ver arriba), que sí queda registrado con quién y
+-- cuándo. Esto es lo que garantiza que el kardex sea auditable de verdad.
 drop policy if exists "authenticated_all" on kardex_movements;
-create policy "authenticated_all" on kardex_movements
-  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_select" on kardex_movements;
+create policy "authenticated_select" on kardex_movements
+  for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated_insert" on kardex_movements;
+create policy "authenticated_insert" on kardex_movements
+  for insert with check (auth.role() = 'authenticated');
 
 drop policy if exists "authenticated_all" on kardex_movement_items;
-create policy "authenticated_all" on kardex_movement_items
-  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_select" on kardex_movement_items;
+create policy "authenticated_select" on kardex_movement_items
+  for select using (auth.role() = 'authenticated');
+drop policy if exists "authenticated_insert" on kardex_movement_items;
+create policy "authenticated_insert" on kardex_movement_items
+  for insert with check (auth.role() = 'authenticated');
 
 -- ----------------------------------------------------------------------------
 -- Storage: buckets privados para firmas y fotos de entrega

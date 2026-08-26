@@ -21,6 +21,77 @@ const DB = {
     return data;
   },
 
+  // Da de alta una prenda nueva (o le agrega tallas nuevas a una que ya
+  // existe, si el nombre coincide) y, si alguna talla trae cantidad
+  // inicial, la registra como una ENTRADA real -- nunca escribe
+  // stock_actual directo, para no repetir el problema del inventario
+  // inicial (stock sin movimiento que lo explique en el Historial).
+  async createPrendaConTallas({ categoriaNombre, tallas, createdBy }) {
+    // Todo en mayúscula: así el catálogo queda uniforme (los datos que ya
+    // existían del inventario inicial también están en mayúscula) y no
+    // aparecen categorías duplicadas solo porque alguien las escribió con
+    // otra combinación de mayúsculas/minúsculas.
+    const nombre = categoriaNombre.trim().toUpperCase();
+    const tallasNormalizadas = tallas.map((t) => ({ ...t, talla: t.talla.trim().toUpperCase() }));
+
+    const { data: existentes, error: findError } = await window.supabaseClient
+      .from('item_categories')
+      .select('id, nombre')
+      .ilike('nombre', nombre);
+    if (findError) throw findError;
+
+    let category = existentes.find((c) => c.nombre.toLowerCase() === nombre.toLowerCase());
+    if (!category) {
+      const { data: nueva, error: catError } = await window.supabaseClient
+        .from('item_categories')
+        .insert({ nombre })
+        .select('id, nombre')
+        .single();
+      if (catError) throw catError;
+      category = nueva;
+    }
+
+    const { data: tallasExistentes, error: tallasError } = await window.supabaseClient
+      .from('item_variants')
+      .select('talla')
+      .eq('item_category_id', category.id);
+    if (tallasError) throw tallasError;
+    const existentesSet = new Set(tallasExistentes.map((v) => v.talla.toUpperCase()));
+
+    const nuevas = tallasNormalizadas.filter((t) => !existentesSet.has(t.talla));
+    const omitidas = tallasNormalizadas.filter((t) => existentesSet.has(t.talla));
+
+    if (nuevas.length === 0) {
+      return { category, creadas: [], omitidas };
+    }
+
+    const { data: variantesCreadas, error: variantsError } = await window.supabaseClient
+      .from('item_variants')
+      .insert(nuevas.map((t) => ({ item_category_id: category.id, talla: t.talla, stock_actual: 0 })))
+      .select('id, talla');
+    if (variantsError) throw variantsError;
+
+    const lineasConStock = variantesCreadas
+      .map((v) => {
+        const original = nuevas.find((t) => t.talla.trim().toLowerCase() === v.talla.toLowerCase());
+        return { item_variant_id: v.id, cantidad: original ? original.cantidad : 0 };
+      })
+      .filter((l) => l.cantidad > 0);
+
+    if (lineasConStock.length > 0) {
+      await this.createMovement({
+        header: {
+          tipo: 'entrada',
+          observaciones: 'Alta de prenda/talla nueva en el catálogo',
+          created_by: createdBy,
+        },
+        lines: lineasConStock,
+      });
+    }
+
+    return { category, creadas: variantesCreadas, omitidas };
+  },
+
   // ---- Perfil del usuario logueado ------------------------------------------
 
   async getMyProfile() {
@@ -88,7 +159,31 @@ const DB = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+
+    // created_by/anulado_por apuntan a auth.users, no directamente a
+    // profiles, así que no se puede embeber vía PostgREST — se resuelven
+    // aparte para poder mostrar quién registró y quién anuló cada
+    // movimiento (rastro de auditoría en el Historial).
+    const userIds = [...new Set(
+      data.flatMap((m) => [m.created_by, m.anulado_por]).filter(Boolean)
+    )];
+    let perfiles = {};
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await window.supabaseClient
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+      if (profilesError) throw profilesError;
+      perfiles = Object.fromEntries(
+        profilesData.map((p) => [p.id, p.full_name || p.username || 'Usuario'])
+      );
+    }
+
+    return data.map((m) => ({
+      ...m,
+      creado_por_nombre: m.created_by ? (perfiles[m.created_by] || 'Usuario') : null,
+      anulado_por_nombre: m.anulado_por ? (perfiles[m.anulado_por] || 'Usuario') : null,
+    }));
   },
 
   // Inserta el encabezado del movimiento y sus líneas. El trigger de la BD

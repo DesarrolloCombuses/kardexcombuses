@@ -4,10 +4,6 @@ Router.register('historial', {
     if (!this._bound) {
       document.getElementById('historial-refresh').addEventListener('click', () => this._load());
       document.getElementById('historial-tipo').addEventListener('change', () => this._load());
-      document.getElementById('modal-close').addEventListener('click', () => this._closeModal());
-      document.getElementById('modal-backdrop').addEventListener('click', (e) => {
-        if (e.target.id === 'modal-backdrop') this._closeModal();
-      });
       this._bound = true;
     }
     await this._load();
@@ -81,7 +77,7 @@ Router.register('historial', {
     }
 
     const anuladoHtml = m.anulado
-      ? `<p class="view-error" style="margin-top:1rem">Este movimiento fue <strong>anulado</strong>${m.anulado_at ? ' el ' + new Date(m.anulado_at).toLocaleString('es-CO') : ''}. El stock ya fue revertido.</p>`
+      ? `<p class="view-error" style="margin-top:1rem">Este movimiento fue <strong>anulado</strong>${m.anulado_at ? ' el ' + new Date(m.anulado_at).toLocaleString('es-CO') : ''}${m.anulado_por_nombre ? ' por ' + m.anulado_por_nombre : ''}. El stock ya fue revertido.</p>`
       : `<button type="button" id="modal-anular-btn" class="btn-secondary" style="margin-top:1rem;color:var(--danger-text)">Anular este movimiento</button>`;
 
     document.getElementById('modal-body').innerHTML = `
@@ -89,6 +85,7 @@ Router.register('historial', {
         <span class="tag ${m.tipo}">${m.tipo}</span>
         ${new Date(m.fecha).toLocaleString('es-CO')}
       </h2>
+      <p><strong>Registrado por:</strong> ${m.creado_por_nombre || '—'}</p>
       ${evidenciaHtml}
       <p><strong>Prendas:</strong></p>
       <ul>${lineasHtml}</ul>
