@@ -22,35 +22,32 @@ Router.register('salida', {
       this._bindWizardNav();
 
       this._signatureReceptor = new SignaturePad(document.getElementById('firma-receptor'));
-      this._signatureEntrega = new SignaturePad(document.getElementById('firma-entrega'));
       this._camera = new CameraCapture({
         inputEl: document.getElementById('foto-receptor-input'),
         previewEl: document.getElementById('foto-receptor-preview'),
       });
 
-      document.querySelectorAll('[data-clear-signature]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const target = btn.dataset.clearSignature === 'firma-receptor'
-            ? this._signatureReceptor
-            : this._signatureEntrega;
-          target.clear();
-        });
+      document.querySelector('[data-clear-signature="firma-receptor"]').addEventListener('click', () => {
+        this._signatureReceptor.clear();
       });
 
       this._bound = true;
     } else {
       this._signatureReceptor.clear();
-      this._signatureEntrega.clear();
       this._camera.reset();
     }
 
+    // Quien entrega es quien tiene la sesión iniciada -- no hace falta que
+    // lo escriba ni lo firme, ya queda registrado por created_by. Aquí solo
+    // se muestra su nombre como confirmación en el paso final.
+    let nombreEntrega = 'tu usuario';
     try {
-      const profile = await DB.getMyProfile();
-      const nombre = profile && (profile.full_name || profile.username);
-      if (nombre) {
-        document.getElementById('salida-entregado-por').value = nombre;
-      }
-    } catch { /* opcional, no bloquea el flujo */ }
+      const [profile, session] = await Promise.all([DB.getMyProfile(), Auth.getSession()]);
+      nombreEntrega = (profile && (profile.full_name || profile.username)) || session.user.email;
+    } catch { /* se deja el valor por defecto */ }
+    this._entregadoPorNombre = nombreEntrega;
+    document.getElementById('salida-entregado-por-info').innerHTML =
+      `Vas a registrar esta entrega como: <strong>${nombreEntrega}</strong>`;
 
     this._goToStep(1);
   },
@@ -109,12 +106,9 @@ Router.register('salida', {
     if (step === 3 && this._signatureReceptor.isEmpty()) {
       return 'Falta la firma de quien recibe.';
     }
-    if (step === 4 && !this._camera.hasPhoto()) {
-      return 'Falta la foto de quien recibe.';
-    }
-    if (step === 5) {
-      if (this._signatureEntrega.isEmpty()) return 'Falta la firma de quien entrega.';
-      if (!document.getElementById('salida-entregado-por').value.trim()) return 'Indica el nombre de quien entrega.';
+    if (step === 4) {
+      if (this._camera.processing) return 'Espera un momento, la foto se está procesando…';
+      if (!this._camera.hasPhoto()) return 'Falta la foto de quien recibe.';
     }
     return null;
   },
@@ -129,6 +123,11 @@ Router.register('salida', {
       li.classList.toggle('active', s === n);
       li.classList.toggle('done', s < n);
     });
+    // Mientras un paso está oculto, su <canvas> de firma mide 0x0 (el
+    // navegador no le da tamaño a algo que no se está mostrando), así que
+    // no se podía dibujar nada encima. Por eso hay que recalcularlo justo
+    // al entrar al paso donde vive la firma, no antes.
+    if (n === 3) this._signatureReceptor.resize();
     document.getElementById('salida-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
 
@@ -226,7 +225,6 @@ Router.register('salida', {
     };
 
     const employeeId = document.getElementById('salida-empleado').value;
-    const entregadoPor = document.getElementById('salida-entregado-por').value.trim();
     const observaciones = document.getElementById('salida-observaciones').value.trim() || null;
     const lineas = this._collectLineas();
 
@@ -248,16 +246,8 @@ Router.register('salida', {
       showError('Falta la firma de quien recibe.');
       return;
     }
-    if (this._signatureEntrega.isEmpty()) {
-      showError('Falta la firma de quien entrega.');
-      return;
-    }
     if (!this._camera.hasPhoto()) {
       showError('Falta la foto de quien recibe.');
-      return;
-    }
-    if (!entregadoPor) {
-      showError('Indica el nombre de quien entrega.');
       return;
     }
 
@@ -268,14 +258,9 @@ Router.register('salida', {
     try {
       const session = await Auth.getSession();
 
-      const [firmaReceptorBlob, firmaEntregaBlob] = await Promise.all([
-        this._signatureReceptor.toBlob(),
-        this._signatureEntrega.toBlob(),
-      ]);
-
-      const [firmaReceptorPath, firmaEntregaPath, fotoPath] = await Promise.all([
+      const firmaReceptorBlob = await this._signatureReceptor.toBlob();
+      const [firmaReceptorPath, fotoPath] = await Promise.all([
         DB.uploadToBucket('firmas', firmaReceptorBlob, 'png'),
-        DB.uploadToBucket('firmas', firmaEntregaBlob, 'png'),
         DB.uploadToBucket('fotos-entrega', this._camera.getFile(), (this._camera.getFile().name.split('.').pop() || 'jpg')),
       ]);
 
@@ -283,9 +268,8 @@ Router.register('salida', {
         header: {
           tipo: 'salida',
           employee_id: employeeId,
-          entregado_por_nombre: entregadoPor,
+          entregado_por_nombre: this._entregadoPorNombre,
           firma_receptor_url: firmaReceptorPath,
-          firma_entrega_url: firmaEntregaPath,
           foto_receptor_url: fotoPath,
           observaciones,
           created_by: session.user.id,

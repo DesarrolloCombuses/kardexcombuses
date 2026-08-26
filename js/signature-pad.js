@@ -64,6 +64,13 @@ class SignaturePad {
     this.canvas.addEventListener('touchend', end);
   }
 
+  // Público para poder recalcular el tamaño del canvas justo cuando su
+  // paso del asistente se hace visible (mientras está oculto mide 0x0 y
+  // no se puede firmar sobre él).
+  resize() {
+    this._resize();
+  }
+
   clear() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.hasStroke = false;

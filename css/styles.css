@@ -300,6 +300,7 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .form-msg.success { color: var(--success-text); }
 
 .hidden { display: none !important; }
+.muted { color: var(--slate-500); }
 
 .view-intro { color: var(--slate-500); font-size: 0.92rem; margin: -0.5rem 0 1.25rem; max-width: 640px; }
 
@@ -407,6 +408,20 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   .cards { grid-template-columns: 1fr; }
   .modal { padding: 1.1rem; }
   th, td { padding: 0.6rem 0.75rem; }
+
+  /* Los 6 pasos de Entrega no caben con su etiqueta a este ancho -- se
+     dejan solo los círculos numerados (la leyenda del paso actual ya dice
+     de qué se trata) para que la barra completa quepa sin scroll lateral. */
+  .wizard-progress li { min-width: 34px; }
+  .wizard-label { display: none; }
+  .wizard-dot { width: 22px; height: 22px; font-size: 0.68rem; }
+  .wizard-progress li:not(:last-child)::after { left: calc(50% + 15px); right: calc(-50% + 15px); }
+
+  /* Categoría y talla lado a lado quedaban ilegibles (muy angostas); cada
+     una pasa a ocupar toda la fila en vez de compartir el ancho. Selector
+     más específico que ".linea-row select" (más abajo en el archivo) para
+     que gane sin depender del orden. */
+  .wizard-panel .linea-row select { flex: 1 1 100%; }
 }
 
 /* =====================================================================
@@ -550,6 +565,15 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .search-input input { border: none; padding: 0.6rem 0; flex: 1; background: transparent; }
 .search-input input:focus { box-shadow: none; }
 
+.historico-date-field {
+  display: flex; align-items: center; gap: 0.6rem; flex-direction: row !important;
+  font-size: 0.82rem; font-weight: 600; color: var(--slate-600);
+  background: var(--white); border: 1px solid var(--slate-200); border-radius: var(--radius-sm);
+  padding: 0.55rem 0.9rem;
+}
+.historico-date-field input[type="date"] { border: none; padding: 0; background: transparent; width: auto; font-weight: 700; color: var(--slate-900); }
+.historico-date-field input[type="date"]:focus { box-shadow: none; }
+
 /* =====================================================================
    Tablas
    ===================================================================== */
@@ -633,22 +657,52 @@ tbody tr:hover { background: var(--slate-50); }
    Historial
    ===================================================================== */
 
-.movement-list { display: flex; flex-direction: column; gap: 0.6rem; }
-.movement-item {
+.movement-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.movement-card {
   background: var(--white);
   border: 1px solid var(--slate-200);
   border-radius: var(--radius);
-  padding: 0.85rem 1.1rem;
+  padding: 0.9rem 1.1rem;
   cursor: pointer;
+  font-size: 0.88rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.movement-card:hover { border-color: var(--blue-600); box-shadow: var(--shadow-sm); }
+
+.movement-card-top {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
-  font-size: 0.88rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px solid var(--slate-100);
 }
-.movement-item:hover { border-color: var(--blue-600); box-shadow: var(--shadow-sm); }
-.movement-item .muted { color: var(--slate-500); }
+.movement-card-fecha { margin-left: auto; font-weight: 700; color: var(--slate-700); }
+
+.movement-card-body { display: flex; flex-direction: column; gap: 0.4rem; }
+.movement-card-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.movement-card-label {
+  flex: 0 0 auto;
+  min-width: 9rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--slate-500);
+}
+.movement-card-value { color: var(--slate-900); }
+.movement-card-foot {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--slate-100);
+  font-size: 0.8rem;
+}
 
 .tag {
   display: inline-flex;
@@ -664,8 +718,22 @@ tbody tr:hover { background: var(--slate-50); }
 .tag.salida { background: var(--danger-bg); color: var(--danger-text); }
 .tag.anulado-tag { background: var(--slate-200); color: var(--slate-600); }
 
-.movement-item.anulado { opacity: 0.6; }
-.movement-item.anulado strong { text-decoration: line-through; }
+.movement-card.anulado { opacity: 0.6; }
+.movement-card.anulado .movement-card-fecha { text-decoration: line-through; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+.pagination-info { font-size: 0.82rem; color: var(--slate-600); text-align: center; }
+@media (max-width: 480px) {
+  .movement-card-label { min-width: 100%; }
+  .movement-card-fecha { margin-left: 0; flex-basis: 100%; }
+}
 
 /* =====================================================================
    Modal
@@ -685,6 +753,48 @@ tbody tr:hover { background: var(--slate-50); }
   font-size: 1.4rem; line-height: 1; padding: 0.3rem 0.6rem; border-radius: 50%;
 }
 .modal-close:hover { background: var(--slate-100); color: var(--slate-700); }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-right: 1.6rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--slate-200);
+}
+.modal-header-fecha { margin-left: auto; font-weight: 700; font-size: 1.02rem; color: var(--slate-900); }
+
+.modal-section + .modal-section { margin-top: 1.1rem; }
+.modal-section-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate-500);
+}
+.modal-observaciones { margin: 0; color: var(--slate-700); }
+
+.evidencia-grid { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+.evidencia-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-decoration: none;
+}
+.evidencia-label { font-size: 0.76rem; font-weight: 600; color: var(--slate-600); }
+.evidencia-item img {
+  max-width: 170px;
+  max-height: 170px;
+  object-fit: contain;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s;
+}
+.evidencia-item:hover img { border-color: var(--blue-600); }
 
 /* =====================================================================
    Update banner

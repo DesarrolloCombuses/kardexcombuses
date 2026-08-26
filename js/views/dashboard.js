@@ -22,10 +22,10 @@ Router.register('dashboard', {
   },
 
   async _reload() {
-    const [stock, employees, recent] = await Promise.all([
+    const [stock, employees, { movements: recent }] = await Promise.all([
       DB.getStockActual(),
       DB.getEmployees({ onlyActive: true }),
-      DB.getMovements(),
+      DB.getMovements({ page: 1, pageSize: 8 }),
     ]);
 
     const categorias = new Set(stock.map((r) => r.item_category_id)).size;
@@ -36,7 +36,7 @@ Router.register('dashboard', {
     document.getElementById('kpi-empleados').textContent = employees.length;
 
     const container = document.getElementById('dashboard-recent');
-    const items = recent.slice(0, 8);
+    const items = recent;
     if (items.length === 0) {
       container.innerHTML = '<p style="padding:1rem;color:var(--text-muted)">Sin movimientos todavía.</p>';
       return;

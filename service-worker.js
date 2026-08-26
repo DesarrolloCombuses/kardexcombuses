@@ -1,6 +1,6 @@
 // Service Worker con caché versionado. Al liberar una nueva versión:
 // 1) subir el número en version.json, 2) actualizar APP_VERSION aquí abajo.
-const APP_VERSION = '1.6.4';
+const APP_VERSION = '1.10.2';
 const CACHE_NAME = `kardex-cache-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -17,12 +17,14 @@ const APP_SHELL = [
   'js/camera.js',
   'js/views/dashboard.js',
   'js/views/inventario.js',
+  'js/views/inventario-historico.js',
   'js/views/estadisticas.js',
   'js/views/nueva-prenda.js',
   'js/views/entrada.js',
   'js/views/salida.js',
   'js/views/empleados.js',
   'js/views/historial.js',
+  'js/views/facturas.js',
   'js/views/ayuda.js',
   'js/pwa-update.js',
   'js/app.js',
@@ -37,7 +39,19 @@ self.addEventListener('install', (event) => {
   // nunca pasa y dejaba a la gente atascada en versiones viejas).
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then((cache) =>
+      // { cache: 'reload' } es clave: cache.addAll() por sí solo puede
+      // reusar una copia que el navegador todavía considera "fresca" en su
+      // propio caché HTTP (por Last-Modified), aunque ya haya una versión
+      // nueva en el servidor. Eso explicaba que, al liberar una versión,
+      // algunos archivos se actualizaran y otros se quedaran atrás según
+      // cuál tuviera el caché del navegador vencido en ese momento.
+      Promise.all(
+        APP_SHELL.map((url) =>
+          fetch(url, { cache: 'reload' }).then((response) => cache.put(url, response))
+        )
+      )
+    )
   );
 });
 

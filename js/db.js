@@ -12,6 +12,62 @@ const DB = {
     return data;
   },
 
+  // Reconstruye el stock que tenía cada prenda/talla al final del día
+  // indicado, usando el stock_resultante que ya queda guardado en cada
+  // línea de movimiento (no hay que recalcular nada desde cero: solo
+  // tomar, por cada talla, el último movimiento no anulado hasta esa
+  // fecha). Las tallas que todavía no existían en esa fecha quedan en 0,
+  // que es el valor correcto.
+  async getStockAsOf(dateISO) {
+    const [categorias, { data: historyRows, error }] = await Promise.all([
+      this.getCategories(),
+      window.supabaseClient
+        .from('kardex_movement_items')
+        .select('item_variant_id, stock_resultante, kardex_movements!inner(fecha, anulado)')
+        .eq('kardex_movements.anulado', false)
+        .lte('kardex_movements.fecha', dateISO),
+    ]);
+    if (error) throw error;
+
+    // El orden en que vienen las filas no está garantizado, así que en vez
+    // de depender de un ORDER BY sobre la tabla relacionada, se compara la
+    // fecha de cada línea y se queda con la más reciente por talla.
+    const stockPorVariante = new Map();
+    historyRows.forEach((row) => {
+      const actual = stockPorVariante.get(row.item_variant_id);
+      if (!actual || row.kardex_movements.fecha > actual.fecha) {
+        stockPorVariante.set(row.item_variant_id, { fecha: row.kardex_movements.fecha, stock: row.stock_resultante });
+      }
+    });
+
+    const rows = [];
+    categorias.forEach((cat) => {
+      const variantes = [...cat.item_variants].sort((a, b) => a.talla.localeCompare(b.talla));
+      const totalCategoria = variantes.reduce((sum, v) => sum + (stockPorVariante.get(v.id)?.stock || 0), 0);
+      variantes.forEach((v) => {
+        rows.push({
+          categoria: cat.nombre,
+          talla: v.talla,
+          stock_actual: stockPorVariante.get(v.id)?.stock || 0,
+          stock_total_categoria: totalCategoria,
+        });
+      });
+    });
+    rows.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.talla.localeCompare(b.talla));
+    return rows;
+  },
+
+  async getEarliestMovementDate() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_movements')
+      .select('fecha')
+      .eq('anulado', false)
+      .order('fecha', { ascending: true })
+      .limit(1);
+    if (error) throw error;
+    return data[0]?.fecha ?? null;
+  },
+
   async getCategories() {
     const { data, error } = await window.supabaseClient
       .from('item_categories')
@@ -92,6 +148,59 @@ const DB = {
     return { category, creadas: variantesCreadas, omitidas };
   },
 
+  // ---- Facturas ---------------------------------------------------------------
+
+  async getFacturas() {
+    const { data, error } = await window.supabaseClient
+      .from('facturas')
+      .select('*')
+      .order('fecha_remision', { ascending: false });
+    if (error) throw error;
+
+    const userIds = [...new Set(data.map((f) => f.created_by).filter(Boolean))];
+    let perfiles = {};
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await window.supabaseClient
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+      if (profilesError) throw profilesError;
+      perfiles = Object.fromEntries(
+        profilesData.map((p) => [p.id, p.full_name || p.username || 'Usuario'])
+      );
+    }
+
+    return data.map((f) => ({
+      ...f,
+      creado_por_nombre: f.created_by ? (perfiles[f.created_by] || 'Usuario') : null,
+    }));
+  },
+
+  async createFactura({ numeroFactura, fechaRemision, archivoFile, observaciones, createdBy }) {
+    const extension = (archivoFile.name.split('.').pop() || 'pdf').toLowerCase();
+    const archivoUrl = await this.uploadToBucket('facturas', archivoFile, extension);
+
+    const { data, error } = await window.supabaseClient
+      .from('facturas')
+      .insert({
+        numero_factura: numeroFactura,
+        fecha_remision: fechaRemision,
+        archivo_url: archivoUrl,
+        archivo_nombre: archivoFile.name,
+        observaciones,
+        created_by: createdBy,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteFactura(id) {
+    const { error } = await window.supabaseClient.from('facturas').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // ---- Perfil del usuario logueado ------------------------------------------
 
   async getMyProfile() {
@@ -139,25 +248,34 @@ const DB = {
 
   // ---- Movimientos (kardex) --------------------------------------------------
 
-  async getMovements({ tipo, employeeId, from, to } = {}) {
+  // page/pageSize son opcionales: si no se pasan, trae todo (se usa así
+  // para la exportación a Excel, que sí necesita el historial completo).
+  // Cuando sí se pasan, se pide el conteo exacto junto con la página para
+  // poder mostrar "Página X de Y" sin traer todas las filas al navegador
+  // -- importante si hay miles de movimientos (entregas masivas).
+  async getMovements({ tipo, employeeId, from, to, page, pageSize } = {}) {
     let query = window.supabaseClient
       .from('kardex_movements')
       .select(`
         *,
-        employees ( nombre, cedula ),
+        employees ( nombre, cedula, cargo, area, numero_interno, ruta ),
         kardex_movement_items (
           id, cantidad, stock_resultante,
           item_variants ( talla, item_categories ( nombre ) )
         )
-      `)
+      `, pageSize ? { count: 'exact' } : {})
       .order('fecha', { ascending: false });
 
     if (tipo) query = query.eq('tipo', tipo);
     if (employeeId) query = query.eq('employee_id', employeeId);
     if (from) query = query.gte('fecha', from);
     if (to) query = query.lte('fecha', to);
+    if (pageSize) {
+      const start = (page - 1) * pageSize;
+      query = query.range(start, start + pageSize - 1);
+    }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw error;
 
     // created_by/anulado_por apuntan a auth.users, no directamente a
@@ -179,11 +297,13 @@ const DB = {
       );
     }
 
-    return data.map((m) => ({
+    const movements = data.map((m) => ({
       ...m,
       creado_por_nombre: m.created_by ? (perfiles[m.created_by] || 'Usuario') : null,
       anulado_por_nombre: m.anulado_por ? (perfiles[m.anulado_por] || 'Usuario') : null,
     }));
+
+    return { movements, total: pageSize ? count : movements.length };
   },
 
   // Inserta el encabezado del movimiento y sus líneas. El trigger de la BD
