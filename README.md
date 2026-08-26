@@ -20,6 +20,25 @@ Proyecto: `https://cbplebkmxrkaafqdhiyi.supabase.co` (ya cargado en [js/config.j
 
 La *anon/publishable key* que está en `js/config.js` es segura de exponer en el cliente: la protección real de los datos la da Row Level Security (todas las tablas exigen sesión autenticada, sin acceso anónimo).
 
+### Mantener actualizados los empleados
+
+Los empleados vienen de la hoja maestra de RRHH/flota de Combuses (Google
+Sheets, publicada como CSV). La app no se conecta sola a esa hoja — Google
+bloquea la lectura directa desde el navegador (CORS) para links publicados,
+así que la sincronización es manual:
+
+1. Cuando haya cambios (ingresos, retiros, cambio de cargo/vehículo/ruta),
+   comparte de nuevo el link publicado de la hoja.
+2. Se regenera un script tipo [sql/sync_empleados_2026-08-26.sql](sql/sync_empleados_2026-08-26.sql)
+   — un `insert ... on conflict (cedula) do update` idempotente que trae
+   *solo* lo que usa el Kardex (nombre, cédula, cargo, área, activo,
+   vehículo/ruta). Deliberadamente no importa los campos sensibles de esa
+   hoja (salario, EPS/AFP, dirección, teléfono, fecha de nacimiento, etc.),
+   que no tienen nada que ver con el control de dotación.
+3. Se ejecuta en el SQL Editor de Supabase. No borra ni desactiva a nadie
+   que no aparezca en la hoja (así no se pierde a alguien cargado a mano
+   desde la app).
+
 ## 2. Servir la app localmente
 
 Los Service Workers solo funcionan sobre HTTPS o `localhost`, así que no basta con abrir el HTML con doble clic. Usa cualquier servidor estático, por ejemplo:
@@ -47,15 +66,17 @@ version.json           Número de versión actual
 css/styles.css
 js/config.js            URL + anon key de Supabase, versión de la app
 js/supabase-client.js
+js/permissions.js        Correos autorizados y rol (admin/viewer) de cada uno
 js/auth.js               Login/logout/guardas de sesión
 js/db.js                  Acceso a datos (Postgres + Storage)
 js/signature-pad.js       Firma electrónica en <canvas>
 js/camera.js               Captura de foto con la cámara del dispositivo
 js/router.js                Navegación por hash entre vistas
 js/pwa-update.js            Aviso de nueva versión disponible
+js/pwa-install.js            Botón "Instalar app" (evento beforeinstallprompt)
 js/app.js                    Bootstrap
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, empleados, historial, facturas, ayuda)
-sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql
+sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql, sql/sync_empleados_*.sql (el más reciente es la última sincronización con RRHH, ver "Mantener actualizados los empleados" arriba)
 ```
 
 ## 5. Publicar una nueva versión
