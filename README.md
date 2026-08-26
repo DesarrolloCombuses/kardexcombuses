@@ -14,6 +14,7 @@ Proyecto: `https://cbplebkmxrkaafqdhiyi.supabase.co` (ya cargado en [js/config.j
    3. [sql/backfill_entrada_inicial.sql](sql/backfill_entrada_inicial.sql) — registra ese inventario inicial como una **entrada** real en el Historial (el seed anterior escribe el stock directo, sin pasar por `kardex_movements`). Solo hace falta correrlo una vez; de ahí en adelante toda entrada/salida ya queda trazada automáticamente por la app.
    4. [sql/update_conductores_vehiculo.sql](sql/update_conductores_vehiculo.sql) — carga el número interno de vehículo y la ruta para los empleados que los tienen (sobre todo conductores), tomado del CSV de empleados. Seguro de re-ejecutar.
    5. [sql/facturas.sql](sql/facturas.sql) — tabla y bucket de Storage para guardar las facturas/soportes de compra (con su PDF o foto adjunto). Seguro de re-ejecutar.
+   6. [sql/add_fecha_entrega.sql](sql/add_fecha_entrega.sql) — agrega la columna `fecha_entrega` a `kardex_movements` (fecha real de la entrega, elegida en el asistente de Salida). Seguro de re-ejecutar.
 2. Ve a **Authentication → Users** y crea el/los usuarios que van a iniciar sesión (correo + contraseña). No hay registro público en la app: los usuarios se crean únicamente desde el dashboard.
    - `profiles` no tiene un trigger automático en este proyecto (es una tabla compartida con otro sistema). Si quieres que el nombre de un usuario aparezca completo en "Entregado por", agrega/edita su fila en `profiles` (columna `full_name`) desde el SQL Editor.
 
@@ -54,7 +55,7 @@ js/router.js                Navegación por hash entre vistas
 js/pwa-update.js            Aviso de nueva versión disponible
 js/app.js                    Bootstrap
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, empleados, historial, facturas, ayuda)
-sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql
+sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql
 ```
 
 ## 5. Publicar una nueva versión

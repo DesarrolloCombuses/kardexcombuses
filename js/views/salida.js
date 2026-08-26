@@ -8,6 +8,11 @@ Router.register('salida', {
     document.getElementById('salida-empleado-search').value = '';
     this._updateEmpleadoInfo();
 
+    const hoy = new Date().toISOString().slice(0, 10);
+    const fechaEntregaInput = document.getElementById('salida-fecha-entrega');
+    fechaEntregaInput.max = hoy;
+    fechaEntregaInput.value = hoy;
+
     const lineasContainer = document.getElementById('salida-lineas');
     lineasContainer.innerHTML = '';
     this._lineCount = 0;
@@ -157,6 +162,9 @@ Router.register('salida', {
       if (!document.getElementById('salida-empleado').value) {
         return 'Selecciona el empleado que recibe.';
       }
+      if (!document.getElementById('salida-fecha-entrega').value) {
+        return 'Selecciona la fecha de la entrega.';
+      }
     }
     if (step === 2) {
       const lineas = this._collectLineas();
@@ -290,11 +298,16 @@ Router.register('salida', {
     };
 
     const employeeId = document.getElementById('salida-empleado').value;
+    const fechaEntrega = document.getElementById('salida-fecha-entrega').value;
     const observaciones = document.getElementById('salida-observaciones').value.trim() || null;
     const lineas = this._collectLineas();
 
     if (!employeeId) {
       showError('Selecciona el empleado que recibe.');
+      return;
+    }
+    if (!fechaEntrega) {
+      showError('Selecciona la fecha de la entrega.');
       return;
     }
     if (lineas.length === 0 || lineas.some((l) => !l.item_variant_id || !l.cantidad || l.cantidad <= 0)) {
@@ -333,6 +346,7 @@ Router.register('salida', {
         header: {
           tipo: 'salida',
           employee_id: employeeId,
+          fecha_entrega: fechaEntrega,
           entregado_por_nombre: this._entregadoPorNombre,
           firma_receptor_url: firmaReceptorPath,
           foto_receptor_url: fotoPath,

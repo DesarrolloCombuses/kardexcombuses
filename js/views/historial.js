@@ -62,6 +62,14 @@ Router.register('historial', {
     list.innerHTML = movements.map((m) => {
       const nLineas = m.kardex_movement_items.length;
       const filas = [];
+      if (m.tipo === 'salida' && m.fecha_entrega) {
+        filas.push(`
+          <div class="movement-card-row">
+            <span class="movement-card-label">Fecha de entrega</span>
+            <span class="movement-card-value">${new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')}</span>
+          </div>
+        `);
+      }
       if (m.tipo === 'salida' && m.employees) {
         const extra = [
           m.employees.cargo,
@@ -146,6 +154,7 @@ Router.register('historial', {
       const base = {
         'Fecha': new Date(m.fecha).toLocaleString('es-CO'),
         'Tipo': m.tipo === 'entrada' ? 'Entrada' : 'Salida',
+        'Fecha de entrega': m.fecha_entrega ? new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO') : '',
         'Empleado': m.employees ? `${m.employees.nombre} (${m.employees.cedula})` : '',
         'Entregado por': m.entregado_por_nombre || '',
         'Registrado por': m.creado_por_nombre || '',
@@ -166,10 +175,10 @@ Router.register('historial', {
     });
 
     const sheet = XLSX.utils.json_to_sheet(data, {
-      header: ['Fecha', 'Tipo', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
+      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
     });
     sheet['!cols'] = [
-      { wch: 19 }, { wch: 9 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
+      { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
       { wch: 26 }, { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
     ];
     const workbook = XLSX.utils.book_new();
@@ -194,6 +203,7 @@ Router.register('historial', {
     const emp = m.employees;
     const datosHtml = [
       this._modalRow('Registrado por', m.creado_por_nombre || '—'),
+      m.tipo === 'salida' && m.fecha_entrega ? this._modalRow('Fecha de entrega', new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')) : '',
       m.tipo === 'salida' && emp ? this._modalRow('Empleado', `${emp.nombre} · CC ${emp.cedula}`) : '',
       m.tipo === 'salida' && emp?.cargo ? this._modalRow('Cargo', emp.cargo) : '',
       m.tipo === 'salida' && emp?.area ? this._modalRow('Área', emp.area) : '',

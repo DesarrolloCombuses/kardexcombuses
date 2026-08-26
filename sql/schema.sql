@@ -86,6 +86,14 @@ alter table kardex_movements add column if not exists anulado boolean not null d
 alter table kardex_movements add column if not exists anulado_at timestamptz;
 alter table kardex_movements add column if not exists anulado_por uuid references auth.users(id);
 
+-- Fecha del día real de la entrega (la elige quien registra la salida),
+-- separada a propósito de "fecha" -- esa sigue siendo el timestamp exacto
+-- de registro que ordena el kardex y que usa Inventario histórico junto
+-- con stock_resultante para reconstruir el stock a una fecha pasada. Si
+-- "fecha" también se pudiera editar libremente, una salida registrada
+-- tarde con fecha atrasada podría desordenar esa reconstrucción.
+alter table kardex_movements add column if not exists fecha_entrega date;
+
 -- Numero interno de vehiculo (y ruta) asociado al empleado, relevante sobre
 -- todo para conductores. Se ve en la Entrega para confirmar que se le
 -- entrega la dotacion al conductor correcto. Datos cargados por separado

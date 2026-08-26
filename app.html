@@ -340,6 +340,10 @@
                   <ul id="salida-empleado-list" class="combobox-list hidden"></ul>
                 </div>
                 <p id="salida-empleado-info" class="employee-info hidden"></p>
+                <label for="salida-fecha-entrega">
+                  Fecha de entrega
+                  <input type="date" id="salida-fecha-entrega" required />
+                </label>
               </fieldset>
               <p class="wizard-msg form-msg error hidden"></p>
               <div class="wizard-nav">
@@ -582,7 +586,7 @@
             <h2>Entrega (Salida)</h2>
             <p class="prose-p">El formulario más largo, porque también sirve como comprobante: queda con firma y foto del empleado que recibió.</p>
             <ol class="help-steps">
-              <li><span class="step-num">1</span><div><strong>Empleado que recibe</strong><p>Búscalo en la lista. Si es conductor con número interno y ruta asignados, aparecen debajo del nombre.</p></div></li>
+              <li><span class="step-num">1</span><div><strong>Empleado que recibe</strong><p>Búscalo por nombre o cédula. Si es conductor con número interno y ruta asignados, aparecen debajo del nombre. También se elige la fecha real de la entrega (por si se registra un día después de que ocurrió).</p></div></li>
               <li><span class="step-num">2</span><div><strong>Prendas a entregar</strong><p>Agrega una línea por cada prenda/talla y cantidad. Si pides más de lo disponible, el campo se marca en rojo y no deja continuar.</p></div></li>
               <li><span class="step-num">3</span><div><strong>Firma de quien recibe</strong><p>El empleado firma con el dedo o el mouse sobre el recuadro.</p></div></li>
               <li><span class="step-num">4</span><div><strong>Foto de quien recibe</strong><p>Evidencia de que la entrega fue en persona. Queda con la fecha y hora marcadas sobre la foto.</p></div></li>
