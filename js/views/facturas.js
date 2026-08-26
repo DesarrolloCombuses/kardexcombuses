@@ -32,14 +32,14 @@ Router.register('facturas', {
     }
     tbody.innerHTML = this._facturas.map((f) => `
       <tr data-id="${f.id}">
-        <td>${f.numero_factura}</td>
-        <td>${new Date(`${f.fecha_remision}T00:00:00`).toLocaleDateString('es-CO')}</td>
-        <td>${f.archivo_url
+        <td data-label="N.º factura">${f.numero_factura}</td>
+        <td data-label="Fecha remisión">${new Date(`${f.fecha_remision}T00:00:00`).toLocaleDateString('es-CO')}</td>
+        <td data-label="Archivo">${f.archivo_url
           ? `<button type="button" class="btn-secondary factura-ver" data-path="${f.archivo_url}">Ver archivo</button>`
           : `<span class="muted" title="${f.archivo_nombre ? 'Era: ' + f.archivo_nombre : ''}">Sin archivo</span>`}</td>
-        <td>${f.observaciones || ''}</td>
-        <td>${f.creado_por_nombre || '—'}</td>
-        <td>${window.APP_ROLE === 'admin' ? '<button type="button" class="linea-remove factura-eliminar">Eliminar</button>' : ''}</td>
+        <td data-label="Observaciones">${f.observaciones || ''}</td>
+        <td data-label="Registrada por">${f.creado_por_nombre || '—'}</td>
+        <td>${window.APP_ROLE === 'admin' ? '<button type="button" class="btn-secondary factura-eliminar" style="color:var(--danger-text)">Eliminar</button>' : ''}</td>
       </tr>
     `).join('');
 

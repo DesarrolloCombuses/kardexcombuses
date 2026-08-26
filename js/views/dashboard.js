@@ -47,13 +47,13 @@ Router.register('dashboard', {
         <tbody>
           ${items.map((m) => `
             <tr class="${m.anulado ? 'anulado-row' : ''}">
-              <td>${new Date(m.fecha).toLocaleString('es-CO')}</td>
-              <td>
+              <td data-label="Fecha">${new Date(m.fecha).toLocaleString('es-CO')}</td>
+              <td data-label="Tipo">
                 <span class="tag ${m.tipo}">${m.tipo}</span>
                 ${m.anulado ? '<span class="tag anulado-tag">Anulado</span>' : ''}
               </td>
-              <td>${m.employees ? m.employees.nombre : '—'}</td>
-              <td>${m.kardex_movement_items.length}</td>
+              <td data-label="Empleado">${m.employees ? m.employees.nombre : '—'}</td>
+              <td data-label="Líneas">${m.kardex_movement_items.length}</td>
             </tr>
           `).join('')}
         </tbody>

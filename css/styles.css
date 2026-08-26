@@ -199,6 +199,13 @@ button svg { width: 16px; height: 16px; flex: none; }
 .form-inline { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .form-inline input { flex: 1; min-width: 140px; }
 
+/* Dos campos por fila (ej. Nombre/Cédula) todavía se leen bien en tablet,
+   pero en celular quedan angostos para escribir cómodo -- cada campo pasa
+   a ocupar toda la fila. */
+@media (max-width: 480px) {
+  .form-inline input, .form-inline .file-picker { flex: 1 1 100%; }
+}
+
 .panel-card {
   background: var(--white);
   border: 1px solid var(--slate-200);
@@ -574,8 +581,19 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .empty-note { color: var(--slate-500); font-size: 0.88rem; margin: 0.5rem 0 0; }
 
 @media (max-width: 480px) {
-  .low-stock-row { grid-template-columns: 1fr 80px 56px; gap: 0.5rem; }
-  .bar-row { grid-template-columns: 84px 1fr 38px; gap: 0.5rem; }
+  /* El nombre de categoría casi nunca cabe truncado en una columna angosta
+     (ej. "BOTAS GESTORES MOVILIDAD Y SERVICIO"), así que en vez de seguir
+     comprimiendo las 3 columnas en una sola fila, el nombre pasa a su
+     propia línea completa y la barra + valor quedan debajo. */
+  .bar-row, .low-stock-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "label label" "track value";
+    row-gap: 0.35rem;
+    column-gap: 0.6rem;
+  }
+  .bar-row .bar-label, .low-stock-row .lsr-name { grid-area: label; white-space: normal; }
+  .bar-row .bar-track, .low-stock-row .low-stock-track { grid-area: track; }
+  .bar-row .bar-value, .low-stock-row .lsr-value { grid-area: value; }
   .donut { width: 150px; height: 150px; }
 }
 
@@ -613,6 +631,51 @@ th, td { text-align: left; padding: 0.7rem 1.1rem; border-bottom: 1px solid var(
 th { background: var(--slate-50); color: var(--slate-500); font-weight: 600; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--slate-50); }
+
+/* En celular una tabla ancha obliga a hacer scroll horizontal para leer
+   cada dato, que es justo lo que se siente "apretado" y poco de app móvil.
+   Cada fila pasa a verse como una tarjeta propia, con el nombre de columna
+   (data-label, puesto desde JS) como etiqueta a la izquierda del valor. */
+@media (max-width: 640px) {
+  .table-wrap { background: transparent; border: none; box-shadow: none; overflow-x: visible; }
+  .table-wrap table, .table-wrap tbody, .table-wrap tr { display: block; width: 100%; }
+  .table-wrap thead { display: none; }
+  .table-wrap tbody tr {
+    background: var(--white);
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 0 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .table-wrap tbody tr:last-child { margin-bottom: 0; }
+  .table-wrap td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--slate-100);
+    white-space: normal;
+    text-align: right;
+  }
+  .table-wrap td:last-child { border-bottom: none; }
+  .table-wrap td:empty { display: none; }
+  .table-wrap td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--slate-500);
+    text-align: left;
+  }
+  .table-wrap td:not([data-label])::before { content: none; }
+  /* Celdas de acciones (sin data-label, uno o más botones): agrupados a
+     la derecha en vez de repartidos por los extremos de la fila. */
+  .table-wrap td:not([data-label]) { justify-content: flex-end; flex-wrap: wrap; }
+}
 
 /* =====================================================================
    Firma / cámara

@@ -184,10 +184,10 @@ Router.register('historial', {
 
     const prendasHtml = m.kardex_movement_items.map((li) => `
       <tr>
-        <td>${li.item_variants.item_categories.nombre}</td>
-        <td>${li.item_variants.talla}</td>
-        <td>${li.cantidad}</td>
-        <td>${li.stock_resultante}</td>
+        <td data-label="Categoría">${li.item_variants.item_categories.nombre}</td>
+        <td data-label="Talla">${li.item_variants.talla}</td>
+        <td data-label="Cant.">${li.cantidad}</td>
+        <td data-label="Stock result.">${li.stock_resultante}</td>
       </tr>
     `).join('');
 

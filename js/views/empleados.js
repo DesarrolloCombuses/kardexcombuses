@@ -18,11 +18,11 @@ Router.register('empleados', {
     }
     tbody.innerHTML = employees.map((e) => `
       <tr>
-        <td>${e.nombre}</td>
-        <td>${e.cedula}</td>
-        <td>${e.cargo || '—'}</td>
-        <td>${e.area || '—'}</td>
-        <td>${e.activo ? 'Activo' : 'Inactivo'}</td>
+        <td data-label="Nombre">${e.nombre}</td>
+        <td data-label="Cédula">${e.cedula}</td>
+        <td data-label="Cargo">${e.cargo || '—'}</td>
+        <td data-label="Área">${e.area || '—'}</td>
+        <td data-label="Estado">${e.activo ? 'Activo' : 'Inactivo'}</td>
         <td>
           <button type="button" class="btn-secondary" data-edit="${e.id}">Editar</button>
           <button type="button" class="btn-secondary" data-toggle="${e.id}" data-active="${e.activo}">

@@ -64,10 +64,10 @@ Router.register('inventario-historico', {
     }
     tbody.innerHTML = rows.map((r) => `
       <tr>
-        <td>${r.categoria}</td>
-        <td>${r.talla}</td>
-        <td>${r.stock_actual}</td>
-        <td>${r.stock_total_categoria}</td>
+        <td data-label="Categoría">${r.categoria}</td>
+        <td data-label="Talla">${r.talla}</td>
+        <td data-label="Stock">${r.stock_actual}</td>
+        <td data-label="Total categoría">${r.stock_total_categoria}</td>
       </tr>
     `).join('');
   },
