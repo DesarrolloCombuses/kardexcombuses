@@ -139,7 +139,26 @@
                 <div class="card-label">Empleados activos</div>
               </div>
             </div>
+            <a href="#/estadisticas" class="card card-link">
+              <span class="card-icon" data-tone="green" id="kpi-bajo-stock-icon">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l8.2 14.2a1 1 0 01-.87 1.5H2.67a1 1 0 01-.87-1.5L10 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.3" r="0.9" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="kpi-bajo-stock">—</div>
+                <div class="card-label">Prendas con stock bajo</div>
+              </div>
+            </a>
           </div>
+
+          <div id="dashboard-stock-alert" class="callout danger hidden">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l8.2 14.2a1 1 0 01-.87 1.5H2.67a1 1 0 01-.87-1.5L10 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.3" r="0.9" fill="currentColor"/></svg>
+            <div style="flex:1">
+              <strong id="dashboard-stock-alert-title">Prendas con stock bajo</strong>
+              <div id="dashboard-low-stock" class="low-stock-list"></div>
+              <a href="#/estadisticas" class="alert-link">Ver todo el detalle en Estadísticas →</a>
+            </div>
+          </div>
+
           <div class="section-heading">
             <h2>Últimos movimientos</h2>
           </div>

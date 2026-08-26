@@ -488,6 +488,16 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .card-value { font-size: 1.55rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .card-label { color: var(--slate-500); font-size: 0.82rem; margin-top: 0.15rem; }
 
+a.card-link { text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md); }
+
+/* Alerta de stock bajo en el Dashboard: reusa .callout, con la lista de
+   prendas de Estadísticas (.low-stock-list) embebida adentro. */
+#dashboard-stock-alert { align-items: flex-start; }
+#dashboard-stock-alert .low-stock-list { margin: 0.6rem 0; }
+#dashboard-stock-alert strong { font-size: 0.92rem; }
+.alert-link { color: inherit; font-weight: 700; text-decoration: underline; font-size: 0.82rem; }
+
 .section-heading { margin: 0 0 0.85rem; }
 
 /* =====================================================================

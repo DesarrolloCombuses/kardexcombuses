@@ -111,7 +111,9 @@ Router.register('estadisticas', {
     const sorted = [...items].sort((a, b) => a.stock_actual - b.stock_actual);
     el.innerHTML = sorted.map((r) => {
       const nivel = r.stock_actual <= 2 ? 'critico' : 'alerta';
-      const pct = Math.min(100, (r.stock_actual / 5) * 100);
+      // Mínimo de 6% para que un stock en 0 siga mostrando una barra roja
+      // visible en vez de desaparecer (justo el caso más urgente).
+      const pct = Math.max(6, Math.min(100, (r.stock_actual / 5) * 100));
       return `
         <div class="low-stock-row">
           <span class="lsr-name">${r.categoria}<small>Talla ${r.talla}</small></span>
