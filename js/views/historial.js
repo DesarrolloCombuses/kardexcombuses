@@ -156,6 +156,10 @@ Router.register('historial', {
         'Tipo': m.tipo === 'entrada' ? 'Entrada' : 'Salida',
         'Fecha de entrega': m.fecha_entrega ? new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO') : '',
         'Empleado': m.employees ? `${m.employees.nombre} (${m.employees.cedula})` : '',
+        'Cargo': m.employees?.cargo || '',
+        'Área': m.employees?.area || '',
+        'Ruta': m.employees?.ruta || '',
+        'Vehículo': m.employees?.numero_interno || '',
         'Entregado por': m.entregado_por_nombre || '',
         'Registrado por': m.creado_por_nombre || '',
         'Anulado': m.anulado ? 'Sí' : 'No',
@@ -175,11 +179,12 @@ Router.register('historial', {
     });
 
     const sheet = XLSX.utils.json_to_sheet(data, {
-      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
+      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
     });
     sheet['!cols'] = [
       { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
-      { wch: 26 }, { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
+      { wch: 26 }, { wch: 20 }, { wch: 22 }, { wch: 10 }, { wch: 12 },
+      { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, 'Historial');
