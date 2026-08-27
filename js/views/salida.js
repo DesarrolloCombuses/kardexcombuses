@@ -216,6 +216,7 @@ Router.register('salida', {
     }
 
     const partes = [`Vehículo interno: <strong>${empleado.numero_interno}</strong>`];
+    if (empleado.base) partes.push(`Base: <strong>${empleado.base}</strong>`);
     if (empleado.ruta) partes.push(`Ruta: <strong>${empleado.ruta}</strong>`);
     info.innerHTML = partes.join(' · ');
     info.classList.remove('hidden');

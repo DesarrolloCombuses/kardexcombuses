@@ -74,6 +74,7 @@ Router.register('historial', {
         const extra = [
           m.employees.cargo,
           m.employees.numero_interno ? `vehículo ${m.employees.numero_interno}` : '',
+          m.employees.base ? `base ${m.employees.base}` : '',
           m.employees.ruta ? `ruta ${m.employees.ruta}` : '',
         ].filter(Boolean).join(' · ');
         filas.push(`
@@ -160,6 +161,7 @@ Router.register('historial', {
         'Área': m.employees?.area || '',
         'Ruta': m.employees?.ruta || '',
         'Vehículo': m.employees?.numero_interno || '',
+        'Base': m.employees?.base || '',
         'Entregado por': m.entregado_por_nombre || '',
         'Registrado por': m.creado_por_nombre || '',
         'Anulado': m.anulado ? 'Sí' : 'No',
@@ -179,11 +181,11 @@ Router.register('historial', {
     });
 
     const sheet = XLSX.utils.json_to_sheet(data, {
-      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
+      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Base', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
     });
     sheet['!cols'] = [
       { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
-      { wch: 26 }, { wch: 20 }, { wch: 22 }, { wch: 10 }, { wch: 12 },
+      { wch: 26 }, { wch: 20 }, { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
       { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
     ];
     const workbook = XLSX.utils.book_new();
@@ -213,6 +215,7 @@ Router.register('historial', {
       m.tipo === 'salida' && emp?.cargo ? this._modalRow('Cargo', emp.cargo) : '',
       m.tipo === 'salida' && emp?.area ? this._modalRow('Área', emp.area) : '',
       m.tipo === 'salida' && emp?.numero_interno ? this._modalRow('Vehículo interno', emp.numero_interno) : '',
+      m.tipo === 'salida' && emp?.base ? this._modalRow('Base', emp.base) : '',
       m.tipo === 'salida' && emp?.ruta ? this._modalRow('Ruta', emp.ruta) : '',
       m.tipo === 'salida' ? this._modalRow('Entregado por', m.entregado_por_nombre || '—') : '',
     ].join('');

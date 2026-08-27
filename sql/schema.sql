@@ -102,6 +102,11 @@ alter table employees add column if not exists numero_interno text;
 alter table employees add column if not exists vehiculo_asociado text;
 alter table employees add column if not exists ruta text;
 
+-- Base/afiliado del vehículo asignado (a qué empresa/base va dirigido el
+-- vehículo del conductor). Se carga por número interno de vehículo, no por
+-- empleado -- ver sql/update_base_vehiculo_2026-08-27.sql.
+alter table employees add column if not exists base text;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);
