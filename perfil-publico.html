@@ -4,112 +4,109 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Completar mis datos — Kardex Dotación</title>
-  <meta name="theme-color" content="#0b1f3a" />
+  <meta name="theme-color" content="#0a1930" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* Look propio de esta página (no el de login-shell/login-card que usa
+       index.html): esta es una experiencia de cara al candidato/nuevo
+       empleado, no la pantalla de acceso del personal interno, así que
+       vale la pena que se vea distinta -- con más presencia de marca y
+       más aire que un formulario administrativo cualquiera. */
+    .pp-body { min-height: 100vh; background: var(--slate-100); display: flex; flex-direction: column; }
+
+    .pp-header {
+      background: var(--navy-900);
+      background-image: linear-gradient(135deg, var(--navy-900), var(--navy-800));
+      color: #fff;
+      padding: 1.1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .pp-header-mark {
+      width: 40px; height: 40px; flex: none; border-radius: 11px;
+      background: rgba(255, 255, 255, 0.12);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pp-header-mark svg { width: 22px; height: 22px; }
+    .pp-header-text { display: flex; flex-direction: column; line-height: 1.3; }
+    .pp-header-text strong { font-size: 0.95rem; letter-spacing: 0.03em; }
+    .pp-header-text span { font-size: 0.78rem; color: rgba(255, 255, 255, 0.68); }
+
+    .pp-main { flex: 1; display: flex; justify-content: center; padding: 1.75rem 1rem 3rem; }
+    .pp-card {
+      width: 100%; max-width: 640px;
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: 1.85rem 1.6rem;
+      align-self: flex-start;
+    }
+    .pp-card.hidden { display: none; }
+    .pp-card h2 { font-size: 1.3rem; }
+    .pp-subtitle { color: var(--slate-500); margin: 0.35rem 0 1.5rem; font-size: 0.92rem; line-height: 1.5; }
+
+    .pp-footer { text-align: center; color: var(--slate-400); font-size: 0.78rem; padding: 0 1rem 1.5rem; }
+
+    /* Encabezado de perfil dentro del formulario: foto grande + nombre,
+       en vez de enterrar el picker de foto a mitad de una lista de campos. */
+    .pp-profile-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .pp-profile-header .foto-picker-row { margin-bottom: 0; flex: none; }
+    .pp-profile-header .foto-picker-avatar, .pp-profile-header .foto-picker-preview { width: 76px; height: 76px; font-size: 1.6rem; }
+    .pp-profile-header-name { min-width: 0; }
+    .pp-profile-header-name h2 { margin-bottom: 0.15rem; }
+
+    @media (max-width: 560px) {
+      .pp-card { padding: 1.4rem 1.1rem; border-radius: var(--radius); }
+      .pp-profile-header { gap: 0.85rem; }
+    }
+  </style>
 </head>
-<body class="login-body">
-  <div class="login-shell">
-    <aside class="login-brand">
-      <div class="login-brand-top">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        </span>
-        <span class="brand-name">COMBUSES <strong>SA</strong></span>
-      </div>
-      <div class="login-brand-body">
-        <h1>Completa tus datos</h1>
-        <p>Este formulario es para que ingreses algunos datos básicos tuyos y quede tu perfil al día. No necesitas usuario ni contraseña, solo tu cédula.</p>
-      </div>
-      <div class="login-brand-footer">© <span id="pp-year"></span> Combuses SA</div>
-    </aside>
+<body class="pp-body">
+  <header class="pp-header">
+    <span class="pp-header-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </span>
+    <div class="pp-header-text">
+      <strong>COMBUSES SA</strong>
+      <span>Kardex de Dotación · Completar mis datos</span>
+    </div>
+  </header>
 
-    <main class="login-panel">
-      <div class="login-mobile-brand">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        </span>
-        <span>Kardex Dotación · Combuses SA</span>
-      </div>
+  <main class="pp-main">
+    <div class="pp-card" id="pp-gate-card">
+      <h2>Verifica tu identidad</h2>
+      <p class="pp-subtitle">Escribe tu número de cédula para continuar. No necesitas usuario ni contraseña.</p>
+      <form id="pp-gate-form" class="form">
+        <label>
+          Cédula
+          <input type="text" id="pp-cedula" placeholder="Número de cédula" required autocomplete="off" inputmode="numeric" />
+        </label>
+        <button type="submit" class="btn-block"><span>Continuar</span></button>
+        <p id="pp-gate-msg" class="form-msg"></p>
+      </form>
+    </div>
 
-      <div class="login-card" id="pp-gate-card">
-        <h2>Verifica tu identidad</h2>
-        <p class="login-subtitle">Escribe tu número de cédula para continuar</p>
-        <form id="pp-gate-form" class="form">
-          <label>
-            Cédula
-            <input type="text" id="pp-cedula" placeholder="Número de cédula" required autocomplete="off" inputmode="numeric" />
-          </label>
-          <button type="submit" class="btn-block"><span>Continuar</span></button>
-          <p id="pp-gate-msg" class="form-msg"></p>
-        </form>
-      </div>
+    <div class="pp-card hidden" id="pp-form-card"></div>
 
-      <div class="login-card hidden" id="pp-form-card" style="max-width:460px">
-        <h2 id="pp-saludo">Hola</h2>
-        <p class="login-subtitle">Revisa y completa tus datos. Puedes volver a este mismo link cuando quieras para actualizarlos.</p>
+    <div class="pp-card hidden" id="pp-error-card">
+      <h2>Link no válido</h2>
+      <p class="pp-subtitle">Este link no tiene la información necesaria para continuar. Pide a Combuses que te envíe el link nuevamente.</p>
+    </div>
+  </main>
 
-        <div class="detalle-facts">
-          <div class="detalle-fact">
-            <div class="detalle-fact-value" id="pp-cargo" style="font-size:1rem">—</div>
-            <div class="detalle-fact-label">Cargo</div>
-          </div>
-          <div class="detalle-fact">
-            <div class="detalle-fact-value" id="pp-area" style="font-size:1rem">—</div>
-            <div class="detalle-fact-label">Área</div>
-          </div>
-          <div class="detalle-fact">
-            <div class="detalle-fact-value" id="pp-fecha-ingreso" style="font-size:1rem">—</div>
-            <div class="detalle-fact-label">Fecha de ingreso</div>
-          </div>
-        </div>
-
-        <form id="pp-datos-form" class="form">
-          <label>
-            Fecha de nacimiento
-            <input type="date" id="pp-fecha-nacimiento" />
-          </label>
-          <label>
-            Sexo
-            <select id="pp-sexo">
-              <option value="">Selecciona…</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Femenino">Femenino</option>
-              <option value="Otro">Otro</option>
-            </select>
-          </label>
-          <label>
-            Ciudad / municipio de residencia
-            <input type="text" id="pp-lugar-residencia" placeholder="Ej: Medellín" />
-          </label>
-          <label>
-            Barrio
-            <input type="text" id="pp-barrio" placeholder="Ej: Belén" />
-          </label>
-          <label>
-            Teléfono de contacto
-            <input type="tel" id="pp-telefono" placeholder="Número de celular" />
-          </label>
-          <button type="submit" class="btn-block"><span>Guardar mis datos</span></button>
-          <p id="pp-datos-msg" class="form-msg"></p>
-        </form>
-      </div>
-
-      <div class="login-card hidden" id="pp-error-card">
-        <h2>Link no válido</h2>
-        <p class="login-subtitle">Este link no tiene la información necesaria para continuar. Pide a Combuses que te envíe el link nuevamente.</p>
-      </div>
-    </main>
-  </div>
+  <p class="pp-footer">© <span id="pp-year"></span> Combuses SA</p>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/camera.js"></script>
   <script src="js/perfil-publico.js"></script>
 </body>
 </html>

@@ -911,6 +911,10 @@ tbody tr:hover { background: var(--slate-50); }
 .tag.pendiente { background: #fef3e0; color: #8a5a04; }
 .tag.descartado { background: var(--danger-bg); color: var(--danger-text); }
 
+.pp-banner { padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.88rem; font-weight: 600; margin-bottom: 1.1rem; }
+.pp-banner.pendiente { background: #fef3e0; color: #8a5a04; }
+.pp-banner.aprobado { background: var(--success-bg); color: var(--success-text); }
+
 /* =====================================================================
    Perfil sociodemográfico: lista de personas (tarjetas en vez de tabla)
    ===================================================================== */

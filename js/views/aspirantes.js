@@ -45,15 +45,25 @@ Router.register('aspirantes', {
       const estadoTag = a.estado === 'Contratado' ? 'completo' : a.estado === 'Descartado' ? 'descartado' : 'pendiente';
       let acciones;
       if (a.employee_id) {
+        const perfilAprobado = a.employees?.perfil_aprobado_at;
+        const perfilBadge = perfilAprobado
+          ? `<span class="tag completo" title="Aprobado por ${a.employees.perfil_aprobado_por || '—'}">Perfil aprobado</span>`
+          : '<span class="tag pendiente">Perfil pendiente de aprobación</span>';
+        const perfilBtn = perfilAprobado
+          ? `<button type="button" class="btn-secondary aspirante-quitar-aprobacion" data-id="${a.id}">Quitar aprobación</button>`
+          : `<button type="button" class="btn-secondary aspirante-aprobar-perfil" data-id="${a.id}">Aprobar perfil</button>`;
         acciones = `
-          <span class="tag completo">Ya es empleado</span>
-          <button type="button" class="btn-secondary aspirante-link" data-id="${a.id}">Copiar link de perfil</button>
+          ${perfilBadge}
+          <button type="button" class="btn-secondary aspirante-link" data-id="${a.id}">Ver link de perfil</button>
+          ${perfilBtn}
+          <button type="button" class="btn-secondary aspirante-deshacer-seleccion" data-id="${a.id}">Deshacer selección</button>
+          <button type="button" class="btn-secondary aspirante-descartar" data-id="${a.id}" style="color:var(--danger-text)">Descartar</button>
         `;
       } else if (a.estado === 'Descartado') {
         acciones = `<button type="button" class="btn-secondary aspirante-reabrir" data-id="${a.id}">Reabrir</button>`;
       } else {
         acciones = `
-          <button type="button" class="btn-secondary aspirante-aprobar" data-id="${a.id}">Aprobar</button>
+          <button type="button" class="btn-secondary aspirante-seleccionar" data-id="${a.id}">Seleccionar candidato</button>
           <button type="button" class="btn-secondary aspirante-descartar" data-id="${a.id}" style="color:var(--danger-text)">Descartar</button>
         `;
       }
@@ -81,17 +91,26 @@ Router.register('aspirantes', {
         if (a) this._verHoja(a);
       });
     });
-    tbody.querySelectorAll('.aspirante-aprobar').forEach((btn) => {
-      btn.addEventListener('click', () => this._aprobar(btn.dataset.id));
+    tbody.querySelectorAll('.aspirante-seleccionar').forEach((btn) => {
+      btn.addEventListener('click', () => this._seleccionar(btn.dataset.id));
     });
     tbody.querySelectorAll('.aspirante-descartar').forEach((btn) => {
-      btn.addEventListener('click', () => this._cambiarEstado(btn.dataset.id, 'Descartado'));
+      btn.addEventListener('click', () => this._descartar(btn.dataset.id));
     });
     tbody.querySelectorAll('.aspirante-reabrir').forEach((btn) => {
       btn.addEventListener('click', () => this._cambiarEstado(btn.dataset.id, 'En proceso'));
     });
     tbody.querySelectorAll('.aspirante-link').forEach((btn) => {
-      btn.addEventListener('click', () => this._copiarLink(btn));
+      btn.addEventListener('click', () => this._verLink(btn.dataset.id));
+    });
+    tbody.querySelectorAll('.aspirante-deshacer-seleccion').forEach((btn) => {
+      btn.addEventListener('click', () => this._deshacerSeleccion(btn.dataset.id));
+    });
+    tbody.querySelectorAll('.aspirante-aprobar-perfil').forEach((btn) => {
+      btn.addEventListener('click', () => this._aprobarPerfil(btn.dataset.id));
+    });
+    tbody.querySelectorAll('.aspirante-quitar-aprobacion').forEach((btn) => {
+      btn.addEventListener('click', () => this._quitarAprobacionPerfil(btn.dataset.id));
     });
     tbody.querySelectorAll('.aspirante-eliminar').forEach((btn) => {
       btn.addEventListener('click', () => this._eliminar(btn.dataset.id));
@@ -139,24 +158,25 @@ Router.register('aspirantes', {
     }
   },
 
-  // Aprobar = marcar Contratado + crear el empleado, en un solo paso. Al
-  // terminar deja listo el link de perfil público para copiar y enviar.
-  async _aprobar(id) {
+  // Seleccionar = marcar Contratado + crear el empleado, en un solo paso. Al
+  // terminar deja listo el link de perfil público (en un modal, no un
+  // alert() -- en el celular un alert() con una URL larga la corta en
+  // varias líneas y no se puede seleccionar bien para copiarla).
+  //
+  // Esto NO es la aprobación final: "seleccionar" es elegir a este
+  // candidato para el cargo y dejarle el link para que llene sus datos.
+  // "Aprobar perfil" (más abajo) es lo que hace Gestión Humana después,
+  // cuando ya diligenció todo y lo revisaron.
+  async _seleccionar(id) {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante) return;
-    if (!confirm(`¿Aprobar a ${aspirante.nombre} y crear su registro de empleado?`)) return;
+    if (!confirm(`¿Seleccionar a ${aspirante.nombre} y crear su registro de empleado?`)) return;
     try {
-      const empleado = await DB.aprobarAspirante(aspirante);
+      const empleado = await DB.seleccionarAspirante(aspirante);
       await this._load();
-      const url = this._linkPerfil(empleado.id);
-      const copiado = await this._copiarTexto(url);
-      alert(
-        `${aspirante.nombre} quedó aprobado y registrado como empleado.\n\n` +
-        `Link para que complete sus datos:\n${url}` +
-        (copiado ? '\n\n(ya quedó copiado al portapapeles)' : '')
-      );
+      this._mostrarLinkModal(aspirante.nombre, this._linkPerfil(empleado.id));
     } catch (err) {
-      alert('No se pudo aprobar: ' + err.message);
+      alert('No se pudo seleccionar: ' + err.message);
     }
   },
 
@@ -175,17 +195,122 @@ Router.register('aspirantes', {
     }
   },
 
-  async _copiarLink(btn) {
-    const a = this._aspirantes.find((x) => x.id === btn.dataset.id);
+  _verLink(id) {
+    const a = this._aspirantes.find((x) => x.id === id);
     if (!a || !a.employee_id) return;
-    const url = this._linkPerfil(a.employee_id);
-    const copiado = await this._copiarTexto(url);
-    if (copiado) {
-      const original = btn.textContent;
-      btn.textContent = '¡Copiado!';
-      setTimeout(() => { btn.textContent = original; }, 1500);
-    } else {
-      prompt('Copia este link manualmente:', url);
+    this._mostrarLinkModal(a.nombre, this._linkPerfil(a.employee_id));
+  },
+
+  // Modal compartido de la app: el link queda en un input seleccionable
+  // (se puede copiar a mano aunque falle el portapapeles) + un botón que
+  // copia directo, y en el celular un botón "Compartir…" que abre el menú
+  // nativo (WhatsApp, correo, etc. -- lo que tenga instalado el equipo).
+  _mostrarLinkModal(nombre, url) {
+    const puedeCompartir = typeof navigator.share === 'function';
+    document.getElementById('modal-body').innerHTML = `
+      <div class="modal-header">
+        <span class="modal-header-fecha">Link de perfil — ${nombre}</span>
+      </div>
+      <div class="modal-section">
+        <p class="prose-p">Envíale este link a ${nombre} (WhatsApp, correo, etc.). Con su cédula podrá completar sus datos básicos, sin usuario ni contraseña.</p>
+        <input type="text" id="pp-link-input" value="${url}" readonly />
+        <div style="display:flex; gap:0.6rem; margin-top:0.75rem; flex-wrap:wrap">
+          <button type="button" class="btn-secondary" id="pp-link-copiar">Copiar link</button>
+          ${puedeCompartir ? '<button type="button" class="btn-secondary" id="pp-link-compartir">Compartir…</button>' : ''}
+        </div>
+        <p id="pp-link-msg" class="form-msg"></p>
+      </div>
+    `;
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+
+    const input = document.getElementById('pp-link-input');
+    input.addEventListener('click', () => input.select());
+    input.focus();
+    input.select();
+
+    document.getElementById('pp-link-copiar').addEventListener('click', async () => {
+      const ok = await this._copiarTexto(url);
+      const msg = document.getElementById('pp-link-msg');
+      msg.textContent = ok
+        ? 'Copiado al portapapeles.'
+        : 'No se pudo copiar automáticamente. El texto ya quedó seleccionado: cópialo con el teclado o el menú de tu navegador.';
+      msg.className = ok ? 'form-msg success' : 'form-msg error';
+      if (!ok) { input.focus(); input.select(); }
+    });
+
+    const shareBtn = document.getElementById('pp-link-compartir');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        navigator.share({ title: 'Completa tus datos — Kardex Dotación', text: `Hola ${nombre}, completa tus datos aquí:`, url }).catch(() => {});
+      });
+    }
+  },
+
+  async _deshacerSeleccion(id) {
+    const aspirante = this._aspirantes.find((a) => a.id === id);
+    if (!aspirante) return;
+    if (!confirm(
+      `¿Deshacer la selección de ${aspirante.nombre}?\n\n` +
+      `Esto elimina el registro que se creó en Empleados (y lo que ya se le haya cargado ahí: perfil, foto, contactos). ` +
+      `El aspirante vuelve a quedar "En proceso".`
+    )) return;
+    try {
+      await DB.revertirAprobacion(aspirante, 'En proceso');
+      await this._load();
+    } catch (err) {
+      alert('No se pudo deshacer: ' + err.message);
+    }
+  },
+
+  // Descartar sirve en cualquier punto del proceso: si todavía no se había
+  // seleccionado, solo cambia el estado; si ya se había convertido en
+  // empleado (puede pasar: no se presentó, cambió de idea, etc.) también
+  // borra ese registro de Empleados para no dejarlo dando vueltas como
+  // activo.
+  async _descartar(id) {
+    const aspirante = this._aspirantes.find((a) => a.id === id);
+    if (!aspirante) return;
+    const advertencia = aspirante.employee_id
+      ? `¿Descartar a ${aspirante.nombre}?\n\nComo ya estaba seleccionado, esto también elimina el registro que se creó en Empleados (perfil, foto, contactos incluidos).`
+      : `¿Descartar a ${aspirante.nombre}?`;
+    if (!confirm(advertencia)) return;
+    try {
+      if (aspirante.employee_id) {
+        await DB.revertirAprobacion(aspirante, 'Descartado');
+      } else {
+        await DB.updateAspiranteEstado(id, 'Descartado');
+      }
+      await this._load();
+    } catch (err) {
+      alert('No se pudo descartar: ' + err.message);
+    }
+  },
+
+  // Aprobación final del perfil (Gestión Humana): distinta de "seleccionar"
+  // -- el empleado ya existe y ya llenó su parte por el link público; esto
+  // solo dice "revisado y aprobado", queda quién y cuándo, y el link
+  // público se lo muestra a la persona.
+  async _aprobarPerfil(id) {
+    const aspirante = this._aspirantes.find((a) => a.id === id);
+    if (!aspirante || !aspirante.employee_id) return;
+    if (!confirm(`¿Aprobar el perfil de ${aspirante.nombre}?`)) return;
+    try {
+      await DB.aprobarPerfilEmpleado(aspirante.employee_id);
+      await this._load();
+    } catch (err) {
+      alert('No se pudo aprobar el perfil: ' + err.message);
+    }
+  },
+
+  async _quitarAprobacionPerfil(id) {
+    const aspirante = this._aspirantes.find((a) => a.id === id);
+    if (!aspirante || !aspirante.employee_id) return;
+    if (!confirm(`¿Quitar la aprobación del perfil de ${aspirante.nombre}?`)) return;
+    try {
+      await DB.quitarAprobacionPerfil(aspirante.employee_id);
+      await this._load();
+    } catch (err) {
+      alert('No se pudo quitar la aprobación: ' + err.message);
     }
   },
 

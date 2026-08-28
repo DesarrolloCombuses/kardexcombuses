@@ -203,10 +203,15 @@ const DB = {
 
   // ---- Aspirantes (proceso de selección) -------------------------------------
 
+  // Trae también, embebido, el estado de aprobación del perfil del empleado
+  // ya convertido (si lo hay) -- "seleccionar" al aspirante (crearle el
+  // empleado y mandarle el link) es distinto de "aprobar" su perfil (que
+  // ya tiene todos los datos y lo revisó Gestión Humana), y esa segunda
+  // parte vive en employees, no en aspirantes.
   async getAspirantes() {
     const { data, error } = await window.supabaseClient
       .from('aspirantes')
-      .select('*')
+      .select('*, employees ( perfil_aprobado_at, perfil_aprobado_por )')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data;
@@ -271,38 +276,99 @@ const DB = {
     return nuevoEmpleado;
   },
 
-  // "Aprobar" en un solo paso: marca Contratado y convierte a empleado de
-  // una vez, en vez de los dos pasos separados de antes.
-  async aprobarAspirante(aspirante) {
+  // "Seleccionar" en un solo paso: marca Contratado y convierte a empleado
+  // de una vez, en vez de los dos pasos separados de antes. Ojo: esto NO es
+  // la aprobación final del perfil (ver aprobarPerfilEmpleado) -- es elegir
+  // a este candidato y dejarle listo el link para que llene sus datos.
+  async seleccionarAspirante(aspirante) {
     await this.updateAspiranteEstado(aspirante.id, 'Contratado');
     return this.convertirAspiranteAEmpleado(aspirante);
+  },
+
+  // Aprobación final: la hace Gestión Humana una vez el empleado ya
+  // diligenció su perfil por el link público y lo revisaron. Queda quién y
+  // cuándo para trazabilidad. guardarPerfilPublico() limpia estos dos
+  // campos automáticamente si la persona vuelve a guardar algo después --
+  // la aprobación debe corresponder siempre a los datos vigentes.
+  async aprobarPerfilEmpleado(employeeId) {
+    const nombre = await this.getMyDisplayName();
+    const { error } = await window.supabaseClient
+      .from('employees')
+      .update({ perfil_aprobado_at: new Date().toISOString(), perfil_aprobado_por: nombre })
+      .eq('id', employeeId);
+    if (error) throw error;
+  },
+
+  async quitarAprobacionPerfil(employeeId) {
+    const { error } = await window.supabaseClient
+      .from('employees')
+      .update({ perfil_aprobado_at: null, perfil_aprobado_por: null })
+      .eq('id', employeeId);
+    if (error) throw error;
+  },
+
+  // Revierte una aprobación: borra el empleado que se había creado
+  // (contactos/hijos/perfil se van solos por el "on delete cascade" de esas
+  // tablas) y deja al aspirante en el estado indicado -- "En proceso" si fue
+  // un clic por error y se quiere retomar, o "Descartado" si a mitad del
+  // proceso resultó que no sigue. Si el empleado ya tiene movimientos de
+  // dotación registrados, el borrado falla por la relación en
+  // kardex_movements -- eso es a propósito, evita perder historial real.
+  async revertirAprobacion(aspirante, estadoDestino) {
+    const { error: delError } = await window.supabaseClient
+      .from('employees')
+      .delete()
+      .eq('id', aspirante.employee_id);
+    if (delError) throw delError;
+    const { error } = await window.supabaseClient
+      .from('aspirantes')
+      .update({ employee_id: null, estado: estadoDestino, updated_at: new Date().toISOString() })
+      .eq('id', aspirante.id);
+    if (error) throw error;
   },
 
   // ---- Perfil público (autodiligenciamiento por el nuevo empleado) ----------
 
   // Sin sesión iniciada: se llama desde perfil-publico.html. La validación
-  // de que la cédula corresponda al employee_id del link la hace la función
-  // (security definer) del lado del servidor, no el cliente -- ver
-  // sql/perfil_publico.sql.
+  // de que la cédula corresponda al employee_id del link (y la edad mínima)
+  // las hace la función (security definer) del lado del servidor, no el
+  // cliente -- ver sql/perfil_publico.sql. La función devuelve un solo
+  // objeto jsonb con casi todo el perfil sociodemográfico + contactos de
+  // emergencia, para no tener que declarar cada campo en la firma.
   async obtenerPerfilPublico(employeeId, cedula) {
     const { data, error } = await window.supabaseClient
-      .rpc('perfil_publico_obtener', { p_employee_id: employeeId, p_cedula: cedula })
-      .single();
+      .rpc('perfil_publico_obtener', { p_employee_id: employeeId, p_cedula: cedula });
     if (error) throw error;
     return data;
   },
 
-  async guardarPerfilPublico(employeeId, cedula, datos) {
+  // perfil: objeto plano con las claves de perfil_sociodemografico/telefono
+  // que aplican al autodiligenciamiento. contactos: arreglo {nombre,
+  // parentesco, telefono} (reemplaza los existentes, igual que
+  // saveContactosEmergencia). fotoUrl: el path ya subido con
+  // uploadFotoPublico, o null si no se tocó la foto en este guardado.
+  async guardarPerfilPublico(employeeId, cedula, perfil, contactos, fotoUrl) {
     const { error } = await window.supabaseClient.rpc('perfil_publico_guardar', {
       p_employee_id: employeeId,
       p_cedula: cedula,
-      p_fecha_nacimiento: datos.fechaNacimiento || null,
-      p_sexo: datos.sexo || null,
-      p_lugar_residencia: datos.lugarResidencia || null,
-      p_barrio: datos.barrio || null,
-      p_telefono: datos.telefono || null,
+      p_perfil: perfil,
+      p_contactos: contactos || [],
+      p_foto_url: fotoUrl || null,
     });
     if (error) throw error;
+  },
+
+  // Ruta fija por empleado ("perfil-publico/<id>.jpg"): permite que subir
+  // de nuevo la foto reemplace la anterior (upsert), y es lo que habilita
+  // la policy de Storage a validar el path sin depender de la cédula -- ver
+  // sql/perfil_publico.sql.
+  async uploadFotoPublico(employeeId, blob) {
+    const path = `perfil-publico/${employeeId}.jpg`;
+    const { error } = await window.supabaseClient.storage
+      .from('fotos-empleados')
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if (error) throw error;
+    return path;
   },
 
   // ---- Perfil del usuario logueado ------------------------------------------
