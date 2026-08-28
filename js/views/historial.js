@@ -1,11 +1,37 @@
 const PAGE_SIZE = 15;
 
+// Combuses entrega dotación 3 veces al año: abril, agosto y diciembre. En
+// vez de que cada quien anote a mano a qué entrega corresponde una salida,
+// se calcula solo a partir de la fecha de entrega -- cuatrimestre fijo, sin
+// zonas grises: ene-abr -> Abril, may-ago -> Agosto, sep-dic -> Diciembre.
+const PERIODOS = [
+  { nombre: 'Abril', desde: '01-01', hasta: '04-30' },
+  { nombre: 'Agosto', desde: '05-01', hasta: '08-31' },
+  { nombre: 'Diciembre', desde: '09-01', hasta: '12-31' },
+];
+
+function periodoDeFecha(fechaEntregaISO) {
+  if (!fechaEntregaISO) return null;
+  const [year, month] = fechaEntregaISO.split('-').map(Number);
+  const periodo = month <= 4 ? PERIODOS[0] : month <= 8 ? PERIODOS[1] : PERIODOS[2];
+  return `${periodo.nombre} ${year}`;
+}
+
+function rangoPeriodo(year, nombre) {
+  const periodo = PERIODOS.find((p) => p.nombre === nombre);
+  return { from: `${year}-${periodo.desde}`, to: `${year}-${periodo.hasta}` };
+}
+
 Router.register('historial', {
   title: 'Historial de movimientos',
   async onEnter() {
     if (!this._bound) {
       document.getElementById('historial-refresh').addEventListener('click', () => this._load());
       document.getElementById('historial-tipo').addEventListener('change', () => {
+        this._page = 1;
+        this._load();
+      });
+      document.getElementById('historial-periodo').addEventListener('change', () => {
         this._page = 1;
         this._load();
       });
@@ -16,6 +42,7 @@ Router.register('historial', {
       document.getElementById('historial-next').addEventListener('click', () => {
         if (this._page < this._totalPages) { this._page += 1; this._load(); }
       });
+      await this._fillPeriodos();
       this._bound = true;
     }
     this._page = this._page || 1;
@@ -38,12 +65,42 @@ Router.register('historial', {
     this._debounce = setTimeout(() => this._load(), 300);
   },
 
+  // Un período por año desde el primer movimiento registrado (así no hay
+  // que tocar este código cada año que arranca uno nuevo). El valor de
+  // cada <option> es "año|nombre" para poder reconstruir el rango al
+  // filtrar (ver _periodoSeleccionado).
+  async _fillPeriodos() {
+    const primerMovimiento = await DB.getEarliestMovementDate();
+    const anioInicio = primerMovimiento ? new Date(primerMovimiento).getFullYear() : new Date().getFullYear();
+    const anioActual = new Date().getFullYear();
+    const opciones = [];
+    for (let year = anioActual; year >= anioInicio; year -= 1) {
+      PERIODOS.forEach((p) => opciones.push(`<option value="${year}|${p.nombre}">${p.nombre} ${year}</option>`));
+    }
+    document.getElementById('historial-periodo').innerHTML =
+      '<option value="">Todos los períodos</option>' + opciones.join('');
+  },
+
+  _periodoSeleccionado() {
+    const valor = document.getElementById('historial-periodo').value;
+    if (!valor) return null;
+    const [year, nombre] = valor.split('|');
+    return rangoPeriodo(year, nombre);
+  },
+
   // Trae solo la página actual (no todo el historial): con entregas
   // masivas el listado puede crecer a miles de filas y traerlas todas de
   // una sola vez sería lento tanto para Supabase como para el navegador.
   async _load() {
     const tipo = document.getElementById('historial-tipo').value || undefined;
-    const { movements, total } = await DB.getMovements({ tipo, page: this._page, pageSize: PAGE_SIZE });
+    const periodo = this._periodoSeleccionado();
+    const { movements, total } = await DB.getMovements({
+      tipo,
+      fechaEntregaFrom: periodo?.from,
+      fechaEntregaTo: periodo?.to,
+      page: this._page,
+      pageSize: PAGE_SIZE,
+    });
     this._movements = movements;
     this._total = total;
     this._totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -74,7 +131,7 @@ Router.register('historial', {
         filas.push(`
           <div class="movement-card-row">
             <span class="movement-card-label">Fecha de entrega</span>
-            <span class="movement-card-value">${new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')}</span>
+            <span class="movement-card-value">${new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')} <span class="muted">· ${periodoDeFecha(m.fecha_entrega)}</span></span>
           </div>
         `);
       }
@@ -140,13 +197,15 @@ Router.register('historial', {
   // movimiento), para que en Excel se pueda sumar/filtrar por categoría
   // igual que en cualquier kardex de bodega. La lista en pantalla está
   // paginada, así que para exportar se vuelve a pedir el historial
-  // completo (con el mismo filtro de tipo) en una sola llamada aparte.
+  // completo (con los mismos filtros de tipo/período) en una sola llamada
+  // aparte.
   async _exportExcel() {
     const btn = document.getElementById('historial-export-btn');
     const tipo = document.getElementById('historial-tipo').value || undefined;
+    const periodo = this._periodoSeleccionado();
     btn.disabled = true;
     try {
-      const { movements } = await DB.getMovements({ tipo });
+      const { movements } = await DB.getMovements({ tipo, fechaEntregaFrom: periodo?.from, fechaEntregaTo: periodo?.to });
       if (movements.length === 0) {
         alert('No hay movimientos para exportar.');
         return;
@@ -164,6 +223,7 @@ Router.register('historial', {
         'Fecha': new Date(m.fecha).toLocaleString('es-CO'),
         'Tipo': m.tipo === 'entrada' ? 'Entrada' : 'Salida',
         'Fecha de entrega': m.fecha_entrega ? new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO') : '',
+        'Período': periodoDeFecha(m.fecha_entrega) || '',
         'N.º factura': m.facturas?.numero_factura || '',
         'Empleado': m.employees ? `${m.employees.nombre} (${m.employees.cedula})` : '',
         'Cargo': m.employees?.cargo || '',
@@ -190,10 +250,10 @@ Router.register('historial', {
     });
 
     const sheet = XLSX.utils.json_to_sheet(data, {
-      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'N.º factura', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Base', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
+      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Período', 'N.º factura', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Base', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
     });
     sheet['!cols'] = [
-      { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
+      { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
       { wch: 26 }, { wch: 20 }, { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
       { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
     ];
@@ -221,6 +281,7 @@ Router.register('historial', {
       this._modalRow('Registrado por', m.creado_por_nombre || '—'),
       m.tipo === 'entrada' && m.facturas ? this._modalRow('Factura', `${m.facturas.numero_factura} — ${new Date(`${m.facturas.fecha_remision}T00:00:00`).toLocaleDateString('es-CO')}`) : '',
       m.tipo === 'salida' && m.fecha_entrega ? this._modalRow('Fecha de entrega', new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')) : '',
+      m.tipo === 'salida' && m.fecha_entrega ? this._modalRow('Período', periodoDeFecha(m.fecha_entrega)) : '',
       m.tipo === 'salida' && emp ? this._modalRow('Empleado', `${emp.nombre} · CC ${emp.cedula}`) : '',
       m.tipo === 'salida' && emp?.cargo ? this._modalRow('Cargo', emp.cargo) : '',
       m.tipo === 'salida' && emp?.area ? this._modalRow('Área', emp.area) : '',

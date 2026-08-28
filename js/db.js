@@ -253,7 +253,7 @@ const DB = {
   // Cuando sí se pasan, se pide el conteo exacto junto con la página para
   // poder mostrar "Página X de Y" sin traer todas las filas al navegador
   // -- importante si hay miles de movimientos (entregas masivas).
-  async getMovements({ tipo, employeeId, from, to, page, pageSize } = {}) {
+  async getMovements({ tipo, employeeId, from, to, fechaEntregaFrom, fechaEntregaTo, page, pageSize } = {}) {
     let query = window.supabaseClient
       .from('kardex_movements')
       .select(`
@@ -271,6 +271,12 @@ const DB = {
     if (employeeId) query = query.eq('employee_id', employeeId);
     if (from) query = query.gte('fecha', from);
     if (to) query = query.lte('fecha', to);
+    // Filtro por período (Abril/Agosto/Diciembre): usa fecha_entrega, no
+    // fecha -- una entrada nunca la tiene, así que con este filtro activo
+    // quedan excluidas automáticamente (el período es un concepto que solo
+    // aplica a salidas/entregas). Ver Historial._PERIODOS.
+    if (fechaEntregaFrom) query = query.gte('fecha_entrega', fechaEntregaFrom);
+    if (fechaEntregaTo) query = query.lte('fecha_entrega', fechaEntregaTo);
     if (pageSize) {
       const start = (page - 1) * pageSize;
       query = query.range(start, start + pageSize - 1);
