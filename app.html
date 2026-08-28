@@ -69,6 +69,10 @@
           <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Empleados
         </a>
+        <a href="#/sociodemografico" data-nav="sociodemografico">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 14.5v-4M10 14.5V6M13.5 14.5v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Perfil sociodemográfico
+        </a>
         <a href="#/historial" data-nav="historial">
           <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10.5L12.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Historial
@@ -462,6 +466,25 @@
           </div>
         </section>
 
+        <!-- ================= PERFIL SOCIODEMOGRÁFICO ================= -->
+        <section data-view="sociodemografico" class="view">
+          <p class="view-intro">Datos sociodemográficos por empleado (edad, género, estado civil, escolaridad, vivienda, desplazamiento, etc.) para el diagnóstico del SG-SST.</p>
+          <div class="toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="sociodemografico-search" placeholder="Buscar por nombre o cédula…" />
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Nombre</th><th>Cédula</th><th>Cargo</th><th>Perfil</th><th></th></tr>
+              </thead>
+              <tbody id="sociodemografico-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
         <!-- ================= HISTORIAL ================= -->
         <section data-view="historial" class="view">
           <div class="toolbar">
@@ -529,6 +552,7 @@
             <a href="#" data-jump="ayuda-entrada">Entrada</a>
             <a href="#" data-jump="ayuda-entrega">Entrega (Salida)</a>
             <a href="#" data-jump="ayuda-empleados">Empleados</a>
+            <a href="#" data-jump="ayuda-sociodemografico">Perfil sociodemográfico</a>
             <a href="#" data-jump="ayuda-historial">Historial y auditoría</a>
             <a href="#" data-jump="ayuda-facturas">Facturas</a>
             <a href="#" data-jump="ayuda-instalar">Instalar en el celular</a>
@@ -632,6 +656,12 @@
             <p class="prose-p">Haz clic sobre una fila para editarla. La columna <strong>Estado</strong> muestra si sigue activo — un empleado inactivo no aparece como opción al registrar una entrega nueva.</p>
           </div>
 
+          <div class="help-block" id="ayuda-sociodemografico">
+            <h2>Perfil sociodemográfico</h2>
+            <p class="prose-p">Datos de cada empleado para el diagnóstico que exige el SG-SST: edad, género, estado civil, escolaridad, vivienda, medio de desplazamiento, etc. — separado de Empleados porque no tiene que ver con la entrega de dotación.</p>
+            <p class="prose-p">La columna <strong>Perfil</strong> muestra si ya está <span class="tag completo">Completo</span> o sigue <span class="tag pendiente">Pendiente</span>. Haz clic en el botón de la fila para abrir el formulario y guardarlo.</p>
+          </div>
+
           <div class="help-block" id="ayuda-historial">
             <h2>Historial y auditoría</h2>
             <p class="prose-p">Todos los movimientos de la bodega, del más reciente al más antiguo — con tipo (<span class="tag entrada">Entrada</span> / <span class="tag salida">Salida</span>), fecha y quién lo registró. Haz clic en cualquiera para ver el detalle completo.</p>
@@ -722,6 +752,7 @@
   <script src="js/views/entrada.js"></script>
   <script src="js/views/salida.js"></script>
   <script src="js/views/empleados.js"></script>
+  <script src="js/views/sociodemografico.js"></script>
   <script src="js/views/historial.js"></script>
   <script src="js/views/facturas.js"></script>
   <script src="js/views/ayuda.js"></script>

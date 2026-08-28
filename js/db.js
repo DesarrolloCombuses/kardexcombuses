@@ -259,6 +259,42 @@ const DB = {
     return data;
   },
 
+  // ---- Perfil sociodemográfico -----------------------------------------------
+
+  // Solo el employee_id de cada fila que ya tiene perfil cargado -- para
+  // marcar "Completo"/"Pendiente" en el listado sin traer los ~20 campos
+  // de cada uno de los cientos de empleados de una sola vez.
+  async getEmployeeIdsConPerfilSociodemografico() {
+    const { data, error } = await window.supabaseClient
+      .from('perfil_sociodemografico')
+      .select('employee_id');
+    if (error) throw error;
+    return new Set(data.map((r) => r.employee_id));
+  },
+
+  async getPerfilSociodemografico(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('perfil_sociodemografico')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async savePerfilSociodemografico(employeeId, perfil) {
+    const { data, error } = await window.supabaseClient
+      .from('perfil_sociodemografico')
+      .upsert(
+        { ...perfil, employee_id: employeeId, updated_at: new Date().toISOString() },
+        { onConflict: 'employee_id' }
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   // ---- Movimientos (kardex) --------------------------------------------------
 
   // page/pageSize son opcionales: si no se pasan, trae todo (se usa así

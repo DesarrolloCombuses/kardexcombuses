@@ -200,6 +200,13 @@ a.btn-secondary { text-decoration: none; border-radius: var(--radius-sm); paddin
 .btn-ghost { background: transparent; color: var(--slate-300); border: 1px solid rgba(255, 255, 255, 0.14); }
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 
+/* Checkbox dentro de un .form: por defecto un <label> ahí queda en columna
+   (texto arriba, input abajo, ver ".form label" arriba) porque los demás
+   campos son inputs de ancho completo; un checkbox necesita ir en fila,
+   al lado de su propio texto. */
+.form label.checkbox-label { flex-direction: row; align-items: center; gap: 0.5rem; }
+.form label.checkbox-label input[type="checkbox"] { width: auto; }
+
 .form-inline { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .form-inline input { flex: 1; min-width: 140px; }
 
@@ -824,6 +831,8 @@ tbody tr:hover { background: var(--slate-50); }
 .tag.entrada { background: var(--success-bg); color: var(--success-text); }
 .tag.salida { background: var(--danger-bg); color: var(--danger-text); }
 .tag.anulado-tag { background: var(--slate-200); color: var(--slate-600); }
+.tag.completo { background: var(--success-bg); color: var(--success-text); }
+.tag.pendiente { background: #fef3e0; color: #8a5a04; }
 
 .movement-card.anulado { opacity: 0.6; }
 .movement-card.anulado .movement-card-fecha { text-decoration: line-through; }

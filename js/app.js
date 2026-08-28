@@ -12,7 +12,7 @@
   // pueden ver (Router también las bloquea si alguien escribe el hash a
   // mano, esto es solo para que ni aparezcan como opción).
   if (window.APP_ROLE === 'viewer') {
-    ['nueva-prenda', 'entrada', 'salida', 'empleados'].forEach((name) => {
+    ['nueva-prenda', 'entrada', 'salida', 'empleados', 'sociodemografico'].forEach((name) => {
       document.querySelector(`[data-nav="${name}"]`)?.remove();
     });
   }
