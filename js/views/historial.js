@@ -290,6 +290,7 @@ Router.register('historial', {
 
       ${anuladoHtml}
     `;
+    document.getElementById('modal-box').classList.remove('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
 
     const anularBtn = document.getElementById('modal-anular-btn');

@@ -858,6 +858,10 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
   max-width: 540px; width: 100%; max-height: 85vh; overflow-y: auto; position: relative;
   box-shadow: var(--shadow-lg);
 }
+/* Visor de factura (PDF/imagen) en Facturas: necesita más ancho que el
+   detalle de movimiento para que el documento se lea sin tener que abrirlo
+   aparte. Se agrega/quita desde JS (ver js/views/facturas.js _verArchivo). */
+.modal.modal-wide { max-width: 880px; }
 .modal-close {
   position: absolute; top: 0.6rem; right: 0.6rem; background: transparent; color: var(--slate-400);
   font-size: 1.4rem; line-height: 1; padding: 0.3rem 0.6rem; border-radius: 50%;

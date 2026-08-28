@@ -44,17 +44,44 @@ Router.register('facturas', {
     `).join('');
 
     tbody.querySelectorAll('.factura-ver').forEach((btn) => {
-      btn.addEventListener('click', () => this._verArchivo(btn.dataset.path));
+      btn.addEventListener('click', () => {
+        const factura = this._facturas.find((f) => f.id === btn.closest('tr').dataset.id);
+        if (factura) this._verArchivo(factura);
+      });
     });
     tbody.querySelectorAll('.factura-eliminar').forEach((btn) => {
       btn.addEventListener('click', (e) => this._eliminar(e.target.closest('tr').dataset.id));
     });
   },
 
-  async _verArchivo(path) {
+  // Visor dentro del modal compartido en vez de abrir directo en pestaña
+  // nueva: PDF e imagen se pueden ver sin salir de la app; el tipo se
+  // deduce de la extensión guardada en archivo_url (uploadToBucket la
+  // agrega al subir, ver DB.createFactura).
+  async _verArchivo(factura) {
     try {
-      const url = await DB.getSignedUrl('facturas', path);
-      window.open(url, '_blank');
+      const url = await DB.getSignedUrl('facturas', factura.archivo_url);
+      const ext = (factura.archivo_url.split('.').pop() || '').toLowerCase();
+      const esImagen = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+      const esPdf = ext === 'pdf';
+
+      const visor = esImagen
+        ? `<img src="${url}" alt="Factura ${factura.numero_factura}" style="max-width:100%;display:block;margin:0 auto;border-radius:var(--radius-sm)">`
+        : esPdf
+          ? `<iframe src="${url}" title="Factura ${factura.numero_factura}" style="width:100%;height:70vh;border:1px solid var(--slate-200);border-radius:var(--radius-sm)"></iframe>`
+          : `<p class="muted">No se puede previsualizar este tipo de archivo — ábrelo en una pestaña nueva.</p>`;
+
+      document.getElementById('modal-body').innerHTML = `
+        <div class="modal-header">
+          <span class="modal-header-fecha">Factura ${factura.numero_factura}</span>
+        </div>
+        <div class="modal-section">${visor}</div>
+        <div class="modal-section" style="text-align:right">
+          <a href="${url}" target="_blank" rel="noopener" class="btn-secondary">Abrir en pestaña nueva ↗</a>
+        </div>
+      `;
+      document.getElementById('modal-box').classList.add('modal-wide');
+      document.getElementById('modal-backdrop').classList.remove('hidden');
     } catch (err) {
       alert('No se pudo abrir el archivo: ' + err.message);
     }

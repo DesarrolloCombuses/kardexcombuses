@@ -34,11 +34,16 @@
   // app, en vez de que cada vista registre su propio listener sobre los
   // mismos elementos.
   const modalBackdrop = document.getElementById('modal-backdrop');
-  modalBackdrop.querySelector('#modal-close').addEventListener('click', () => {
+  const closeModal = () => {
     modalBackdrop.classList.add('hidden');
-  });
+    // modal-wide la agrega el visor de facturas (necesita más ancho); se
+    // quita acá para que no se quede pegada la próxima vez que se abra
+    // el modal compartido desde otra vista (ej. detalle de Historial).
+    document.getElementById('modal-box').classList.remove('modal-wide');
+  };
+  modalBackdrop.querySelector('#modal-close').addEventListener('click', closeModal);
   modalBackdrop.addEventListener('click', (e) => {
-    if (e.target === modalBackdrop) modalBackdrop.classList.add('hidden');
+    if (e.target === modalBackdrop) closeModal();
   });
 
   Router.init('dashboard');
