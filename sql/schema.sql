@@ -94,6 +94,15 @@ alter table kardex_movements add column if not exists anulado_por uuid reference
 -- tarde con fecha atrasada podría desordenar esa reconstrucción.
 alter table kardex_movements add column if not exists fecha_entrega date;
 
+-- Nombre de quien registra el movimiento, guardado al momento de crearlo
+-- (ver DB.getMyDisplayName en js/db.js). created_by ya identifica al
+-- usuario de forma inequívoca (uuid de auth.users), pero mostrar ese id
+-- no sirve en el Excel de Historial -- y depender de profiles.full_name
+-- fallaba en silencio como "Usuario" para todos si esa tabla (compartida
+-- con otro sistema) no tenía el nombre lleno. Guardarlo acá, con respaldo
+-- al correo de la sesión, garantiza que siempre identifique a la persona.
+alter table kardex_movements add column if not exists creado_por_nombre text;
+
 -- Numero interno de vehiculo (y ruta) asociado al empleado, relevante sobre
 -- todo para conductores. Se ve en la Entrega para confirmar que se le
 -- entrega la dotacion al conductor correcto. Datos cargados por separado

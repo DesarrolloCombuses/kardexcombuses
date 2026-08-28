@@ -215,6 +215,19 @@ const DB = {
     return data;
   },
 
+  // Nombre para mostrar/guardar como "quien registró" un movimiento. Cae a
+  // profiles.full_name/username, y si nadie llenó esa fila (pasa seguido:
+  // profiles es una tabla compartida con otro sistema, ver README), al
+  // correo de la sesión -- así el Excel de Historial siempre identifica a
+  // la persona en vez de mostrar el genérico "Usuario" para todos.
+  async getMyDisplayName() {
+    const [profile, { data }] = await Promise.all([
+      this.getMyProfile(),
+      window.supabaseClient.auth.getUser(),
+    ]);
+    return (profile && (profile.full_name || profile.username)) || data.user?.email || 'Usuario';
+  },
+
   // ---- Empleados ------------------------------------------------------------
 
   async getEmployees({ onlyActive = false } = {}) {
@@ -286,9 +299,12 @@ const DB = {
     if (error) throw error;
 
     // created_by/anulado_por apuntan a auth.users, no directamente a
-    // profiles, así que no se puede embeber vía PostgREST — se resuelven
-    // aparte para poder mostrar quién registró y quién anuló cada
-    // movimiento (rastro de auditoría en el Historial).
+    // profiles, así que no se puede embeber vía PostgREST -- se resuelven
+    // aparte. Para created_by esto es solo un respaldo: desde que existe
+    // la columna kardex_movements.creado_por_nombre (guardada al momento
+    // de registrar, ver DB.getMyDisplayName en entrada.js/salida.js) ya
+    // no depende de que profiles tenga el nombre lleno -- este fallback
+    // por perfiles solo aplica a movimientos de antes de esa columna.
     const userIds = [...new Set(
       data.flatMap((m) => [m.created_by, m.anulado_por]).filter(Boolean)
     )];
@@ -306,7 +322,7 @@ const DB = {
 
     const movements = data.map((m) => ({
       ...m,
-      creado_por_nombre: m.created_by ? (perfiles[m.created_by] || 'Usuario') : null,
+      creado_por_nombre: m.creado_por_nombre || (m.created_by ? (perfiles[m.created_by] || 'Usuario') : null),
       anulado_por_nombre: m.anulado_por ? (perfiles[m.anulado_por] || 'Usuario') : null,
     }));
 

@@ -82,13 +82,14 @@ Router.register('entrada', {
     }
 
     try {
-      const session = await Auth.getSession();
+      const [session, nombreRegistro] = await Promise.all([Auth.getSession(), DB.getMyDisplayName()]);
       await DB.createMovement({
         header: {
           tipo: 'entrada',
           factura_id: facturaId,
           observaciones,
           created_by: session.user.id,
+          creado_por_nombre: nombreRegistro,
         },
         lines: lineas,
       });

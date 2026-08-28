@@ -45,8 +45,7 @@ Router.register('salida', {
     // se muestra su nombre como confirmación en el paso final.
     let nombreEntrega = 'tu usuario';
     try {
-      const [profile, session] = await Promise.all([DB.getMyProfile(), Auth.getSession()]);
-      nombreEntrega = (profile && (profile.full_name || profile.username)) || session.user.email;
+      nombreEntrega = await DB.getMyDisplayName();
     } catch { /* se deja el valor por defecto */ }
     this._entregadoPorNombre = nombreEntrega;
     document.getElementById('salida-entregado-por-info').innerHTML =
@@ -353,6 +352,7 @@ Router.register('salida', {
           employee_id: employeeId,
           fecha_entrega: fechaEntrega,
           entregado_por_nombre: this._entregadoPorNombre,
+          creado_por_nombre: this._entregadoPorNombre,
           firma_receptor_url: firmaReceptorPath,
           foto_receptor_url: fotoPath,
           observaciones,
