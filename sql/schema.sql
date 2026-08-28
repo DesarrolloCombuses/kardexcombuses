@@ -116,6 +116,12 @@ alter table employees add column if not exists ruta text;
 -- empleado -- ver sql/update_base_vehiculo_2026-08-27.sql.
 alter table employees add column if not exists base text;
 
+-- Foto de perfil del empleado (opcional). Guarda solo el path dentro del
+-- bucket "fotos-empleados" (ver más abajo), igual que firma_receptor_url /
+-- foto_receptor_url en kardex_movements -- la URL real se resuelve al
+-- vuelo con un signed URL porque el bucket es privado.
+alter table employees add column if not exists foto_url text;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);
@@ -332,6 +338,19 @@ create policy "authenticated_rw_fotos" on storage.objects
   using (bucket_id = 'fotos-entrega' and auth.role() = 'authenticated')
   with check (bucket_id = 'fotos-entrega' and auth.role() = 'authenticated');
 
+-- Bucket separado para fotos de perfil de empleado: a diferencia de
+-- "fotos-entrega" (evidencia de una entrega puntual), esta es la foto de
+-- carné/perfil de la persona, sin relación con ningún movimiento.
+insert into storage.buckets (id, name, public)
+values ('fotos-empleados', 'fotos-empleados', false)
+on conflict (id) do nothing;
+
+drop policy if exists "authenticated_rw_fotos_empleados" on storage.objects;
+create policy "authenticated_rw_fotos_empleados" on storage.objects
+  for all
+  using (bucket_id = 'fotos-empleados' and auth.role() = 'authenticated')
+  with check (bucket_id = 'fotos-empleados' and auth.role() = 'authenticated');
+
 -- ----------------------------------------------------------------------------
 -- Realtime: para que el inventario/dashboard/historial se actualicen solos
 -- en todas las pantallas abiertas cuando alguien registra un movimiento.
@@ -370,3 +389,86 @@ begin
     alter publication supabase_realtime add table employees;
   end if;
 end $$;
+
+-- ----------------------------------------------------------------------------
+-- Perfil público: autodiligenciamiento del nuevo empleado vía link sin login
+-- (ver sql/perfil_publico.sql). Estas dos funciones son "security definer"
+-- para poder validar la cédula y tocar solo esa fila sin darle al rol anon
+-- permisos directos sobre employees/perfil_sociodemografico.
+-- ----------------------------------------------------------------------------
+
+alter table employees add column if not exists telefono text;
+
+create or replace function public.perfil_publico_obtener(p_employee_id uuid, p_cedula text)
+returns table (
+  nombre text,
+  cargo text,
+  area text,
+  fecha_ingreso date,
+  fecha_nacimiento date,
+  sexo text,
+  lugar_residencia text,
+  barrio text,
+  telefono text
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from employees e
+    where e.id = p_employee_id and trim(e.cedula) = trim(p_cedula)
+  ) then
+    raise exception 'No encontramos un registro con esa cedula para este link.';
+  end if;
+
+  return query
+  select e.nombre, e.cargo, e.area, ps.fecha_ingreso, ps.fecha_nacimiento, ps.sexo,
+         ps.lugar_residencia, ps.barrio, e.telefono
+  from employees e
+  left join perfil_sociodemografico ps on ps.employee_id = e.id
+  where e.id = p_employee_id;
+end;
+$$;
+
+revoke all on function public.perfil_publico_obtener(uuid, text) from public;
+grant execute on function public.perfil_publico_obtener(uuid, text) to anon, authenticated;
+
+create or replace function public.perfil_publico_guardar(
+  p_employee_id uuid,
+  p_cedula text,
+  p_fecha_nacimiento date,
+  p_sexo text,
+  p_lugar_residencia text,
+  p_barrio text,
+  p_telefono text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not exists (
+    select 1 from employees e
+    where e.id = p_employee_id and trim(e.cedula) = trim(p_cedula)
+  ) then
+    raise exception 'No encontramos un registro con esa cedula para este link.';
+  end if;
+
+  update employees set telefono = p_telefono where id = p_employee_id;
+
+  insert into perfil_sociodemografico (employee_id, fecha_nacimiento, sexo, lugar_residencia, barrio, updated_at)
+  values (p_employee_id, p_fecha_nacimiento, p_sexo, p_lugar_residencia, p_barrio, now())
+  on conflict (employee_id) do update set
+    fecha_nacimiento = excluded.fecha_nacimiento,
+    sexo = excluded.sexo,
+    lugar_residencia = excluded.lugar_residencia,
+    barrio = excluded.barrio,
+    updated_at = now();
+end;
+$$;
+
+revoke all on function public.perfil_publico_guardar(uuid, text, date, text, text, text, text) from public;
+grant execute on function public.perfil_publico_guardar(uuid, text, date, text, text, text, text) to anon, authenticated;

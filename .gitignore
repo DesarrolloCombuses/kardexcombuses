@@ -2,3 +2,9 @@
 *.log
 .DS_Store
 Thumbs.db
+
+# Scripts de carga masiva con datos personales sensibles (cedula, fecha de
+# nacimiento, direccion, tipo de sangre, etc.) -- nunca deben publicarse en
+# este repositorio, que es publico. Se corren a mano en el SQL Editor de
+# Supabase y se guardan solo localmente.
+sql/import_perfil_*.sql

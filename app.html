@@ -41,46 +41,78 @@
           <svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2.5" width="6.5" height="6.5" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6.5" height="6.5" rx="1.4" stroke="currentColor" stroke-width="1.5"/></svg>
           Panel
         </a>
-        <a href="#/inventario" data-nav="inventario">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M2.5 6.5l7.5-4 7.5 4-7.5 4-7.5-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.5V14l7.5 4 7.5-4V6.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 10.5V18" stroke="currentColor" stroke-width="1.5"/></svg>
-          Inventario
-        </a>
-        <a href="#/inventario-historico" data-nav="inventario-historico">
-          <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4.5" width="14" height="12" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Inventario histórico
-        </a>
-        <a href="#/estadisticas" data-nav="estadisticas">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M3 17V3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3 17h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5.5" y="10.5" width="2.6" height="5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="10.2" y="7" width="2.6" height="8.5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="14.9" y="4.5" width="2.6" height="11" rx="0.6" stroke="currentColor" stroke-width="1.4"/></svg>
-          Estadísticas
-        </a>
-        <a href="#/nueva-prenda" data-nav="nueva-prenda">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          Agregar prenda
-        </a>
-        <a href="#/entrada" data-nav="entrada">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          Entrada
-        </a>
-        <a href="#/salida" data-nav="salida">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M10 15V6M10 6l-3.5 3.5M10 6l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          Entrega (Salida)
-        </a>
-        <a href="#/empleados" data-nav="empleados">
-          <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Empleados
-        </a>
-        <a href="#/sociodemografico" data-nav="sociodemografico">
-          <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 14.5v-4M10 14.5V6M13.5 14.5v-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Perfil sociodemográfico
-        </a>
-        <a href="#/historial" data-nav="historial">
-          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10.5L12.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Historial
-        </a>
-        <a href="#/facturas" data-nav="facturas">
-          <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8h6M7 11h6M7 14h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Facturas
-        </a>
+
+        <details class="nav-group" open>
+          <summary>
+            <span>Inventario</span>
+            <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <div class="nav-group-items">
+            <a href="#/inventario" data-nav="inventario">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M2.5 6.5l7.5-4 7.5 4-7.5 4-7.5-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 6.5V14l7.5 4 7.5-4V6.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 10.5V18" stroke="currentColor" stroke-width="1.5"/></svg>
+              Inventario
+            </a>
+            <a href="#/inventario-historico" data-nav="inventario-historico">
+              <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4.5" width="14" height="12" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Inventario histórico
+            </a>
+            <a href="#/nueva-prenda" data-nav="nueva-prenda">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Agregar prenda
+            </a>
+            <a href="#/estadisticas" data-nav="estadisticas">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M3 17V3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3 17h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5.5" y="10.5" width="2.6" height="5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="10.2" y="7" width="2.6" height="8.5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="14.9" y="4.5" width="2.6" height="11" rx="0.6" stroke="currentColor" stroke-width="1.4"/></svg>
+              Estadísticas
+            </a>
+          </div>
+        </details>
+
+        <details class="nav-group" open>
+          <summary>
+            <span>Movimientos</span>
+            <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <div class="nav-group-items">
+            <a href="#/entrada" data-nav="entrada">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Entrada
+            </a>
+            <a href="#/salida" data-nav="salida">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 15V6M10 6l-3.5 3.5M10 6l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Entrega (Salida)
+            </a>
+            <a href="#/historial" data-nav="historial">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10.5L12.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Historial
+            </a>
+            <a href="#/facturas" data-nav="facturas">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8h6M7 11h6M7 14h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Facturas
+            </a>
+          </div>
+        </details>
+
+        <details class="nav-group" open>
+          <summary>
+            <span>Personal</span>
+            <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <div class="nav-group-items">
+            <a href="#/aspirantes" data-nav="aspirantes">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="8" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-3.3 2.4-5.2 5.5-5.2s5.5 1.9 5.5 5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M15.5 6v5M13 8.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Selección de personal
+            </a>
+            <a href="#/empleados" data-nav="empleados">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Empleados
+            </a>
+            <a href="#/estadisticas-personal" data-nav="estadisticas-personal">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M3 17V3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3 17h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5.5" y="10.5" width="2.6" height="5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="10.2" y="7" width="2.6" height="8.5" rx="0.6" stroke="currentColor" stroke-width="1.4"/><rect x="14.9" y="4.5" width="2.6" height="11" rx="0.6" stroke="currentColor" stroke-width="1.4"/></svg>
+              Estadísticas de personal
+            </a>
+          </div>
+        </details>
+
         <a href="#/ayuda" data-nav="ayuda">
           <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M7.7 7.8a2.3 2.3 0 014.4 1c0 1.4-2.1 1.7-2.1 3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14.4" r="0.9" fill="currentColor"/></svg>
           Ayuda
@@ -445,43 +477,245 @@
           </form>
         </section>
 
-        <!-- ================= EMPLEADOS ================= -->
-        <section data-view="empleados" class="view">
-          <form id="empleado-form" class="form form-inline panel-card">
-            <input type="hidden" id="empleado-id" />
-            <input type="text" id="empleado-nombre" placeholder="Nombre completo" required />
-            <input type="text" id="empleado-cedula" placeholder="Cédula" required />
-            <input type="text" id="empleado-cargo" placeholder="Cargo" />
-            <input type="text" id="empleado-area" placeholder="Área" />
-            <button type="submit" id="empleado-submit-btn">Agregar</button>
-            <button type="button" id="empleado-cancel-btn" class="btn-secondary hidden">Cancelar edición</button>
+        <!-- ================= ASPIRANTES (SELECCIÓN) ================= -->
+        <section data-view="aspirantes" class="view">
+          <p class="view-intro">Aspirantes en proceso de selección, con su hoja de vida y el cargo al que aplican. Al aprobar se crea de una vez el empleado y queda listo un link para que la persona complete sus propios datos básicos.</p>
+
+          <form id="aspirante-form" class="form form-inline panel-card">
+            <input type="text" id="aspirante-nombre" placeholder="Nombre completo" required />
+            <input type="text" id="aspirante-cedula" placeholder="Cédula" required />
+            <input type="text" id="aspirante-telefono" placeholder="Teléfono (opcional)" />
+            <input type="text" id="aspirante-cargo" list="aspirante-cargo-list" placeholder="Cargo al que aspira" />
+            <datalist id="aspirante-cargo-list"></datalist>
+            <input type="text" id="aspirante-area" list="aspirante-area-list" placeholder="Área a la que aspira" />
+            <datalist id="aspirante-area-list"></datalist>
+            <label class="file-picker" for="aspirante-hoja-input">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v5M7.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span id="aspirante-hoja-label">Adjuntar hoja de vida (PDF o foto)</span>
+            </label>
+            <input type="file" id="aspirante-hoja-input" accept=".pdf,image/*" class="hidden" />
+            <input type="text" id="aspirante-observaciones" placeholder="Observaciones (opcional)" />
+            <button type="submit">Registrar aspirante</button>
           </form>
+          <p id="aspirante-msg" class="form-msg"></p>
+
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Nombre</th><th>Cédula</th><th>Cargo</th><th>Área</th><th>Estado</th><th></th></tr>
+                <tr><th>Nombre</th><th>Cargo al que aspira</th><th>Área</th><th>Teléfono</th><th>Hoja de vida</th><th>Estado</th><th></th></tr>
               </thead>
-              <tbody id="empleados-tbody"></tbody>
+              <tbody id="aspirantes-tbody"></tbody>
             </table>
           </div>
         </section>
 
-        <!-- ================= PERFIL SOCIODEMOGRÁFICO ================= -->
-        <section data-view="sociodemografico" class="view">
-          <p class="view-intro">Datos sociodemográficos por empleado (edad, género, estado civil, escolaridad, vivienda, desplazamiento, etc.) para el diagnóstico del SG-SST.</p>
+        <!-- ================= EMPLEADOS ================= -->
+        <section data-view="empleados" class="view">
+          <p class="view-intro">Ficha única por empleado: datos básicos y perfil sociodemográfico (para el diagnóstico del SG-SST) en un solo lugar.</p>
+
+          <div class="cards" id="empleados-stats">
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="empleados-stat-total">—</div>
+                <div class="card-label">Empleados activos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="empleados-stat-completos">—</div>
+                <div class="card-label">Perfiles completos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="empleados-stat-pendientes">—</div>
+                <div class="card-label">Perfiles pendientes</div>
+              </div>
+            </div>
+          </div>
+
           <div class="toolbar">
             <div class="search-input">
               <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-              <input type="search" id="sociodemografico-search" placeholder="Buscar por nombre o cédula…" />
+              <input type="search" id="empleados-search" placeholder="Buscar por nombre o cédula…" />
+            </div>
+            <select id="empleados-estado">
+              <option value="activos">Solo activos</option>
+              <option value="inactivos">Solo inactivos</option>
+              <option value="todos">Todos</option>
+            </select>
+            <button type="button" id="empleados-nuevo-btn">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Agregar empleado
+            </button>
+          </div>
+
+          <details class="filtros-avanzados">
+            <summary>
+              <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M6 10h8M8.5 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Filtros avanzados
+              <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="filtros-avanzados-body">
+              <label class="filtro-inline">Cargo<select id="empleados-filtro-cargo" data-todos="Todos"><option value="">Todos</option></select></label>
+              <label class="filtro-inline">Área<select id="empleados-filtro-area" data-todos="Todas"><option value="">Todas</option></select></label>
+              <label class="filtro-inline">
+                Perfil
+                <select id="empleados-filtro-perfil">
+                  <option value="">Todos</option>
+                  <option value="completo">Completo</option>
+                  <option value="pendiente">Pendiente</option>
+                </select>
+              </label>
+              <label class="filtro-inline">Ingreso desde<input type="date" id="empleados-filtro-fecha-desde" /></label>
+              <label class="filtro-inline">Ingreso hasta<input type="date" id="empleados-filtro-fecha-hasta" /></label>
+              <button type="button" id="empleados-filtros-limpiar" class="btn-secondary">Limpiar filtros</button>
+            </div>
+          </details>
+
+          <p class="empty-note" id="empleados-contador"></p>
+          <div class="person-list" id="empleados-lista"></div>
+        </section>
+
+        <!-- ================= ESTADÍSTICAS DE PERSONAL ================= -->
+        <section data-view="estadisticas-personal" class="view">
+          <p class="view-intro">Métricas del perfil sociodemográfico de la planta activa, para el diagnóstico y seguimiento del SG-SST.</p>
+
+          <div class="toolbar">
+            <label class="filtro-inline">
+              Ver por cargo
+              <select id="sp-filtro-cargo" data-todos="Todos los cargos"><option value="">Todos los cargos</option></select>
+            </label>
+            <span class="muted" id="sp-filtro-resultado"></span>
+          </div>
+
+          <div class="cards">
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="sp-kpi-total">0</div>
+                <div class="card-label">Empleados activos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="sp-kpi-completos">0</div>
+                <div class="card-label">Perfiles completos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="sp-kpi-edad">—</div>
+                <div class="card-label">Edad promedio</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="sp-kpi-conduce">0%</div>
+                <div class="card-label">Conduce para su labor</div>
+              </div>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Nombre</th><th>Cédula</th><th>Cargo</th><th>Perfil</th><th></th></tr>
-              </thead>
-              <tbody id="sociodemografico-tbody"></tbody>
-            </table>
+
+          <div class="panel-card chart-card ruta-dashboard">
+            <div class="section-heading">
+              <h2>Conductores por ruta</h2>
+              <p class="view-intro" id="sp-ruta-subtitulo" style="margin:0.2rem 0 0">0 conductores</p>
+            </div>
+            <div class="ruta-kpis">
+              <div class="ruta-kpi">
+                <div class="ruta-kpi-value" id="sp-ruta-kpi-rutas">0</div>
+                <div class="ruta-kpi-label">Rutas con conductores</div>
+              </div>
+              <div class="ruta-kpi">
+                <div class="ruta-kpi-value" id="sp-ruta-kpi-lider">—</div>
+                <div class="ruta-kpi-label">Ruta con más conductores</div>
+              </div>
+              <div class="ruta-kpi">
+                <div class="ruta-kpi-value" id="sp-ruta-kpi-sinruta">0</div>
+                <div class="ruta-kpi-label">Conductores sin ruta</div>
+              </div>
+            </div>
+            <div id="sp-bars-ruta" class="ranked-bars"></div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Sexo</h2></div>
+              <div class="donut-wrap">
+                <div id="sp-donut-sexo" class="donut">
+                  <div class="donut-center"><span id="sp-donut-sexo-total">0</span><small>personas</small></div>
+                </div>
+                <ul id="sp-legend-sexo" class="donut-legend"></ul>
+              </div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Rango de edad</h2></div>
+              <div id="sp-bars-edad" class="bar-chart"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Estado civil</h2></div>
+              <div id="sp-bars-estado-civil" class="bar-chart"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Grado de escolaridad</h2></div>
+              <div id="sp-bars-escolaridad" class="bar-chart"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Estrato socioeconómico</h2></div>
+              <div id="sp-bars-estrato" class="bar-chart"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Medio de desplazamiento</h2></div>
+              <div class="donut-wrap">
+                <div id="sp-donut-medio" class="donut">
+                  <div class="donut-center"><span id="sp-donut-medio-total">0</span><small>personas</small></div>
+                </div>
+                <ul id="sp-legend-medio" class="donut-legend"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Turno de trabajo</h2></div>
+              <div class="donut-wrap">
+                <div id="sp-donut-turno" class="donut">
+                  <div class="donut-center"><span id="sp-donut-turno-total">0</span><small>personas</small></div>
+                </div>
+                <ul id="sp-legend-turno" class="donut-legend"></ul>
+              </div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Tipo de sangre</h2></div>
+              <div id="sp-bars-sangre" class="bar-chart"></div>
+            </div>
           </div>
         </section>
 
@@ -551,8 +785,9 @@
             <a href="#" data-jump="ayuda-agregar-prenda">Agregar prenda</a>
             <a href="#" data-jump="ayuda-entrada">Entrada</a>
             <a href="#" data-jump="ayuda-entrega">Entrega (Salida)</a>
+            <a href="#" data-jump="ayuda-aspirantes">Selección de personal</a>
             <a href="#" data-jump="ayuda-empleados">Empleados</a>
-            <a href="#" data-jump="ayuda-sociodemografico">Perfil sociodemográfico</a>
+            <a href="#" data-jump="ayuda-estadisticas-personal">Estadísticas de personal</a>
             <a href="#" data-jump="ayuda-historial">Historial y auditoría</a>
             <a href="#" data-jump="ayuda-facturas">Facturas</a>
             <a href="#" data-jump="ayuda-instalar">Instalar en el celular</a>
@@ -650,16 +885,35 @@
             </ol>
           </div>
 
-          <div class="help-block" id="ayuda-empleados">
-            <h2>Empleados</h2>
-            <p class="prose-p">La lista de personas a las que se les puede entregar dotación, administrada desde aquí sin tocar la base de datos.</p>
-            <p class="prose-p">Haz clic sobre una fila para editarla. La columna <strong>Estado</strong> muestra si sigue activo — un empleado inactivo no aparece como opción al registrar una entrega nueva.</p>
+          <div class="help-block" id="ayuda-aspirantes">
+            <h2>Selección de personal</h2>
+            <p class="prose-p">Registro de aspirantes en proceso de selección: nombre, cédula, cargo y área a los que aplican, y su hoja de vida adjunta (PDF o foto).</p>
+            <div class="help-fields">
+              <div class="help-field"><span class="help-field-name">Cargo / Área</span><span class="help-field-desc">Sugieren los cargos y áreas que ya existen en Empleados mientras se escribe, pero se puede digitar uno nuevo si todavía no existe en la planta. Se guardan aparte para poder hacerle seguimiento al proceso por área, no solo por cargo.</span></div>
+              <div class="help-field"><span class="help-field-name">Aprobar</span><span class="help-field-desc">Marca el aspirante como "Contratado" y crea de una vez su registro en Empleados (nombre, cédula, cargo y área ya llenos), sin pasos intermedios.</span></div>
+              <div class="help-field"><span class="help-field-name">Copiar link de perfil</span><span class="help-field-desc">Aparece una vez aprobado. Genera un link para enviarle (WhatsApp, correo, etc.) al nuevo empleado: con su cédula, entra sin necesidad de usuario ni contraseña y completa él mismo su fecha de nacimiento, sexo, dirección y teléfono. El resto del perfil sociodemográfico (vivienda, familia, tipo de vinculación, fecha de ingreso, etc.) lo completa el personal de Combuses desde Empleados.</span></div>
+              <div class="help-field"><span class="help-field-name">Descartar / Reabrir</span><span class="help-field-desc">Descartar saca al aspirante del proceso sin borrar su registro; Reabrir lo vuelve a dejar "En proceso".</span></div>
+            </div>
           </div>
 
-          <div class="help-block" id="ayuda-sociodemografico">
-            <h2>Perfil sociodemográfico</h2>
-            <p class="prose-p">Datos de cada empleado para el diagnóstico que exige el SG-SST: edad, género, estado civil, escolaridad, vivienda, medio de desplazamiento, etc. — separado de Empleados porque no tiene que ver con la entrega de dotación.</p>
-            <p class="prose-p">La columna <strong>Perfil</strong> muestra si ya está <span class="tag completo">Completo</span> o sigue <span class="tag pendiente">Pendiente</span>. Haz clic en el botón de la fila para abrir el formulario y guardarlo.</p>
+          <div class="help-block" id="ayuda-empleados">
+            <h2>Empleados</h2>
+            <p class="prose-p">La ficha de cada persona a la que se le puede entregar dotación — administrada desde aquí, sin tocar la base de datos. Cada tarjeta tiene sus datos básicos (nombre, cédula, cargo, área) y su perfil sociodemográfico (edad, género, estado civil, escolaridad, vivienda, medio de desplazamiento, etc., para el diagnóstico que exige el SG-SST) juntos en un mismo formulario.</p>
+            <div class="help-fields">
+              <div class="help-field"><span class="help-field-name">Agregar empleado</span><span class="help-field-desc">Abre el formulario en blanco. El perfil sociodemográfico es opcional al crear — se puede completar después.</span></div>
+              <div class="help-field"><span class="help-field-name">Foto</span><span class="help-field-desc">Opcional, se toma con la cámara o se adjunta un archivo. Reemplaza las iniciales en la lista y en la ficha; "Quitar foto" la borra sin necesidad de subir una nueva.</span></div>
+              <div class="help-field"><span class="help-field-name">Perfil</span><span class="help-field-desc">Muestra si el perfil sociodemográfico ya está <span class="tag completo">Completo</span> o sigue <span class="tag pendiente">Pendiente</span>.</span></div>
+              <div class="help-field"><span class="help-field-name">Contactos de emergencia / Hijos</span><span class="help-field-desc">Opcionales, dentro del mismo formulario. Se pueden agregar tantos como haga falta con "+ Agregar" y quitar uno a la vez con "Quitar"; una fila que se deja vacía no se guarda.</span></div>
+              <div class="help-field"><span class="help-field-name">Filtro de estado</span><span class="help-field-desc">Por defecto se ven "Solo activos". Cambia a "Solo inactivos" o "Todos" para encontrar a alguien que ya no está (por ejemplo, para reactivarlo) — un empleado inactivo no aparece como opción al registrar una entrega nueva.</span></div>
+              <div class="help-field"><span class="help-field-name">Filtros avanzados</span><span class="help-field-desc">Despliega el panel para acotar por cargo, área, si el perfil sociodemográfico está completo o pendiente, y por rango de fecha de ingreso. Se pueden combinar entre sí y con la búsqueda por nombre/cédula; "Limpiar filtros" los quita todos de una vez.</span></div>
+            </div>
+          </div>
+
+          <div class="help-block" id="ayuda-estadisticas-personal">
+            <h2>Estadísticas de personal</h2>
+            <p class="prose-p">Las mismas variables del perfil sociodemográfico, en forma de gráficas, para tener un panorama general de la planta activa sin tener que abrir empleado por empleado — insumo directo para el diagnóstico del SG-SST.</p>
+            <p class="prose-p">Solo cuenta a quienes tienen perfil sociodemográfico <span class="tag completo">Completo</span>; si un dato específico no se llenó, esa persona cae en "Sin dato" dentro de esa gráfica en particular. La excepción es "Conductores por ruta": cuenta a todo activo con Cargo "Conductor", tenga o no perfil completo, porque la ruta se guarda aparte, en los Datos básicos.</p>
+            <p class="prose-p">"Ver por cargo" filtra toda la página (KPIs y gráficas incluida "Conductores por ruta") a un solo cargo — por ejemplo, elige "Conductor" para ver únicamente esas métricas. "Todos los cargos" vuelve a la vista completa.</p>
           </div>
 
           <div class="help-block" id="ayuda-historial">
@@ -751,8 +1005,9 @@
   <script src="js/views/nueva-prenda.js"></script>
   <script src="js/views/entrada.js"></script>
   <script src="js/views/salida.js"></script>
+  <script src="js/views/aspirantes.js"></script>
   <script src="js/views/empleados.js"></script>
-  <script src="js/views/sociodemografico.js"></script>
+  <script src="js/views/estadisticas-personal.js"></script>
   <script src="js/views/historial.js"></script>
   <script src="js/views/facturas.js"></script>
   <script src="js/views/ayuda.js"></script>

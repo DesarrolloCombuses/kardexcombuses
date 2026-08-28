@@ -4,9 +4,15 @@
 // misma en que se tomó, ya que "capture" abre la cámara directo) para que
 // quede como evidencia con el momento de la entrega, no solo el archivo.
 class CameraCapture {
-  constructor({ inputEl, previewEl }) {
+  // "stamp" (fecha/hora quemada en la foto) es la marca de evidencia que
+  // necesita una foto de Entrega, pero no tiene sentido en una foto de
+  // perfil de empleado -- ahí debe quedar limpia. Se puede desactivar acá
+  // en vez de necesitar una clase aparte para ese caso.
+  constructor({ inputEl, previewEl, stamp = true, filename = 'foto-receptor.jpg' }) {
     this.inputEl = inputEl;
     this.previewEl = previewEl;
+    this.stamp = stamp;
+    this.filename = filename;
     this.file = null;
     this._objectUrl = null;
     this.processing = false;
@@ -39,10 +45,10 @@ class CameraCapture {
     canvas.height = img.naturalHeight;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    this._drawTimestamp(ctx, canvas.width, canvas.height);
+    if (this.stamp) this._drawTimestamp(ctx, canvas.width, canvas.height);
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
-    return new File([blob], 'foto-receptor.jpg', { type: 'image/jpeg' });
+    return new File([blob], this.filename, { type: 'image/jpeg' });
   }
 
   _drawTimestamp(ctx, width, height) {

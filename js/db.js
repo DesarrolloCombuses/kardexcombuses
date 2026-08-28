@@ -201,6 +201,110 @@ const DB = {
     if (error) throw error;
   },
 
+  // ---- Aspirantes (proceso de selección) -------------------------------------
+
+  async getAspirantes() {
+    const { data, error } = await window.supabaseClient
+      .from('aspirantes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async createAspirante({ nombre, cedula, telefono, cargoAspirado, areaAspirada, hojaVidaFile, observaciones }) {
+    let hojaVidaUrl = null;
+    let hojaVidaNombre = null;
+    if (hojaVidaFile) {
+      const extension = (hojaVidaFile.name.split('.').pop() || 'pdf').toLowerCase();
+      hojaVidaUrl = await this.uploadToBucket('hojas-vida', hojaVidaFile, extension);
+      hojaVidaNombre = hojaVidaFile.name;
+    }
+    const { data, error } = await window.supabaseClient
+      .from('aspirantes')
+      .insert({
+        nombre,
+        cedula: cedula || null,
+        telefono: telefono || null,
+        cargo_aspirado: cargoAspirado || null,
+        area_aspirada: areaAspirada || null,
+        hoja_vida_url: hojaVidaUrl,
+        hoja_vida_nombre: hojaVidaNombre,
+        observaciones: observaciones || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateAspiranteEstado(id, estado) {
+    const { error } = await window.supabaseClient
+      .from('aspirantes')
+      .update({ estado, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteAspirante(id) {
+    const { error } = await window.supabaseClient.from('aspirantes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
+  // cédula, cargo al que aspiraba) y deja el vínculo guardado en
+  // aspirantes.employee_id -- así no se puede convertir dos veces por error
+  // y la lista de Aspirantes puede mostrar "Ya es empleado" en vez del botón.
+  async convertirAspiranteAEmpleado(aspirante) {
+    const nuevoEmpleado = await this.createEmployee({
+      nombre: aspirante.nombre,
+      cedula: aspirante.cedula,
+      cargo: aspirante.cargo_aspirado || null,
+      area: aspirante.area_aspirada || null,
+      activo: true,
+    });
+    const { error } = await window.supabaseClient
+      .from('aspirantes')
+      .update({ employee_id: nuevoEmpleado.id, updated_at: new Date().toISOString() })
+      .eq('id', aspirante.id);
+    if (error) throw error;
+    return nuevoEmpleado;
+  },
+
+  // "Aprobar" en un solo paso: marca Contratado y convierte a empleado de
+  // una vez, en vez de los dos pasos separados de antes.
+  async aprobarAspirante(aspirante) {
+    await this.updateAspiranteEstado(aspirante.id, 'Contratado');
+    return this.convertirAspiranteAEmpleado(aspirante);
+  },
+
+  // ---- Perfil público (autodiligenciamiento por el nuevo empleado) ----------
+
+  // Sin sesión iniciada: se llama desde perfil-publico.html. La validación
+  // de que la cédula corresponda al employee_id del link la hace la función
+  // (security definer) del lado del servidor, no el cliente -- ver
+  // sql/perfil_publico.sql.
+  async obtenerPerfilPublico(employeeId, cedula) {
+    const { data, error } = await window.supabaseClient
+      .rpc('perfil_publico_obtener', { p_employee_id: employeeId, p_cedula: cedula })
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async guardarPerfilPublico(employeeId, cedula, datos) {
+    const { error } = await window.supabaseClient.rpc('perfil_publico_guardar', {
+      p_employee_id: employeeId,
+      p_cedula: cedula,
+      p_fecha_nacimiento: datos.fechaNacimiento || null,
+      p_sexo: datos.sexo || null,
+      p_lugar_residencia: datos.lugarResidencia || null,
+      p_barrio: datos.barrio || null,
+      p_telefono: datos.telefono || null,
+    });
+    if (error) throw error;
+  },
+
   // ---- Perfil del usuario logueado ------------------------------------------
 
   async getMyProfile() {
@@ -293,6 +397,57 @@ const DB = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  // Empleados + su perfil sociodemográfico embebido en una sola consulta
+  // (relación 1 a 1 por el unique de employee_id) -- para las estadísticas
+  // de personal, que necesitan los ~18 campos de cada uno, no solo si
+  // existe o no como en getEmployeeIdsConPerfilSociodemografico(). También
+  // trae contactos de emergencia e hijos (1 a muchos, PostgREST los
+  // devuelve como arreglo) para no tener que pedirlos aparte al abrir cada
+  // ficha o formulario de empleado.
+  async getEmployeesConPerfil({ onlyActive = true } = {}) {
+    let query = window.supabaseClient
+      .from('employees')
+      .select('*, perfil_sociodemografico ( * ), contactos_emergencia ( * ), hijos_empleado ( * )')
+      .order('nombre');
+    if (onlyActive) query = query.eq('activo', true);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+
+  // ---- Contactos de emergencia e hijos ---------------------------------------
+
+  // Ambas son listas (un empleado puede tener varios), así que en vez de un
+  // upsert por fila se reemplaza todo de una vez: se borran las filas
+  // existentes del empleado y se insertan las actuales -- más simple que
+  // llevar el control de cuáles filas cambiaron/se borraron desde un
+  // formulario con filas que se agregan y quitan libremente.
+  async saveContactosEmergencia(employeeId, contactos) {
+    const { error: delError } = await window.supabaseClient
+      .from('contactos_emergencia')
+      .delete()
+      .eq('employee_id', employeeId);
+    if (delError) throw delError;
+    if (!contactos.length) return;
+    const { error } = await window.supabaseClient
+      .from('contactos_emergencia')
+      .insert(contactos.map((c) => ({ ...c, employee_id: employeeId })));
+    if (error) throw error;
+  },
+
+  async saveHijosEmpleado(employeeId, hijos) {
+    const { error: delError } = await window.supabaseClient
+      .from('hijos_empleado')
+      .delete()
+      .eq('employee_id', employeeId);
+    if (delError) throw delError;
+    if (!hijos.length) return;
+    const { error } = await window.supabaseClient
+      .from('hijos_empleado')
+      .insert(hijos.map((h) => ({ ...h, employee_id: employeeId })));
+    if (error) throw error;
   },
 
   // ---- Movimientos (kardex) --------------------------------------------------

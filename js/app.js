@@ -12,8 +12,14 @@
   // pueden ver (Router también las bloquea si alguien escribe el hash a
   // mano, esto es solo para que ni aparezcan como opción).
   if (window.APP_ROLE === 'viewer') {
-    ['nueva-prenda', 'entrada', 'salida', 'empleados', 'sociodemografico'].forEach((name) => {
+    ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'estadisticas-personal'].forEach((name) => {
       document.querySelector(`[data-nav="${name}"]`)?.remove();
+    });
+    // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/
+    // Personal) se quedó sin ningún enlace adentro, se quita el submenú
+    // completo para no dejar un encabezado colapsable vacío.
+    document.querySelectorAll('.nav-group').forEach((group) => {
+      if (!group.querySelector('[data-nav]')) group.remove();
     });
   }
 
