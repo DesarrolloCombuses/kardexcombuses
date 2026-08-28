@@ -259,6 +259,7 @@ const DB = {
       .select(`
         *,
         employees ( nombre, cedula, cargo, area, numero_interno, ruta, base ),
+        facturas ( numero_factura, fecha_remision ),
         kardex_movement_items (
           id, cantidad, stock_resultante,
           item_variants ( talla, item_categories ( nombre ) )

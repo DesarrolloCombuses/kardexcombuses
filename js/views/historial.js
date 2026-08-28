@@ -62,6 +62,14 @@ Router.register('historial', {
     list.innerHTML = movements.map((m) => {
       const nLineas = m.kardex_movement_items.length;
       const filas = [];
+      if (m.tipo === 'entrada' && m.facturas) {
+        filas.push(`
+          <div class="movement-card-row">
+            <span class="movement-card-label">Factura</span>
+            <span class="movement-card-value">${m.facturas.numero_factura}</span>
+          </div>
+        `);
+      }
       if (m.tipo === 'salida' && m.fecha_entrega) {
         filas.push(`
           <div class="movement-card-row">
@@ -156,6 +164,7 @@ Router.register('historial', {
         'Fecha': new Date(m.fecha).toLocaleString('es-CO'),
         'Tipo': m.tipo === 'entrada' ? 'Entrada' : 'Salida',
         'Fecha de entrega': m.fecha_entrega ? new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO') : '',
+        'N.º factura': m.facturas?.numero_factura || '',
         'Empleado': m.employees ? `${m.employees.nombre} (${m.employees.cedula})` : '',
         'Cargo': m.employees?.cargo || '',
         'Área': m.employees?.area || '',
@@ -181,10 +190,10 @@ Router.register('historial', {
     });
 
     const sheet = XLSX.utils.json_to_sheet(data, {
-      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Base', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
+      header: ['Fecha', 'Tipo', 'Fecha de entrega', 'N.º factura', 'Categoría', 'Talla', 'Cantidad', 'Stock resultante', 'Empleado', 'Cargo', 'Área', 'Ruta', 'Vehículo', 'Base', 'Entregado por', 'Registrado por', 'Anulado', 'Anulado por', 'Anulado el', 'Observaciones'],
     });
     sheet['!cols'] = [
-      { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
+      { wch: 19 }, { wch: 9 }, { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 9 }, { wch: 10 }, { wch: 15 },
       { wch: 26 }, { wch: 20 }, { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
       { wch: 20 }, { wch: 20 }, { wch: 9 }, { wch: 20 }, { wch: 19 }, { wch: 30 },
     ];
@@ -210,6 +219,7 @@ Router.register('historial', {
     const emp = m.employees;
     const datosHtml = [
       this._modalRow('Registrado por', m.creado_por_nombre || '—'),
+      m.tipo === 'entrada' && m.facturas ? this._modalRow('Factura', `${m.facturas.numero_factura} — ${new Date(`${m.facturas.fecha_remision}T00:00:00`).toLocaleDateString('es-CO')}`) : '',
       m.tipo === 'salida' && m.fecha_entrega ? this._modalRow('Fecha de entrega', new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')) : '',
       m.tipo === 'salida' && emp ? this._modalRow('Empleado', `${emp.nombre} · CC ${emp.cedula}`) : '',
       m.tipo === 'salida' && emp?.cargo ? this._modalRow('Cargo', emp.cargo) : '',
