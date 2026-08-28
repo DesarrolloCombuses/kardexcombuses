@@ -193,6 +193,10 @@ button svg { width: 16px; height: 16px; flex: none; }
 .btn-block { width: 100%; padding: 0.75rem 1rem; box-shadow: var(--shadow-sm); }
 .btn-secondary { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--slate-100); color: var(--slate-700); }
 .btn-secondary:hover { background: var(--slate-200); }
+/* .btn-secondary en un <a> (ej. el botón de "Crear prenda nueva" en
+   Entrada): la regla base "button" de arriba no le aplica a un <a>, así
+   que aquí se repite lo mínimo para que se vea igual de botón. */
+a.btn-secondary { text-decoration: none; border-radius: var(--radius-sm); padding: 0.65rem 1.1rem; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; }
 .btn-ghost { background: transparent; color: var(--slate-300); border: 1px solid rgba(255, 255, 255, 0.14); }
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 
