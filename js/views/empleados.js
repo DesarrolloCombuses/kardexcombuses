@@ -310,7 +310,9 @@ Router.register('empleados', {
 
     document.getElementById('modal-body').innerHTML = `
       <div class="detalle-header">
-        <span class="person-avatar detalle-avatar" id="empleado-detalle-avatar">${this._iniciales(empleado.nombre)}</span>
+        <button type="button" class="detalle-avatar-btn" id="empleado-detalle-avatar-btn" aria-label="Ver foto de perfil en grande">
+          <span class="person-avatar detalle-avatar" id="empleado-detalle-avatar">${this._iniciales(empleado.nombre)}</span>
+        </button>
         <div class="detalle-header-info">
           <div class="detalle-nombre">${empleado.nombre}</div>
           <div class="detalle-sub">CC ${empleado.cedula}${empleado.cargo ? ' · ' + empleado.cargo : ''}${empleado.area ? ' · ' + empleado.area : ''}</div>
@@ -356,6 +358,14 @@ Router.register('empleados', {
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
         this._pintarFoto(document.getElementById('empleado-detalle-avatar'), url);
+        if (!url) return;
+        // La foto en el círculo de arriba queda chica a propósito (es un
+        // avatar, no un visor) -- clic para verla de verdad, en una pestaña
+        // nueva con su tamaño real en vez de un lightbox que complique el
+        // modal que ya está abierto.
+        const btn = document.getElementById('empleado-detalle-avatar-btn');
+        btn.classList.add('clickeable');
+        btn.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
       });
     }
   },

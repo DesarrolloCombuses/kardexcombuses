@@ -172,7 +172,11 @@ function validarFechaNacimiento(iso) {
               <svg viewBox="0 0 20 20" fill="none"><path d="M4 7h2.5l1-2h5l1 2H16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="11.5" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
               <span id="pp-foto-label">${perfil.foto_url ? 'Cambiar foto' : 'Agregar foto'}</span>
             </label>
-            <input type="file" id="pp-foto-input" accept="image/*" capture="user" class="hidden" />
+            <!-- Sin "capture": así el selector nativo del celular deja
+                 elegir entre tomar una foto nueva o escogerla de la
+                 galería, en vez de forzar la cámara de una (que es lo que
+                 pasa con el atributo capture y no deja otra opción). -->
+            <input type="file" id="pp-foto-input" accept="image/*" class="hidden" />
           </div>
         </div>
         <div class="pp-profile-header-name">
