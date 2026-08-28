@@ -456,8 +456,9 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   /* Categoría y talla lado a lado quedaban ilegibles (muy angostas); cada
      una pasa a ocupar toda la fila en vez de compartir el ancho. Selector
      más específico que ".linea-row select" (más abajo en el archivo) para
-     que gane sin depender del orden. */
-  .wizard-panel .linea-row select { flex: 1 1 100%; }
+     que gane sin depender del orden. Aplica tanto al asistente de Salida
+     como a las líneas de Entrada (esta última no es un wizard). */
+  .wizard-panel .linea-row select, #entrada-lineas .linea-row select { flex: 1 1 100%; }
 }
 
 /* =====================================================================

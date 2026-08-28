@@ -312,26 +312,18 @@
 
         <!-- ================= ENTRADA ================= -->
         <section data-view="entrada" class="view">
-          <p class="view-intro">Registra el ingreso de nuevas unidades a la bodega de dotación.</p>
+          <p class="view-intro">Registra el ingreso de nuevas unidades a la bodega de dotación. Puedes agregar varias prendas/tallas de una misma factura en un solo registro.</p>
           <form id="entrada-form" class="form panel-card">
-            <label>
-              Categoría
-              <select id="entrada-categoria" required></select>
-            </label>
-            <label>
-              Talla
-              <select id="entrada-talla" required></select>
-            </label>
-            <label>
-              Cantidad
-              <input type="number" id="entrada-cantidad" min="1" required />
-            </label>
             <label>
               Factura / soporte de compra
               <select id="entrada-factura">
                 <option value="">Sin factura asociada</option>
               </select>
             </label>
+
+            <div id="entrada-lineas"></div>
+            <button type="button" id="entrada-add-linea" class="btn-secondary">+ Agregar prenda</button>
+
             <label>
               Observaciones
               <textarea id="entrada-observaciones" rows="2"></textarea>
