@@ -40,6 +40,16 @@ function valorCampoDetalle(campo, valor) {
   return valor;
 }
 
+// La ruta puede quedar escrita como "700", "Ruta 700" o "R700" según quién
+// la digite -- se compara solo por los dígitos para no depender del formato.
+function esRuta700(ruta) {
+  return String(ruta || '').replace(/\D/g, '') === '700';
+}
+
+function esConductorRuta700(empleado) {
+  return /conductor/i.test(empleado?.cargo || '') && esRuta700(empleado?.ruta);
+}
+
 function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
@@ -299,6 +309,8 @@ Router.register('empleados', {
       </div>
     ` : '';
 
+    const sonarHtml = this._sonarBloqueHtml(empleado);
+
     const contactos = empleado.contactos_emergencia || [];
     const contactosHtml = contactos.length ? `
       <div class="modal-section">
@@ -354,6 +366,7 @@ Router.register('empleados', {
 
       ${contactosHtml}
       ${hijosHtml}
+      ${sonarHtml}
 
       <button type="button" id="empleado-detalle-editar" style="margin-top:1.2rem">Editar</button>
     `;
@@ -361,6 +374,9 @@ Router.register('empleados', {
     document.getElementById('modal-backdrop').classList.remove('hidden');
 
     document.getElementById('empleado-detalle-editar').addEventListener('click', () => this._abrirModal(empleado));
+
+    const sonarBtn = document.getElementById('empleado-sonar-btn');
+    if (sonarBtn) sonarBtn.addEventListener('click', () => this._reenviarSonar(empleado));
 
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
@@ -374,6 +390,61 @@ Router.register('empleados', {
         btn.classList.add('clickeable');
         btn.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
       });
+    }
+  },
+
+  // Los conductores de la ruta 700 deben existir también en Sonar Telematics
+  // (plataforma externa de rastreo GPS de los vehículos). Este bloque solo
+  // aparece para ellos; el resto de empleados no lo ve.
+  _sonarBloqueHtml(empleado) {
+    if (!esConductorRuta700(empleado)) return '';
+    let badge;
+    if (empleado.sonar_synced_at) {
+      badge = `<span class="tag completo">Sincronizado el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
+    } else if (empleado.sonar_sync_error) {
+      badge = `<span class="tag descartado">Error: ${empleado.sonar_sync_error}</span>`;
+    } else {
+      badge = `<span class="tag pendiente">Sin enviar a Sonar</span>`;
+    }
+    return `
+      <div class="modal-section">
+        <h3 class="modal-section-title">Sonar Telematics</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Este conductor es de la ruta 700, por eso también debe quedar registrado en Sonar Telematics.</p>
+        <div id="empleado-sonar-badge" style="margin-bottom:0.6rem">${badge}</div>
+        <button type="button" id="empleado-sonar-btn" class="btn-secondary">${empleado.sonar_synced_at ? 'Reenviar a Sonar' : 'Enviar a Sonar'}</button>
+        <p id="empleado-sonar-msg" class="form-msg"></p>
+      </div>
+    `;
+  },
+
+  async _enviarASonar(employeeId, msgEl) {
+    msgEl.textContent = 'Enviando a Sonar…';
+    msgEl.className = 'form-msg';
+    try {
+      const res = await DB.enviarConductorASonar(employeeId);
+      msgEl.textContent = res.ok ? 'Enviado a Sonar correctamente.' : `Sonar respondió con un error: ${res.message}`;
+      msgEl.className = res.ok ? 'form-msg success' : 'form-msg error';
+      return res;
+    } catch (err) {
+      msgEl.textContent = 'No se pudo enviar a Sonar: ' + err.message;
+      msgEl.className = 'form-msg error';
+      return null;
+    }
+  },
+
+  async _reenviarSonar(empleado) {
+    const res = await this._enviarASonar(empleado.id, document.getElementById('empleado-sonar-msg'));
+    if (!res) return;
+    const badgeWrap = document.getElementById('empleado-sonar-badge');
+    const btn = document.getElementById('empleado-sonar-btn');
+    if (res.ok) {
+      empleado.sonar_synced_at = new Date().toISOString();
+      empleado.sonar_sync_error = null;
+      if (badgeWrap) badgeWrap.innerHTML = `<span class="tag completo">Sincronizado el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
+      if (btn) btn.textContent = 'Reenviar a Sonar';
+    } else {
+      empleado.sonar_sync_error = res.message;
+      if (badgeWrap) badgeWrap.innerHTML = `<span class="tag descartado">Error: ${res.message}</span>`;
     }
   },
 
@@ -503,6 +574,7 @@ Router.register('empleados', {
     // stamp:false -- a diferencia de la foto de Entrega, esta es la foto de
     // perfil/carné del empleado, no debe quedar con fecha/hora quemada.
     this._fotoUrlOriginal = empleado?.foto_url || null;
+    this._empleadoSonarSyncedAt = empleado?.sonar_synced_at || null;
     this._fotoQuitada = false;
     this._fotoCamera = new CameraCapture({
       inputEl: document.getElementById('empleado-foto-input'),
@@ -657,6 +729,22 @@ Router.register('empleados', {
       }
       await DB.saveContactosEmergencia(id, contactos);
       await DB.saveHijosEmpleado(id, hijos);
+
+      // Primera vez que este conductor queda con cargo Conductor + ruta 700:
+      // se ofrece enviarlo a Sonar de una vez, mostrando exactamente qué se
+      // enviaría para que quien guarda pueda revisarlo antes de confirmar.
+      // Ediciones posteriores no vuelven a preguntar solas -- para eso queda
+      // el botón "Reenviar a Sonar" en el detalle del empleado.
+      const requiereSonar = /conductor/i.test(basico.cargo || '') && esRuta700(basico.ruta);
+      if (requiereSonar && !this._empleadoSonarSyncedAt) {
+        const detalle = `Cédula: ${basico.cedula}\nNombre: ${basico.nombre}\nTeléfono: ${basico.telefono || '(sin dato)'}\nCorreo: ${basico.email_personal || '(sin dato)'}`;
+        if (window.confirm(`Este conductor quedó asignado a la ruta 700.\n\nSe enviará a Sonar Telematics con estos datos:\n${detalle}\n\n¿Enviarlo ahora?`)) {
+          await this._enviarASonar(id, msg);
+          await this._load();
+          return;
+        }
+      }
+
       msg.textContent = 'Empleado guardado correctamente.';
       msg.className = 'form-msg success';
       await this._load();

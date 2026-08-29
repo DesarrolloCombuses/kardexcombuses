@@ -122,6 +122,12 @@ alter table employees add column if not exists base text;
 -- vuelo con un signed URL porque el bucket es privado.
 alter table employees add column if not exists foto_url text;
 
+-- Resultado del ultimo envio del conductor (ruta 700) a Sonar Telematics.
+-- El envio en si lo hace la Edge Function sonar-insert-driver -- ver
+-- sql/sonar_conductores.sql. Las credenciales de Sonar no viven aqui.
+alter table employees add column if not exists sonar_synced_at timestamptz;
+alter table employees add column if not exists sonar_sync_error text;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);

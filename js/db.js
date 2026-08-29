@@ -430,6 +430,24 @@ const DB = {
     return data;
   },
 
+  // Llama a la Edge Function que inserta/actualiza al conductor en Sonar
+  // Telematics (SOAP). Las credenciales de Sonar viven como secrets de la
+  // función, nunca en el cliente. Requiere sesión activa (auth: 'user').
+  async enviarConductorASonar(employeeId) {
+    const { data, error } = await window.supabaseClient.functions.invoke('sonar-insert-driver', {
+      body: { employee_id: employeeId },
+    });
+    if (error) {
+      let mensaje = error.message;
+      try {
+        const body = await error.context?.json();
+        if (body?.message) mensaje = body.message;
+      } catch (_) {}
+      throw new Error(mensaje);
+    }
+    return data;
+  },
+
   // ---- Perfil sociodemográfico -----------------------------------------------
 
   // Solo el employee_id de cada fila que ya tiene perfil cargado -- para

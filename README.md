@@ -20,10 +20,25 @@ Proyecto: `https://cbplebkmxrkaafqdhiyi.supabase.co` (ya cargado en [js/config.j
    8. [sql/add_factura_entrada.sql](sql/add_factura_entrada.sql) — agrega `factura_id` a `kardex_movements` para poder vincular cada entrada con la factura de la que salió (antes no había forma de identificarlo y se anotaba a mano en observaciones). Debe correrse después de `sql/facturas.sql`. Seguro de re-ejecutar.
    9. [sql/add_creado_por_nombre.sql](sql/add_creado_por_nombre.sql) — agrega `creado_por_nombre` a `kardex_movements`, guardado al momento de registrar cada entrada/salida (con respaldo al correo si `profiles` no tiene el nombre lleno), para que Historial y el Excel siempre identifiquen quién hizo cada movimiento. Seguro de re-ejecutar.
    10. [sql/perfil_sociodemografico.sql](sql/perfil_sociodemografico.sql) — tabla `perfil_sociodemografico` (edad, género, estado civil, escolaridad, vivienda, desplazamiento, etc. por empleado) para el diagnóstico del SG-SST, con RLS igual al resto de ERP Combuses. Seguro de re-ejecutar.
+   11. [sql/sonar_conductores.sql](sql/sonar_conductores.sql) — agrega `sonar_synced_at`/`sonar_sync_error` a `employees`, para rastrear si un conductor de la ruta 700 ya quedó registrado en Sonar Telematics (ver sección "Integración con Sonar Telematics" más abajo). Seguro de re-ejecutar.
 2. Ve a **Authentication → Users** y crea el/los usuarios que van a iniciar sesión (correo + contraseña). No hay registro público en la app: los usuarios se crean únicamente desde el dashboard.
    - `profiles` no tiene un trigger automático en este proyecto (es una tabla compartida con otro sistema). Si quieres que el nombre de un usuario aparezca completo en vez de su correo, agrega/edita su fila en `profiles` (columna `full_name`) desde el SQL Editor.
 
 La *anon/publishable key* que está en `js/config.js` es segura de exponer en el cliente: la protección real de los datos la da Row Level Security (todas las tablas exigen sesión autenticada, sin acceso anónimo).
+
+### Integración con Sonar Telematics (conductores de la ruta 700)
+
+**Importante**: el proyecto Supabase de Combuses es compartido con el sistema de flota, que ya tiene su propio ecosistema de Edge Functions y secrets de Sonar (`asignar-conductor-sonar*`, `sonar-dispatch`, `sonar-sync-positions`, etc. — no viven en este repo). Antes de tocar cualquier secret o función de Sonar desde aquí, correr `supabase secrets list` y `supabase functions list` para no pisar algo que ya está en producción.
+
+Cuando se guarda un empleado con cargo "Conductor" y ruta "700", el ERP ofrece enviarlo a Sonar Telematics (registro del conductor vía `SET_InsertDriver`) mostrando antes un resumen de los datos a enviar. Esto lo hace la Edge Function [supabase/functions/sonar-insert-driver](supabase/functions/sonar-insert-driver/index.ts), que:
+- Solo se puede invocar con una sesión autenticada del ERP (no expone las credenciales de Sonar al cliente).
+- Reutiliza los secrets `SONAR_USER`, `SONAR_PASSWORD` y `SONAR_FLEET_ID` que ya existían en el proyecto para el resto de la integración de Sonar.
+
+Para desplegarla o actualizarla:
+```bash
+supabase functions deploy sonar-insert-driver --project-ref cbplebkmxrkaafqdhiyi
+```
+Las credenciales de Sonar se configuran (si hiciera falta cambiarlas) con `supabase secrets set SONAR_USER=... SONAR_PASSWORD=... --project-ref cbplebkmxrkaafqdhiyi` — nunca se escriben en este repo.
 
 ### Mantener actualizados los empleados
 
@@ -83,7 +98,8 @@ js/pwa-update.js            Aviso de nueva versión disponible
 js/pwa-install.js            Botón "Instalar app" (evento beforeinstallprompt)
 js/app.js                    Bootstrap
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, aspirantes —selección de personal—, empleados —incluye el perfil sociodemográfico—, historial, facturas, ayuda)
-sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql, sql/update_base_vehiculo_*.sql, sql/add_factura_entrada.sql, sql/add_creado_por_nombre.sql, sql/perfil_sociodemografico.sql, sql/aspirantes.sql, sql/perfil_publico.sql (funciones RPC que usa perfil-publico.html para validar la cédula del lado del servidor sin necesitar sesión), sql/link_facturas_observaciones_*.sql (cruza a mano una sola vez el número de factura que haya quedado en Observaciones de entradas viejas contra facturas.numero_factura), sql/sync_empleados_*.sql (el más reciente es la última sincronización con RRHH, ver "Mantener actualizados los empleados" arriba)
+supabase/functions/sonar-insert-driver   Edge Function: registra en Sonar Telematics a los conductores de la ruta 700 (ver "Integración con Sonar Telematics" arriba)
+sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql, sql/update_base_vehiculo_*.sql, sql/add_factura_entrada.sql, sql/add_creado_por_nombre.sql, sql/perfil_sociodemografico.sql, sql/aspirantes.sql, sql/perfil_publico.sql (funciones RPC que usa perfil-publico.html para validar la cédula del lado del servidor sin necesitar sesión), sql/link_facturas_observaciones_*.sql (cruza a mano una sola vez el número de factura que haya quedado en Observaciones de entradas viejas contra facturas.numero_factura), sql/sync_empleados_*.sql (el más reciente es la última sincronización con RRHH, ver "Mantener actualizados los empleados" arriba), sql/sonar_conductores.sql (columnas de seguimiento del envío a Sonar)
 ```
 
 ## 5. Publicar una nueva versión
