@@ -23,6 +23,13 @@ const CAMPOS_SOCIODEMOGRAFICOS = [
   { id: 'conduce', label: '¿Conduce para el desempeño de sus funciones?', type: 'checkbox' },
   { id: 'tipo_vehiculo_conduce', label: 'Tipo de vehículo que conduce', type: 'text' },
   { id: 'anios_experiencia_conduccion', label: 'Años de experiencia en conducción', type: 'number' },
+  { id: 'talla_camisa', label: 'Talla de camisa', type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] },
+  { id: 'talla_pantalon', label: 'Talla de pantalón', type: 'select', options: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'] },
+  { id: 'talla_calzado', label: 'Talla de calzado', type: 'select', options: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'] },
+  { id: 'eps', label: 'EPS', type: 'text' },
+  { id: 'arl', label: 'ARL', type: 'text' },
+  { id: 'fondo_pension', label: 'Fondo de pensión', type: 'text' },
+  { id: 'caja_compensacion', label: 'Caja de compensación', type: 'text' },
   { id: 'observaciones', label: 'Observaciones', type: 'textarea' },
 ];
 
@@ -315,7 +322,7 @@ Router.register('empleados', {
         </button>
         <div class="detalle-header-info">
           <div class="detalle-nombre">${empleado.nombre}</div>
-          <div class="detalle-sub">CC ${empleado.cedula}${empleado.cargo ? ' · ' + empleado.cargo : ''}${empleado.area ? ' · ' + empleado.area : ''}</div>
+          <div class="detalle-sub">CC ${empleado.cedula}${empleado.cargo ? ' · ' + empleado.cargo : ''}${empleado.area ? ' · ' + empleado.area : ''}${empleado.telefono ? ' · ' + empleado.telefono : ''}${empleado.email_personal ? ' · ' + empleado.email_personal : ''}</div>
         </div>
         <div class="detalle-tags">
           <span class="tag ${empleado.activo ? 'activo' : 'inactivo-tag'}">${empleado.activo ? 'Activo' : 'Inactivo'}</span>
@@ -445,6 +452,8 @@ Router.register('empleados', {
             <label>Cédula<input type="text" id="empleado-cedula" value="${empleado?.cedula || ''}" required /></label>
             <label>Cargo<input type="text" id="empleado-cargo" value="${empleado?.cargo || ''}" /></label>
             <label>Área<input type="text" id="empleado-area" value="${empleado?.area || ''}" /></label>
+            <label>Teléfono<input type="tel" id="empleado-telefono" value="${empleado?.telefono || ''}" /></label>
+            <label>Correo personal<input type="email" id="empleado-email-personal" value="${empleado?.email_personal || ''}" /></label>
           </div>
           <label class="checkbox-label"><input type="checkbox" id="empleado-activo" ${!empleado || empleado.activo ? 'checked' : ''} /> Empleado activo</label>
         </fieldset>
@@ -556,6 +565,8 @@ Router.register('empleados', {
       cedula,
       cargo: document.getElementById('empleado-cargo').value.trim() || null,
       area: document.getElementById('empleado-area').value.trim() || null,
+      telefono: document.getElementById('empleado-telefono').value.trim() || null,
+      email_personal: document.getElementById('empleado-email-personal').value.trim() || null,
       activo: document.getElementById('empleado-activo').checked,
       numero_interno: document.getElementById('empleado-numero-interno').value.trim() || null,
       ruta: document.getElementById('empleado-ruta').value.trim() || null,

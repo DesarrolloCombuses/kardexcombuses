@@ -35,6 +35,13 @@ create table if not exists perfil_sociodemografico (
   conduce boolean,
   tipo_vehiculo_conduce text,
   anios_experiencia_conduccion integer,
+  talla_camisa text,
+  talla_pantalon text,
+  talla_calzado text,
+  eps text,
+  arl text,
+  fondo_pension text,
+  caja_compensacion text,
   observaciones text,
 
   created_at timestamptz not null default now(),

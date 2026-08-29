@@ -1,34 +1,14 @@
 -- ============================================================================
 -- Kardex de Dotacion -- Combuses SA
--- Autodiligenciamiento del perfil por parte del nuevo empleado, via un link
--- publico (sin login) que se le comparte manualmente. El link solo trae el
--- id del empleado; la cedula la escribe la persona y se valida del lado del
--- servidor antes de mostrar o guardar cualquier dato -- por eso estas
--- funciones son "security definer" en vez de dar permisos directos de tabla
--- al rol anon.
---
--- Version ampliada: cubre casi todo el perfil sociodemografico (tipo de
--- identificacion, vivienda, familia, grupo etnico, salud, etc.), foto de
--- perfil, contactos de emergencia e hijos, talla de dotacion, afiliaciones
--- (EPS/ARL/pension/caja de compensacion) y correo personal, con validacion
--- de edad minima (17 anios) del lado del servidor. Reemplaza versiones
--- anteriores (mas basicas) de este archivo.
---
--- Ejecutar en el SQL Editor de Supabase despues de schema.sql,
--- perfil_sociodemografico.sql y contactos_hijos_empleado.sql. Seguro de
--- re-ejecutar.
+-- Amplia el perfil con: talla de dotacion (camisa/pantalon/calzado -- util
+-- porque esta misma app reparte la dotacion), afiliaciones (EPS, ARL, fondo
+-- de pension, caja de compensacion) y correo personal. Tambien deja que
+-- "Hijos" se pueda diligenciar desde el link publico (antes solo se
+-- editaba desde Empleados, igual que ya pasaba con Contactos de
+-- emergencia).
+-- Ejecutar despues de perfil_sociodemografico.sql, contactos_hijos_empleado.sql
+-- y perfil_publico.sql. Seguro de re-ejecutar.
 -- ============================================================================
-
-alter table employees add column if not exists telefono text;
-alter table employees add column if not exists email_personal text;
-
--- Aprobacion final del perfil: distinta de "seleccionar" al aspirante
--- (convertirlo en empleado y enviarle el link). El empleado ya tiene todos
--- sus datos autodiligenciados cuando la jefa de Gestion Humana revisa y
--- aprueba desde Seleccion de personal -- eso es lo que queda registrado
--- acá, y es lo que el link publico le muestra a la persona.
-alter table employees add column if not exists perfil_aprobado_at timestamptz;
-alter table employees add column if not exists perfil_aprobado_por text;
 
 alter table perfil_sociodemografico add column if not exists talla_camisa text;
 alter table perfil_sociodemografico add column if not exists talla_pantalon text;
@@ -38,12 +18,10 @@ alter table perfil_sociodemografico add column if not exists arl text;
 alter table perfil_sociodemografico add column if not exists fondo_pension text;
 alter table perfil_sociodemografico add column if not exists caja_compensacion text;
 
--- Firmas anteriores de estas funciones -- se borran antes de recrearlas
--- porque el numero/tipo de parametros cambio, y "create or replace" no
--- reemplaza una funcion si la firma es distinta (dejaria varias versiones
--- conviviendo, ambiguas para PostgREST).
-drop function if exists public.perfil_publico_obtener(uuid, text);
-drop function if exists public.perfil_publico_guardar(uuid, text, date, text, text, text, text);
+alter table employees add column if not exists email_personal text;
+
+-- Firma anterior de esta funcion (sin p_hijos) -- se borra antes de
+-- recrearla porque el numero de parametros cambio.
 drop function if exists public.perfil_publico_guardar(uuid, text, jsonb, jsonb, text);
 
 create or replace function public.perfil_publico_obtener(p_employee_id uuid, p_cedula text)
@@ -153,9 +131,6 @@ begin
     raise exception 'Revisa la fecha de nacimiento, parece incorrecta.';
   end if;
 
-  -- Cualquier guardado desde el link deja el perfil otra vez pendiente de
-  -- aprobación: si ya estaba aprobado y la persona corrige un dato, la
-  -- aprobación anterior quedó sobre datos que ya no son los actuales.
   update employees set
     telefono = coalesce(p_perfil->>'telefono', telefono),
     email_personal = coalesce(p_perfil->>'email_personal', email_personal),
@@ -244,33 +219,3 @@ $$;
 
 revoke all on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) from public;
 grant execute on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) to anon, authenticated;
-
--- Deja que el link publico (rol anon, sin sesion) suba/reemplace SOLO la
--- foto de perfil del empleado del link, y unicamente bajo esta ruta fija
--- ("perfil-publico/<id-del-empleado>.jpg", una foto por empleado). No
--- depende de la cedula -- las policies de Storage no tienen forma de
--- validarla, solo pueden mirar la ruta del archivo -- pero exige que exista
--- un empleado con exactamente ese id, y aunque suban el archivo, no queda
--- como LA foto oficial del empleado (employees.foto_url) hasta que
--- perfil_publico_guardar() la registre, y esa funcion si valida la cedula.
--- A proposito no se da permiso de lectura (select) a anon sobre este bucket:
--- así nadie puede listar ni ver la foto de otro empleado con solo la anon
--- key, aunque sepa o adivine su id.
-drop policy if exists "anon_insert_foto_perfil_publico" on storage.objects;
-create policy "anon_insert_foto_perfil_publico" on storage.objects
-  for insert
-  to anon
-  with check (
-    bucket_id = 'fotos-empleados'
-    and exists (select 1 from employees e where name = 'perfil-publico/' || e.id::text || '.jpg')
-  );
-
-drop policy if exists "anon_update_foto_perfil_publico" on storage.objects;
-create policy "anon_update_foto_perfil_publico" on storage.objects
-  for update
-  to anon
-  using (bucket_id = 'fotos-empleados' and name like 'perfil-publico/%')
-  with check (
-    bucket_id = 'fotos-empleados'
-    and exists (select 1 from employees e where name = 'perfil-publico/' || e.id::text || '.jpg')
-  );

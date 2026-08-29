@@ -400,6 +400,7 @@ end $$;
 -- ----------------------------------------------------------------------------
 
 alter table employees add column if not exists telefono text;
+alter table employees add column if not exists email_personal text;
 
 -- Aprobación final del perfil: distinta de "seleccionar" al aspirante
 -- (convertirlo en empleado y enviarle el link). El empleado ya tiene todos
@@ -409,8 +410,17 @@ alter table employees add column if not exists telefono text;
 alter table employees add column if not exists perfil_aprobado_at timestamptz;
 alter table employees add column if not exists perfil_aprobado_por text;
 
+alter table perfil_sociodemografico add column if not exists talla_camisa text;
+alter table perfil_sociodemografico add column if not exists talla_pantalon text;
+alter table perfil_sociodemografico add column if not exists talla_calzado text;
+alter table perfil_sociodemografico add column if not exists eps text;
+alter table perfil_sociodemografico add column if not exists arl text;
+alter table perfil_sociodemografico add column if not exists fondo_pension text;
+alter table perfil_sociodemografico add column if not exists caja_compensacion text;
+
 drop function if exists public.perfil_publico_obtener(uuid, text);
 drop function if exists public.perfil_publico_guardar(uuid, text, date, text, text, text, text);
+drop function if exists public.perfil_publico_guardar(uuid, text, jsonb, jsonb, text);
 
 create or replace function public.perfil_publico_obtener(p_employee_id uuid, p_cedula text)
 returns jsonb
@@ -433,6 +443,7 @@ begin
     'cargo', e.cargo,
     'area', e.area,
     'telefono', e.telefono,
+    'email_personal', e.email_personal,
     'foto_url', e.foto_url,
     'perfil_aprobado_at', e.perfil_aprobado_at,
     'fecha_ingreso', ps.fecha_ingreso,
@@ -454,9 +465,20 @@ begin
     'conduce', ps.conduce,
     'tipo_vehiculo_conduce', ps.tipo_vehiculo_conduce,
     'anios_experiencia_conduccion', ps.anios_experiencia_conduccion,
+    'talla_camisa', ps.talla_camisa,
+    'talla_pantalon', ps.talla_pantalon,
+    'talla_calzado', ps.talla_calzado,
+    'eps', ps.eps,
+    'arl', ps.arl,
+    'fondo_pension', ps.fondo_pension,
+    'caja_compensacion', ps.caja_compensacion,
     'contactos', coalesce((
       select jsonb_agg(jsonb_build_object('nombre', ce.nombre, 'parentesco', ce.parentesco, 'telefono', ce.telefono) order by ce.created_at)
       from contactos_emergencia ce where ce.employee_id = e.id
+    ), '[]'::jsonb),
+    'hijos', coalesce((
+      select jsonb_agg(jsonb_build_object('nombre', h.nombre, 'fecha_nacimiento', h.fecha_nacimiento, 'sexo', h.sexo) order by h.created_at)
+      from hijos_empleado h where h.employee_id = e.id
     ), '[]'::jsonb)
   ) into v_result
   from employees e
@@ -475,6 +497,7 @@ create or replace function public.perfil_publico_guardar(
   p_cedula text,
   p_perfil jsonb,
   p_contactos jsonb default '[]'::jsonb,
+  p_hijos jsonb default '[]'::jsonb,
   p_foto_url text default null
 )
 returns void
@@ -511,6 +534,7 @@ begin
   -- aprobación anterior quedó sobre datos que ya no son los actuales.
   update employees set
     telefono = coalesce(p_perfil->>'telefono', telefono),
+    email_personal = coalesce(p_perfil->>'email_personal', email_personal),
     foto_url = coalesce(p_foto_url, foto_url),
     perfil_aprobado_at = null,
     perfil_aprobado_por = null
@@ -520,7 +544,9 @@ begin
     employee_id, tipo_identificacion, fecha_nacimiento, sexo, estado_civil, grado_escolaridad,
     composicion_familiar, personas_a_cargo, cabeza_familia, estrato_socioeconomico,
     lugar_residencia, barrio, tipo_vivienda, medio_desplazamiento, raza, tipo_sangre,
-    conduce, tipo_vehiculo_conduce, anios_experiencia_conduccion, updated_at
+    conduce, tipo_vehiculo_conduce, anios_experiencia_conduccion,
+    talla_camisa, talla_pantalon, talla_calzado, eps, arl, fondo_pension, caja_compensacion,
+    updated_at
   ) values (
     p_employee_id,
     p_perfil->>'tipo_identificacion',
@@ -541,6 +567,13 @@ begin
     coalesce((p_perfil->>'conduce')::boolean, false),
     p_perfil->>'tipo_vehiculo_conduce',
     nullif(p_perfil->>'anios_experiencia_conduccion', '')::integer,
+    p_perfil->>'talla_camisa',
+    p_perfil->>'talla_pantalon',
+    p_perfil->>'talla_calzado',
+    p_perfil->>'eps',
+    p_perfil->>'arl',
+    p_perfil->>'fondo_pension',
+    p_perfil->>'caja_compensacion',
     now()
   )
   on conflict (employee_id) do update set
@@ -562,6 +595,13 @@ begin
     conduce = excluded.conduce,
     tipo_vehiculo_conduce = excluded.tipo_vehiculo_conduce,
     anios_experiencia_conduccion = excluded.anios_experiencia_conduccion,
+    talla_camisa = excluded.talla_camisa,
+    talla_pantalon = excluded.talla_pantalon,
+    talla_calzado = excluded.talla_calzado,
+    eps = excluded.eps,
+    arl = excluded.arl,
+    fondo_pension = excluded.fondo_pension,
+    caja_compensacion = excluded.caja_compensacion,
     updated_at = now();
 
   delete from contactos_emergencia where employee_id = p_employee_id;
@@ -569,11 +609,17 @@ begin
   select p_employee_id, c->>'nombre', c->>'parentesco', c->>'telefono'
   from jsonb_array_elements(coalesce(p_contactos, '[]'::jsonb)) as c
   where coalesce(c->>'nombre', '') <> '';
+
+  delete from hijos_empleado where employee_id = p_employee_id;
+  insert into hijos_empleado (employee_id, nombre, fecha_nacimiento, sexo)
+  select p_employee_id, h->>'nombre', nullif(h->>'fecha_nacimiento', '')::date, h->>'sexo'
+  from jsonb_array_elements(coalesce(p_hijos, '[]'::jsonb)) as h
+  where coalesce(h->>'nombre', '') <> '';
 end;
 $$;
 
-revoke all on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, text) from public;
-grant execute on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, text) to anon, authenticated;
+revoke all on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) from public;
+grant execute on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) to anon, authenticated;
 
 -- Deja que el link publico (rol anon, sin sesion) suba/reemplace SOLO la
 -- foto de perfil del empleado del link, y unicamente bajo esta ruta fija

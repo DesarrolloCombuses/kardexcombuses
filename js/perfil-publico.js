@@ -51,6 +51,26 @@ const SECCIONES_PUBLICAS = [
       { id: 'anios_experiencia_conduccion', label: 'Años de experiencia en conducción', type: 'number' },
     ],
   },
+  {
+    // Como esta misma app reparte la dotación, tener la talla desde el
+    // ingreso evita tener que preguntarla después o adivinarla al momento
+    // de la entrega.
+    titulo: 'Talla de dotación',
+    campos: [
+      { id: 'talla_camisa', label: 'Talla de camisa', type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] },
+      { id: 'talla_pantalon', label: 'Talla de pantalón', type: 'select', options: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'] },
+      { id: 'talla_calzado', label: 'Talla de calzado', type: 'select', options: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'] },
+    ],
+  },
+  {
+    titulo: 'Afiliaciones',
+    campos: [
+      { id: 'eps', label: 'EPS', type: 'text' },
+      { id: 'arl', label: 'ARL', type: 'text' },
+      { id: 'fondo_pension', label: 'Fondo de pensión', type: 'text' },
+      { id: 'caja_compensacion', label: 'Caja de compensación', type: 'text' },
+    ],
+  },
 ];
 
 const TODOS_LOS_CAMPOS = SECCIONES_PUBLICAS.flatMap((s) => s.campos);
@@ -150,6 +170,27 @@ function validarFechaNacimiento(iso) {
     wrap.querySelector('.linea-remove').addEventListener('click', () => wrap.remove());
   }
 
+  function addHijoRow(hijo) {
+    const wrap = document.createElement('div');
+    wrap.className = 'linea-row-wrap';
+    wrap.innerHTML = `
+      <div class="linea-row">
+        <div class="linea-field"><span class="linea-field-label">Nombre</span><input type="text" class="hijo-nombre" value="${hijo?.nombre || ''}" /></div>
+        <div class="linea-field"><span class="linea-field-label">Fecha de nacimiento</span><input type="date" class="hijo-fecha-nacimiento" value="${hijo?.fecha_nacimiento || ''}" /></div>
+        <div class="linea-field"><span class="linea-field-label">Sexo</span>
+          <select class="hijo-sexo">
+            <option value="">—</option>
+            <option value="Masculino" ${hijo?.sexo === 'Masculino' ? 'selected' : ''}>Masculino</option>
+            <option value="Femenino" ${hijo?.sexo === 'Femenino' ? 'selected' : ''}>Femenino</option>
+          </select>
+        </div>
+        <button type="button" class="linea-remove">Quitar</button>
+      </div>
+    `;
+    document.getElementById('pp-hijos').appendChild(wrap);
+    wrap.querySelector('.linea-remove').addEventListener('click', () => wrap.remove());
+  }
+
   function bannerAprobacionHtml(perfil) {
     return perfil.perfil_aprobado_at
       ? '<div class="pp-banner aprobado" id="pp-estado-banner">✓ Tu perfil fue aprobado. ¡Bienvenido(a) a Combuses!</div>'
@@ -202,7 +243,10 @@ function validarFechaNacimiento(iso) {
 
         <fieldset class="pp-section">
           <legend>Contacto</legend>
-          <label>Teléfono<input type="tel" id="pp-telefono" value="${perfil.telefono || ''}" placeholder="Número de celular" /></label>
+          <div class="fieldset-grid">
+            <label>Teléfono<input type="tel" id="pp-telefono" value="${perfil.telefono || ''}" placeholder="Número de celular" /></label>
+            <label>Correo personal<input type="email" id="pp-email-personal" value="${perfil.email_personal || ''}" placeholder="tucorreo@ejemplo.com" /></label>
+          </div>
         </fieldset>
 
         <fieldset class="pp-section">
@@ -212,6 +256,13 @@ function validarFechaNacimiento(iso) {
           <button type="button" id="pp-contacto-add" class="btn-secondary">+ Agregar contacto</button>
         </fieldset>
 
+        <fieldset class="pp-section">
+          <legend>Hijos</legend>
+          <p class="view-intro" style="margin:0 0 0.6rem">Si tienes, puedes agregar más de uno.</p>
+          <div id="pp-hijos"></div>
+          <button type="button" id="pp-hijo-add" class="btn-secondary">+ Agregar hijo/a</button>
+        </fieldset>
+
         <button type="submit" class="btn-block"><span>Guardar mis datos</span></button>
         <p id="pp-datos-msg" class="form-msg"></p>
       </form>
@@ -219,6 +270,9 @@ function validarFechaNacimiento(iso) {
 
     document.getElementById('pp-contacto-add').addEventListener('click', () => addContactoRow());
     (perfil.contactos || []).forEach((c) => addContactoRow(c));
+
+    document.getElementById('pp-hijo-add').addEventListener('click', () => addHijoRow());
+    (perfil.hijos || []).forEach((h) => addHijoRow(h));
 
     // stamp:false -- es una foto de perfil, no debe quedar con fecha/hora
     // quemada como las de evidencia de entrega.
@@ -263,7 +317,11 @@ function validarFechaNacimiento(iso) {
         fotoUrl = await DB.uploadFotoPublico(employeeId, fotoCamera.getFile());
       }
 
-      const perfil = { fecha_nacimiento: fechaNacimiento, telefono: document.getElementById('pp-telefono').value.trim() || null };
+      const perfil = {
+        fecha_nacimiento: fechaNacimiento,
+        telefono: document.getElementById('pp-telefono').value.trim() || null,
+        email_personal: document.getElementById('pp-email-personal').value.trim() || null,
+      };
       TODOS_LOS_CAMPOS.forEach((c) => { perfil[c.id] = leerValorCampo(c); });
 
       const contactos = Array.from(document.querySelectorAll('#pp-contactos .linea-row'))
@@ -274,7 +332,15 @@ function validarFechaNacimiento(iso) {
         }))
         .filter((c) => c.nombre);
 
-      await DB.guardarPerfilPublico(employeeId, cedulaVerificada, perfil, contactos, fotoUrl);
+      const hijos = Array.from(document.querySelectorAll('#pp-hijos .linea-row'))
+        .map((row) => ({
+          nombre: row.querySelector('.hijo-nombre').value.trim(),
+          fecha_nacimiento: row.querySelector('.hijo-fecha-nacimiento').value || null,
+          sexo: row.querySelector('.hijo-sexo').value || null,
+        }))
+        .filter((h) => h.nombre);
+
+      await DB.guardarPerfilPublico(employeeId, cedulaVerificada, perfil, contactos, hijos, fotoUrl);
       msg.textContent = 'Datos guardados. ¡Gracias!';
       msg.className = 'form-msg success';
 

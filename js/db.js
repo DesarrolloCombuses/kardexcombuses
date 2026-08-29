@@ -347,12 +347,13 @@ const DB = {
   // parentesco, telefono} (reemplaza los existentes, igual que
   // saveContactosEmergencia). fotoUrl: el path ya subido con
   // uploadFotoPublico, o null si no se tocó la foto en este guardado.
-  async guardarPerfilPublico(employeeId, cedula, perfil, contactos, fotoUrl) {
+  async guardarPerfilPublico(employeeId, cedula, perfil, contactos, hijos, fotoUrl) {
     const { error } = await window.supabaseClient.rpc('perfil_publico_guardar', {
       p_employee_id: employeeId,
       p_cedula: cedula,
       p_perfil: perfil,
       p_contactos: contactos || [],
+      p_hijos: hijos || [],
       p_foto_url: fotoUrl || null,
     });
     if (error) throw error;
