@@ -1,7 +1,7 @@
 {
-  "name": "Kardex Dotación — Combuses SA",
-  "short_name": "Kardex Dotación",
-  "description": "Kardex de entradas y salidas de dotación con firma electrónica y foto.",
+  "name": "ERP Combuses",
+  "short_name": "ERP Combuses",
+  "description": "Gestión de dotación, personal y aspirantes de Combuses SA, con firma electrónica y foto en cada entrega.",
   "start_url": "index.html",
   "scope": ".",
   "display": "standalone",

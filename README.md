@@ -1,8 +1,9 @@
-# Kardex de Dotación — Combuses SA
+# ERP Combuses
 
-PWA en HTML/CSS/JS puro (sin build step) para llevar el kardex de entradas y
-salidas de dotación, con firma electrónica y foto en cada entrega, respaldada
-por Supabase (Postgres + Auth + Storage).
+PWA en HTML/CSS/JS puro (sin build step) para la gestión de dotación y
+personal de Combuses SA: kardex de entradas y salidas con firma electrónica
+y foto en cada entrega, selección de aspirantes y perfil de empleados,
+respaldada por Supabase (Postgres + Auth + Storage).
 
 ## 1. Configurar Supabase
 
@@ -18,7 +19,7 @@ Proyecto: `https://cbplebkmxrkaafqdhiyi.supabase.co` (ya cargado en [js/config.j
    7. [sql/update_base_vehiculo_2026-08-27.sql](sql/update_base_vehiculo_2026-08-27.sql) — carga la columna `base` de `employees` (el afiliado al que va dirigido el vehículo, ya agregada por el `alter table` de `schema.sql`), cruzando por número interno de vehículo en vez de por cédula. Seguro de re-ejecutar; si cambia la base de algún vehículo, se regenera este script igual que `sql/sync_empleados_*.sql`.
    8. [sql/add_factura_entrada.sql](sql/add_factura_entrada.sql) — agrega `factura_id` a `kardex_movements` para poder vincular cada entrada con la factura de la que salió (antes no había forma de identificarlo y se anotaba a mano en observaciones). Debe correrse después de `sql/facturas.sql`. Seguro de re-ejecutar.
    9. [sql/add_creado_por_nombre.sql](sql/add_creado_por_nombre.sql) — agrega `creado_por_nombre` a `kardex_movements`, guardado al momento de registrar cada entrada/salida (con respaldo al correo si `profiles` no tiene el nombre lleno), para que Historial y el Excel siempre identifiquen quién hizo cada movimiento. Seguro de re-ejecutar.
-   10. [sql/perfil_sociodemografico.sql](sql/perfil_sociodemografico.sql) — tabla `perfil_sociodemografico` (edad, género, estado civil, escolaridad, vivienda, desplazamiento, etc. por empleado) para el diagnóstico del SG-SST, con RLS igual al resto de Kardex. Seguro de re-ejecutar.
+   10. [sql/perfil_sociodemografico.sql](sql/perfil_sociodemografico.sql) — tabla `perfil_sociodemografico` (edad, género, estado civil, escolaridad, vivienda, desplazamiento, etc. por empleado) para el diagnóstico del SG-SST, con RLS igual al resto de ERP Combuses. Seguro de re-ejecutar.
 2. Ve a **Authentication → Users** y crea el/los usuarios que van a iniciar sesión (correo + contraseña). No hay registro público en la app: los usuarios se crean únicamente desde el dashboard.
    - `profiles` no tiene un trigger automático en este proyecto (es una tabla compartida con otro sistema). Si quieres que el nombre de un usuario aparezca completo en vez de su correo, agrega/edita su fila en `profiles` (columna `full_name`) desde el SQL Editor.
 
@@ -35,7 +36,7 @@ así que la sincronización es manual:
    comparte de nuevo el link publicado de la hoja.
 2. Se regenera un script tipo [sql/sync_empleados_2026-08-26.sql](sql/sync_empleados_2026-08-26.sql)
    — un `insert ... on conflict (cedula) do update` idempotente que trae
-   *solo* lo que usa el Kardex (nombre, cédula, cargo, área, activo,
+   *solo* lo que usa ERP Combuses (nombre, cédula, cargo, área, activo,
    vehículo/ruta). Deliberadamente no importa los campos sensibles de esa
    hoja (salario, EPS/AFP, dirección, teléfono, fecha de nacimiento, etc.),
    que no tienen nada que ver con el control de dotación.

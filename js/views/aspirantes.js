@@ -241,7 +241,7 @@ Router.register('aspirantes', {
     const shareBtn = document.getElementById('pp-link-compartir');
     if (shareBtn) {
       shareBtn.addEventListener('click', () => {
-        navigator.share({ title: 'Completa tus datos — Kardex Dotación', text: `Hola ${nombre}, completa tus datos aquí:`, url }).catch(() => {});
+        navigator.share({ title: 'Completa tus datos — ERP Combuses', text: `Hola ${nombre}, completa tus datos aquí:`, url }).catch(() => {});
       });
     }
   },
