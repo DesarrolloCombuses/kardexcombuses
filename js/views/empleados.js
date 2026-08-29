@@ -366,6 +366,7 @@ Router.register('empleados', {
       </div>
 
       ${vehiculoHtml}
+      ${sonarHtml}
 
       <div class="modal-section">
         <h3 class="modal-section-title">Perfil sociodemográfico</h3>
@@ -374,7 +375,6 @@ Router.register('empleados', {
 
       ${contactosHtml}
       ${hijosHtml}
-      ${sonarHtml}
 
       <button type="button" id="empleado-detalle-editar" style="margin-top:1.2rem">Editar</button>
     `;
