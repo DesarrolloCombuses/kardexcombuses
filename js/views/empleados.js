@@ -418,15 +418,15 @@ Router.register('empleados', {
   },
 
   async _enviarASonar(employeeId, msgEl) {
-    msgEl.textContent = 'Enviando a Sonar…';
+    msgEl.textContent = 'Conectando con Sonar…';
     msgEl.className = 'form-msg';
     try {
       const res = await DB.enviarConductorASonar(employeeId);
-      msgEl.textContent = res.ok ? 'Enviado a Sonar correctamente.' : `Sonar respondió con un error: ${res.message}`;
+      msgEl.textContent = res.ok ? '✓ Conectado con Sonar: el conductor quedó creado.' : `No se pudo conectar con Sonar: ${res.message}`;
       msgEl.className = res.ok ? 'form-msg success' : 'form-msg error';
       return res;
     } catch (err) {
-      msgEl.textContent = 'No se pudo enviar a Sonar: ' + err.message;
+      msgEl.textContent = 'No se pudo conectar con Sonar: ' + err.message;
       msgEl.className = 'form-msg error';
       return null;
     }
@@ -731,18 +731,15 @@ Router.register('empleados', {
       await DB.saveHijosEmpleado(id, hijos);
 
       // Primera vez que este conductor queda con cargo Conductor + ruta 700:
-      // se ofrece enviarlo a Sonar de una vez, mostrando exactamente qué se
-      // enviaría para que quien guarda pueda revisarlo antes de confirmar.
-      // Ediciones posteriores no vuelven a preguntar solas -- para eso queda
-      // el botón "Reenviar a Sonar" en el detalle del empleado.
+      // se envía a Sonar automáticamente, sin pedir confirmación -- el
+      // mensaje deja explícito que se conectó con Sonar para que quede
+      // claro que sí pasó. Ediciones posteriores no vuelven a enviarse
+      // solas -- para eso queda el botón "Reenviar a Sonar" en el detalle.
       const requiereSonar = /conductor/i.test(basico.cargo || '') && esRuta700(basico.ruta);
       if (requiereSonar && !this._empleadoSonarSyncedAt) {
-        const detalle = `Cédula: ${basico.cedula}\nNombre: ${basico.nombre}\nTeléfono: ${basico.telefono || '(sin dato)'}\nCorreo: ${basico.email_personal || '(sin dato)'}`;
-        if (window.confirm(`Este conductor quedó asignado a la ruta 700.\n\nSe enviará a Sonar Telematics con estos datos:\n${detalle}\n\n¿Enviarlo ahora?`)) {
-          await this._enviarASonar(id, msg);
-          await this._load();
-          return;
-        }
+        await this._enviarASonar(id, msg);
+        await this._load();
+        return;
       }
 
       msg.textContent = 'Empleado guardado correctamente.';
