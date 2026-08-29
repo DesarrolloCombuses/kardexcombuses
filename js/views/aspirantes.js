@@ -1,3 +1,10 @@
+// Áreas administrativas fijas para clasificar la vacante -- se muestran
+// siempre como sugerencia (además de las áreas que ya traen los empleados
+// activos), porque el campo "área" de Empleados históricamente se usa más
+// como cargo ("CONDUCTORES RUTA URBANA", "GESTOR DE SERVICIOS Y EMBARQUE",
+// etc.) que como una categoría limpia, y estas 5 no aparecían solas.
+const AREAS_VACANTE_FIJAS = ['CONTABILIDAD', 'GERENCIA', 'GESTION Y CONTROL DE FLOTA', 'GESTION HUMANA', 'NOMINA'];
+
 Router.register('aspirantes', {
   title: 'Selección de personal',
 
@@ -32,7 +39,7 @@ Router.register('aspirantes', {
       document.getElementById(id).innerHTML = opciones.map((v) => `<option value="${v}"></option>`).join('');
     };
     llenar('aspirante-cargo-list', empleados.map((e) => e.cargo));
-    llenar('aspirante-area-list', empleados.map((e) => e.area));
+    llenar('aspirante-area-list', [...AREAS_VACANTE_FIJAS, ...empleados.map((e) => e.area)]);
   },
 
   _render() {
