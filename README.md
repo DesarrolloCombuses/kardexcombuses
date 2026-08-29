@@ -26,19 +26,22 @@ Proyecto: `https://cbplebkmxrkaafqdhiyi.supabase.co` (ya cargado en [js/config.j
 
 La *anon/publishable key* que está en `js/config.js` es segura de exponer en el cliente: la protección real de los datos la da Row Level Security (todas las tablas exigen sesión autenticada, sin acceso anónimo).
 
-### Integración con Sonar Telematics (conductores de la ruta 700)
+### Integración con Sonar Telematics (conductores de rutas 700, 2 y 41)
 
 **Importante**: el proyecto Supabase de Combuses es compartido con el sistema de flota, que ya tiene su propio ecosistema de Edge Functions y secrets de Sonar (`asignar-conductor-sonar*`, `sonar-dispatch`, `sonar-sync-positions`, etc. — no viven en este repo). Antes de tocar cualquier secret o función de Sonar desde aquí, correr `supabase secrets list` y `supabase functions list` para no pisar algo que ya está en producción.
 
-Cuando se guarda un empleado con cargo "Conductor" y ruta "700", el ERP ofrece enviarlo a Sonar Telematics (registro del conductor vía `SET_InsertDriver`) mostrando antes un resumen de los datos a enviar. Esto lo hace la Edge Function [supabase/functions/sonar-insert-driver](supabase/functions/sonar-insert-driver/index.ts), que:
+Cuando se guarda un empleado con cargo "Conductor" y una ruta configurada (ver `RUTAS_SONAR` en [js/views/empleados.js](js/views/empleados.js)), el ERP lo envía automáticamente a Sonar Telematics (registro del conductor vía `SET_InsertDriver`), mostrando el resultado en el formulario. Esto lo hace la Edge Function [supabase/functions/sonar-insert-driver](supabase/functions/sonar-insert-driver/index.ts), que:
 - Solo se puede invocar con una sesión autenticada del ERP (no expone las credenciales de Sonar al cliente).
-- Reutiliza los secrets `SONAR_USER`, `SONAR_PASSWORD` y `SONAR_FLEET_ID` que ya existían en el proyecto para el resto de la integración de Sonar.
+- **Combuses tiene más de una cuenta/flota en Sonar** — no todas las rutas comparten usuario ni flota. La función resuelve cada ruta a una "cuenta" (ver `RUTA_A_CUENTA` dentro del archivo):
+  - `urbana` (ruta 700): secrets `SONAR_USER` / `SONAR_PASSWORD` / `SONAR_FLEET_ID`, ya existentes en el proyecto (compartidos con `asignar-conductor-sonar-v2`).
+  - `urbana2` (rutas 2 y 41): secrets `SONAR_USER_2` / `SONAR_PASSWORD_2` / `SONAR_FLEET_ID_2`, creados para esta integración.
+  - Para sumar una ruta nueva: si ya usa una cuenta existente, agregarla a `RUTA_A_CUENTA` (y a `RUTAS_SONAR` en `empleados.js`); si es una cuenta nueva, crear sus secrets con un sufijo nuevo (`_3`, etc.) y agregar la entrada en `SONAR_ACCOUNTS`.
 
 Para desplegarla o actualizarla:
 ```bash
 supabase functions deploy sonar-insert-driver --project-ref cbplebkmxrkaafqdhiyi
 ```
-Las credenciales de Sonar se configuran (si hiciera falta cambiarlas) con `supabase secrets set SONAR_USER=... SONAR_PASSWORD=... --project-ref cbplebkmxrkaafqdhiyi` — nunca se escriben en este repo.
+Las credenciales de Sonar se configuran con `supabase secrets set SONAR_USER_N=... SONAR_PASSWORD_N=... SONAR_FLEET_ID_N=... --project-ref cbplebkmxrkaafqdhiyi` — nunca se escriben en este repo.
 
 ### Mantener actualizados los empleados
 

@@ -1,8 +1,14 @@
-// Envía/actualiza un conductor de la ruta 700 en Sonar Telematics (SOAP,
-// ASMX), replicando la lógica del Apps Script "SET_InsertDriver" que ya
-// usaba Combuses, pero corriendo del lado del servidor: las credenciales de
-// Sonar (SONAR_USER/SONAR_PASSWORD) quedan como secrets de esta función,
-// nunca en el cliente ni en el repo.
+// Envía/actualiza un conductor en Sonar Telematics (SOAP, ASMX), replicando
+// la lógica de los Apps Script "SET_InsertDriver" que ya usaba Combuses,
+// pero corriendo del lado del servidor: las credenciales de Sonar quedan
+// como secrets de esta función, nunca en el cliente ni en el repo.
+//
+// Combuses tiene MÁS DE UNA cuenta/flota en Sonar -- no todas las rutas
+// comparten usuario ni flota (ej: ruta 700 usa una cuenta, rutas 2 y 41
+// usan otra distinta). Por eso cada ruta se resuelve a una "cuenta" abajo;
+// para sumar una ruta nueva basta con agregarla a RUTA_A_CUENTA (si ya
+// tiene cuenta) o crear una cuenta nueva con sus propios secrets
+// SONAR_USER_N/SONAR_PASSWORD_N/SONAR_FLEET_ID_N y redesplegar.
 //
 // Solo la puede invocar un usuario ya autenticado en el ERP (auth: 'user'
 // exige una sesión válida de Supabase Auth) -- a diferencia del webhook de
@@ -16,7 +22,28 @@ const NS_TEMPURI = "http://tempuri.org/";
 const NS_SONAR = "http://sonaravl.com/webservices/";
 const SOAP_ACTION_INSERT_TEMPURI = NS_TEMPURI + "SET_InsertDriver";
 const SOAP_ACTION_INSERT_SONAR = NS_SONAR + "SET_InsertDriver";
-const FLEET_ID_RUTA_700_DEFAULT = 3638;
+
+interface SonarAccount {
+  userEnv: string;
+  passwordEnv: string;
+  fleetEnv: string;
+  fleetDefault: number;
+}
+
+// "urbana" ya la usaba asignar-conductor-sonar-v2 (SONAR_USER/SONAR_PASSWORD/
+// SONAR_FLEET_ID, sin tocar). "urbana2" es una cuenta nueva, con sus propios
+// secrets (SONAR_USER_2/SONAR_PASSWORD_2/SONAR_FLEET_ID_2) para no pisar la
+// primera.
+const SONAR_ACCOUNTS: Record<string, SonarAccount> = {
+  urbana: { userEnv: "SONAR_USER", passwordEnv: "SONAR_PASSWORD", fleetEnv: "SONAR_FLEET_ID", fleetDefault: 3638 },
+  urbana2: { userEnv: "SONAR_USER_2", passwordEnv: "SONAR_PASSWORD_2", fleetEnv: "SONAR_FLEET_ID_2", fleetDefault: 3721 },
+};
+
+const RUTA_A_CUENTA: Record<string, string> = {
+  "700": "urbana",
+  "2": "urbana2",
+  "41": "urbana2",
+};
 
 function xmlEscape(s: unknown): string {
   return String(s ?? "")
@@ -193,25 +220,24 @@ export default {
 
     const rutaNormalizada = String(empleado.ruta || "").replace(/\D/g, "");
     const esConductor = /conductor/i.test(empleado.cargo || "");
-    if (!esConductor || rutaNormalizada !== "700") {
+    const cuentaKey = RUTA_A_CUENTA[rutaNormalizada];
+    if (!esConductor || !cuentaKey) {
       return Response.json(
-        { ok: false, message: "Este empleado no es conductor de la ruta 700; no se envía a Sonar." },
+        { ok: false, message: "Este empleado no es conductor de una ruta configurada para Sonar; no se envía." },
         { status: 400 },
       );
     }
+    const cuenta = SONAR_ACCOUNTS[cuentaKey];
 
-    const sonarUser = Deno.env.get("SONAR_USER");
-    const sonarPassword = Deno.env.get("SONAR_PASSWORD");
+    const sonarUser = Deno.env.get(cuenta.userEnv);
+    const sonarPassword = Deno.env.get(cuenta.passwordEnv);
     if (!sonarUser || !sonarPassword) {
       return Response.json(
-        { ok: false, message: "Faltan las credenciales de Sonar (SONAR_USER/SONAR_PASSWORD) configuradas en el servidor." },
+        { ok: false, message: `Faltan las credenciales de Sonar (${cuenta.userEnv}/${cuenta.passwordEnv}) configuradas en el servidor.` },
         { status: 500 },
       );
     }
-    // Misma variable SONAR_FLEET_ID que ya usan asignar-conductor-sonar-v2 y
-    // sonar-drivers en este mismo proyecto -- una sola flota para todo
-    // Combuses en Sonar, no una por ruta.
-    const fleetId = Number(Deno.env.get("SONAR_FLEET_ID")) || FLEET_ID_RUTA_700_DEFAULT;
+    const fleetId = Number(Deno.env.get(cuenta.fleetEnv)) || cuenta.fleetDefault;
 
     const { data: perfil } = await ctx.supabase
       .from("perfil_sociodemografico")

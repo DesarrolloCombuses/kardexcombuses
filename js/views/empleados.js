@@ -40,14 +40,22 @@ function valorCampoDetalle(campo, valor) {
   return valor;
 }
 
+// Rutas cuyos conductores también deben quedar registrados en Sonar
+// Telematics -- mantener sincronizada con RUTA_A_CUENTA en
+// supabase/functions/sonar-insert-driver/index.ts (Combuses tiene más de
+// una cuenta/flota en Sonar, así que cada ruta nueva se agrega en los dos
+// lados: acá solo decide si se ofrece el envío, la Edge Function decide con
+// qué cuenta se envía).
+const RUTAS_SONAR = ['700', '2', '41'];
+
 // La ruta puede quedar escrita como "700", "Ruta 700" o "R700" según quién
 // la digite -- se compara solo por los dígitos para no depender del formato.
-function esRuta700(ruta) {
-  return String(ruta || '').replace(/\D/g, '') === '700';
+function esRutaSonar(ruta) {
+  return RUTAS_SONAR.includes(String(ruta || '').replace(/\D/g, ''));
 }
 
-function esConductorRuta700(empleado) {
-  return /conductor/i.test(empleado?.cargo || '') && esRuta700(empleado?.ruta);
+function esConductorRutaSonar(empleado) {
+  return /conductor/i.test(empleado?.cargo || '') && esRutaSonar(empleado?.ruta);
 }
 
 function formatFecha(iso) {
@@ -393,11 +401,11 @@ Router.register('empleados', {
     }
   },
 
-  // Los conductores de la ruta 700 deben existir también en Sonar Telematics
-  // (plataforma externa de rastreo GPS de los vehículos). Este bloque solo
-  // aparece para ellos; el resto de empleados no lo ve.
+  // Los conductores de ciertas rutas (RUTAS_SONAR) deben existir también en
+  // Sonar Telematics (plataforma externa de rastreo GPS de los vehículos).
+  // Este bloque solo aparece para ellos; el resto de empleados no lo ve.
   _sonarBloqueHtml(empleado) {
-    if (!esConductorRuta700(empleado)) return '';
+    if (!esConductorRutaSonar(empleado)) return '';
     let badge;
     if (empleado.sonar_synced_at) {
       badge = `<span class="tag completo">Sincronizado el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
@@ -409,7 +417,7 @@ Router.register('empleados', {
     return `
       <div class="modal-section">
         <h3 class="modal-section-title">Sonar Telematics</h3>
-        <p class="view-intro" style="margin:0 0 0.6rem">Este conductor es de la ruta 700, por eso también debe quedar registrado en Sonar Telematics.</p>
+        <p class="view-intro" style="margin:0 0 0.6rem">Este conductor pertenece a una ruta (${empleado.ruta || ''}) que también debe quedar registrada en Sonar Telematics.</p>
         <div id="empleado-sonar-badge" style="margin-bottom:0.6rem">${badge}</div>
         <button type="button" id="empleado-sonar-btn" class="btn-secondary">${empleado.sonar_synced_at ? 'Reenviar a Sonar' : 'Enviar a Sonar'}</button>
         <p id="empleado-sonar-msg" class="form-msg"></p>
@@ -730,12 +738,13 @@ Router.register('empleados', {
       await DB.saveContactosEmergencia(id, contactos);
       await DB.saveHijosEmpleado(id, hijos);
 
-      // Primera vez que este conductor queda con cargo Conductor + ruta 700:
-      // se envía a Sonar automáticamente, sin pedir confirmación -- el
-      // mensaje deja explícito que se conectó con Sonar para que quede
-      // claro que sí pasó. Ediciones posteriores no vuelven a enviarse
-      // solas -- para eso queda el botón "Reenviar a Sonar" en el detalle.
-      const requiereSonar = /conductor/i.test(basico.cargo || '') && esRuta700(basico.ruta);
+      // Primera vez que este conductor queda con cargo Conductor + una ruta
+      // de RUTAS_SONAR: se envía a Sonar automáticamente, sin pedir
+      // confirmación -- el mensaje deja explícito que se conectó con Sonar
+      // para que quede claro que sí pasó. Ediciones posteriores no vuelven
+      // a enviarse solas -- para eso queda el botón "Reenviar a Sonar" en
+      // el detalle.
+      const requiereSonar = esConductorRutaSonar(basico);
       if (requiereSonar && !this._empleadoSonarSyncedAt) {
         await this._enviarASonar(id, msg);
         await this._load();
