@@ -481,32 +481,97 @@
         <section data-view="aspirantes" class="view">
           <p class="view-intro">Aspirantes en proceso de selección, con su hoja de vida y el cargo al que aplican. Al seleccionar un candidato se crea de una vez el empleado y queda listo un link para que la persona complete su perfil; la aprobación final queda aparte, una vez ya diligenció todo.</p>
 
-          <form id="aspirante-form" class="form form-inline panel-card">
-            <input type="text" id="aspirante-nombre" placeholder="Nombre completo" required />
-            <input type="text" id="aspirante-cedula" placeholder="Cédula" required />
-            <input type="text" id="aspirante-telefono" placeholder="Teléfono (opcional)" />
-            <input type="text" id="aspirante-cargo" list="aspirante-cargo-list" placeholder="Cargo al que aspira" />
-            <datalist id="aspirante-cargo-list"></datalist>
-            <input type="text" id="aspirante-area" list="aspirante-area-list" placeholder="Área a la que aspira" />
-            <datalist id="aspirante-area-list"></datalist>
-            <label class="file-picker" for="aspirante-hoja-input">
-              <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v5M7.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <span id="aspirante-hoja-label">Adjuntar hoja de vida (PDF o foto)</span>
-            </label>
-            <input type="file" id="aspirante-hoja-input" accept=".pdf,image/*" class="hidden" />
-            <input type="text" id="aspirante-observaciones" placeholder="Observaciones (opcional)" />
-            <button type="submit">Registrar aspirante</button>
-          </form>
-          <p id="aspirante-msg" class="form-msg"></p>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Nombre</th><th>Cargo al que aspira</th><th>Área</th><th>Teléfono</th><th>Hoja de vida</th><th>Estado</th><th></th></tr>
-              </thead>
-              <tbody id="aspirantes-tbody"></tbody>
-            </table>
+          <div class="cards" id="aspirantes-stats">
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="aspirantes-stat-proceso">—</div>
+                <div class="card-label">En proceso</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="aspirantes-stat-contratados">—</div>
+                <div class="card-label">Contratados</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="aspirantes-stat-descartados">—</div>
+                <div class="card-label">Descartados</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="aspirantes-stat-mes">—</div>
+                <div class="card-label">Registrados este mes</div>
+              </div>
+            </div>
           </div>
+
+          <form id="aspirante-form" class="form panel-card" style="margin-bottom:1.25rem">
+            <div class="fieldset-grid">
+              <label>Nombre completo<input type="text" id="aspirante-nombre" required /></label>
+              <label>Cédula<input type="text" id="aspirante-cedula" required /></label>
+              <label>Teléfono<input type="text" id="aspirante-telefono" placeholder="Opcional" /></label>
+              <label>Cargo al que aspira<input type="text" id="aspirante-cargo" list="aspirante-cargo-list" /><datalist id="aspirante-cargo-list"></datalist></label>
+              <label>Área a la que aspira<input type="text" id="aspirante-area" list="aspirante-area-list" /><datalist id="aspirante-area-list"></datalist></label>
+              <label>Observaciones<input type="text" id="aspirante-observaciones" placeholder="Opcional" /></label>
+            </div>
+            <div class="foto-picker-row" style="margin-top:0.25rem">
+              <label class="file-picker" for="aspirante-hoja-input">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v5M7.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span id="aspirante-hoja-label">Adjuntar hoja de vida (PDF o foto)</span>
+              </label>
+              <input type="file" id="aspirante-hoja-input" accept=".pdf,image/*" class="hidden" />
+            </div>
+            <div>
+              <button type="submit">Registrar aspirante</button>
+              <p id="aspirante-msg" class="form-msg"></p>
+            </div>
+          </form>
+
+          <div class="toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="aspirantes-search" placeholder="Buscar por nombre o cédula…" />
+            </div>
+            <select id="aspirantes-filtro-estado">
+              <option value="">Todos los estados</option>
+              <option value="En proceso">En proceso</option>
+              <option value="Contratado">Contratado</option>
+              <option value="Descartado">Descartado</option>
+            </select>
+          </div>
+
+          <details class="filtros-avanzados">
+            <summary>
+              <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M6 10h8M8.5 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Filtros avanzados
+              <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="filtros-avanzados-body">
+              <label class="filtro-inline">Cargo<select id="aspirantes-filtro-cargo" data-todos="Todos"><option value="">Todos</option></select></label>
+              <label class="filtro-inline">Área<select id="aspirantes-filtro-area" data-todos="Todas"><option value="">Todas</option></select></label>
+              <label class="filtro-inline">Registrado desde<input type="date" id="aspirantes-filtro-fecha-desde" /></label>
+              <label class="filtro-inline">Registrado hasta<input type="date" id="aspirantes-filtro-fecha-hasta" /></label>
+              <button type="button" id="aspirantes-filtros-limpiar" class="btn-secondary">Limpiar filtros</button>
+            </div>
+          </details>
+
+          <p class="empty-note" id="aspirantes-contador"></p>
+          <div class="person-list" id="aspirantes-lista"></div>
         </section>
 
         <!-- ================= EMPLEADOS ================= -->

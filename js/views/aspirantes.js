@@ -5,6 +5,14 @@
 // etc.) que como una categoría limpia, y estas 5 no aparecían solas.
 const AREAS_VACANTE_FIJAS = ['CONTABILIDAD', 'GERENCIA', 'GESTION Y CONTROL DE FLOTA', 'GESTION HUMANA', 'NOMINA'];
 
+function formatFechaAspirante(iso) {
+  return iso ? new Date(iso).toLocaleDateString('es-CO') : '—';
+}
+
+function formatFechaHoraAspirante(iso) {
+  return iso ? new Date(iso).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+}
+
 Router.register('aspirantes', {
   title: 'Selección de personal',
 
@@ -12,6 +20,13 @@ Router.register('aspirantes', {
     if (!this._bound) {
       document.getElementById('aspirante-form').addEventListener('submit', (e) => this._submit(e));
       document.getElementById('aspirante-hoja-input').addEventListener('change', () => this._updateHojaLabel());
+      ['aspirantes-search', 'aspirantes-filtro-fecha-desde', 'aspirantes-filtro-fecha-hasta'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => this._render());
+      });
+      ['aspirantes-filtro-estado', 'aspirantes-filtro-cargo', 'aspirantes-filtro-area'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', () => this._render());
+      });
+      document.getElementById('aspirantes-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       this._bound = true;
     }
     await this._load();
@@ -27,6 +42,8 @@ Router.register('aspirantes', {
     const [aspirantes, empleados] = await Promise.all([DB.getAspirantes(), DB.getEmployees({ onlyActive: true })]);
     this._aspirantes = aspirantes;
     this._llenarSugerencias(empleados);
+    this._llenarFiltros(aspirantes);
+    this._pintarStats(aspirantes);
     this._render();
   },
 
@@ -42,86 +59,196 @@ Router.register('aspirantes', {
     llenar('aspirante-area-list', [...AREAS_VACANTE_FIJAS, ...empleados.map((e) => e.area)]);
   },
 
+  // Los filtros de Cargo/Área se llenan con lo que realmente aparece entre
+  // los aspirantes registrados (no una lista fija), preservando la
+  // selección previa si sigue existiendo -- mismo patrón que Empleados.
+  _llenarFiltros(aspirantes) {
+    const llenarSelect = (id, valores) => {
+      const sel = document.getElementById(id);
+      const actual = sel.value;
+      const opciones = [...new Set(valores.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+      sel.innerHTML = `<option value="">${sel.dataset.todos}</option>` + opciones.map((v) => `<option value="${v}">${v}</option>`).join('');
+      if (opciones.includes(actual)) sel.value = actual;
+    };
+    llenarSelect('aspirantes-filtro-cargo', aspirantes.map((a) => a.cargo_aspirado));
+    llenarSelect('aspirantes-filtro-area', aspirantes.map((a) => a.area_aspirada));
+  },
+
+  _limpiarFiltros() {
+    document.getElementById('aspirantes-search').value = '';
+    document.getElementById('aspirantes-filtro-estado').value = '';
+    document.getElementById('aspirantes-filtro-cargo').value = '';
+    document.getElementById('aspirantes-filtro-area').value = '';
+    document.getElementById('aspirantes-filtro-fecha-desde').value = '';
+    document.getElementById('aspirantes-filtro-fecha-hasta').value = '';
+    this._render();
+  },
+
+  // Tarjetas de resumen arriba de todo -- "Registrados este mes" es la
+  // estadística más simple y útil sobre la fecha de registro sin tener que
+  // abrir un reporte aparte.
+  _pintarStats(aspirantes) {
+    const hoy = new Date();
+    const inicioMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    const esteMes = aspirantes.filter((a) => (a.created_at || '').slice(0, 7) === inicioMes).length;
+    document.getElementById('aspirantes-stat-proceso').textContent = aspirantes.filter((a) => a.estado === 'En proceso').length;
+    document.getElementById('aspirantes-stat-contratados').textContent = aspirantes.filter((a) => a.estado === 'Contratado').length;
+    document.getElementById('aspirantes-stat-descartados').textContent = aspirantes.filter((a) => a.estado === 'Descartado').length;
+    document.getElementById('aspirantes-stat-mes').textContent = esteMes;
+  },
+
+  _iniciales(nombre) {
+    const partes = (nombre || '').trim().split(/\s+/);
+    return ((partes[0]?.[0] || '') + (partes[1]?.[0] || '')).toUpperCase();
+  },
+
   _render() {
-    const tbody = document.getElementById('aspirantes-tbody');
-    if (this._aspirantes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7">Sin aspirantes registrados.</td></tr>';
+    const q = document.getElementById('aspirantes-search').value.trim().toLowerCase();
+    const estado = document.getElementById('aspirantes-filtro-estado').value;
+    const cargo = document.getElementById('aspirantes-filtro-cargo').value;
+    const area = document.getElementById('aspirantes-filtro-area').value;
+    const fechaDesde = document.getElementById('aspirantes-filtro-fecha-desde').value;
+    const fechaHasta = document.getElementById('aspirantes-filtro-fecha-hasta').value;
+
+    let filtrados = this._aspirantes;
+    if (estado) filtrados = filtrados.filter((a) => a.estado === estado);
+    if (cargo) filtrados = filtrados.filter((a) => a.cargo_aspirado === cargo);
+    if (area) filtrados = filtrados.filter((a) => a.area_aspirada === area);
+    if (fechaDesde) filtrados = filtrados.filter((a) => (a.created_at || '').slice(0, 10) >= fechaDesde);
+    if (fechaHasta) filtrados = filtrados.filter((a) => (a.created_at || '').slice(0, 10) <= fechaHasta);
+    if (q) filtrados = filtrados.filter((a) => a.nombre.toLowerCase().includes(q) || (a.cedula || '').includes(q));
+
+    const total = this._aspirantes.length;
+    document.getElementById('aspirantes-contador').textContent =
+      filtrados.length === total ? `${total} aspirante(s)` : `Mostrando ${filtrados.length} de ${total} aspirante(s)`;
+
+    const lista = document.getElementById('aspirantes-lista');
+    if (filtrados.length === 0) {
+      lista.innerHTML = '<p class="empty-note">Sin resultados con estos filtros.</p>';
       return;
     }
-    tbody.innerHTML = this._aspirantes.map((a) => {
+
+    lista.innerHTML = filtrados.map((a) => {
       const estadoTag = a.estado === 'Contratado' ? 'completo' : a.estado === 'Descartado' ? 'descartado' : 'pendiente';
-      let acciones;
-      if (a.employee_id) {
-        const perfilAprobado = a.employees?.perfil_aprobado_at;
-        const perfilBadge = perfilAprobado
-          ? `<span class="tag completo" title="Aprobado por ${a.employees.perfil_aprobado_por || '—'}">Perfil aprobado</span>`
-          : '<span class="tag pendiente">Perfil pendiente de aprobación</span>';
-        const perfilBtn = perfilAprobado
-          ? `<button type="button" class="btn-secondary aspirante-quitar-aprobacion" data-id="${a.id}">Quitar aprobación</button>`
-          : `<button type="button" class="btn-secondary aspirante-aprobar-perfil" data-id="${a.id}">Aprobar perfil</button>`;
-        acciones = `
-          ${perfilBadge}
-          <button type="button" class="btn-secondary aspirante-link" data-id="${a.id}">Ver link de perfil</button>
-          ${perfilBtn}
-          <button type="button" class="btn-secondary aspirante-deshacer-seleccion" data-id="${a.id}">Deshacer selección</button>
-          <button type="button" class="btn-secondary aspirante-descartar" data-id="${a.id}" style="color:var(--danger-text)">Descartar</button>
-        `;
-      } else if (a.estado === 'Descartado') {
-        acciones = `<button type="button" class="btn-secondary aspirante-reabrir" data-id="${a.id}">Reabrir</button>`;
-      } else {
-        acciones = `
-          <button type="button" class="btn-secondary aspirante-seleccionar" data-id="${a.id}">Seleccionar candidato</button>
-          <button type="button" class="btn-secondary aspirante-descartar" data-id="${a.id}" style="color:var(--danger-text)">Descartar</button>
-        `;
-      }
+      const meta = [
+        `CC ${a.cedula}`,
+        a.cargo_aspirado || 'Sin cargo',
+        a.area_aspirada,
+        `Registrado ${formatFechaAspirante(a.created_at)}`,
+      ].filter(Boolean).join(' · ');
       return `
-      <tr data-id="${a.id}">
-        <td data-label="Nombre">${a.nombre}${a.cedula ? ' <span class="muted">· CC ' + a.cedula + '</span>' : ''}</td>
-        <td data-label="Cargo al que aspira">${a.cargo_aspirado || '—'}</td>
-        <td data-label="Área">${a.area_aspirada || '—'}</td>
-        <td data-label="Teléfono">${a.telefono || '—'}</td>
-        <td data-label="Hoja de vida">${a.hoja_vida_url
-          ? `<button type="button" class="btn-secondary aspirante-ver-hoja" data-id="${a.id}">Ver</button>`
-          : '<span class="muted">Sin archivo</span>'}</td>
-        <td data-label="Estado"><span class="tag ${estadoTag}">${a.estado}</span></td>
-        <td data-label="">
-          ${acciones}
-          <button type="button" class="btn-secondary aspirante-eliminar" data-id="${a.id}" style="color:var(--danger-text)">Eliminar</button>
-        </td>
-      </tr>
-    `;
+        <div class="person-row ${a.estado === 'Descartado' ? 'inactivo' : ''}">
+          <span class="person-avatar">${this._iniciales(a.nombre)}</span>
+          <div class="person-info">
+            <div class="person-name">${a.nombre}</div>
+            <div class="person-meta"><span>${meta}</span></div>
+          </div>
+          <span class="tag ${estadoTag}">${a.estado}</span>
+          <button type="button" class="btn-secondary" data-detalle="${a.id}">Ver detalle</button>
+        </div>
+      `;
     }).join('');
 
-    tbody.querySelectorAll('.aspirante-ver-hoja').forEach((btn) => {
+    lista.querySelectorAll('[data-detalle]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const a = this._aspirantes.find((x) => x.id === btn.dataset.id);
-        if (a) this._verHoja(a);
+        const a = this._aspirantes.find((x) => x.id === btn.dataset.detalle);
+        if (a) this._verDetalle(a);
       });
     });
-    tbody.querySelectorAll('.aspirante-seleccionar').forEach((btn) => {
-      btn.addEventListener('click', () => this._seleccionar(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-descartar').forEach((btn) => {
-      btn.addEventListener('click', () => this._descartar(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-reabrir').forEach((btn) => {
-      btn.addEventListener('click', () => this._cambiarEstado(btn.dataset.id, 'En proceso'));
-    });
-    tbody.querySelectorAll('.aspirante-link').forEach((btn) => {
-      btn.addEventListener('click', () => this._verLink(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-deshacer-seleccion').forEach((btn) => {
-      btn.addEventListener('click', () => this._deshacerSeleccion(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-aprobar-perfil').forEach((btn) => {
-      btn.addEventListener('click', () => this._aprobarPerfil(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-quitar-aprobacion').forEach((btn) => {
-      btn.addEventListener('click', () => this._quitarAprobacionPerfil(btn.dataset.id));
-    });
-    tbody.querySelectorAll('.aspirante-eliminar').forEach((btn) => {
-      btn.addEventListener('click', () => this._eliminar(btn.dataset.id));
-    });
+  },
+
+  // Ficha completa del aspirante en un modal (mismo patrón que el detalle de
+  // Empleados): acá viven todos los datos y todas las acciones posibles
+  // según en qué punto del proceso esté, en vez de amontonarlas en la fila.
+  _verDetalle(a) {
+    const estadoTag = a.estado === 'Contratado' ? 'completo' : a.estado === 'Descartado' ? 'descartado' : 'pendiente';
+
+    let acciones;
+    if (a.employee_id) {
+      const perfilAprobado = a.employees?.perfil_aprobado_at;
+      const perfilBadge = perfilAprobado
+        ? `<span class="tag completo" title="Aprobado por ${a.employees.perfil_aprobado_por || '—'}">Perfil aprobado</span>`
+        : '<span class="tag pendiente">Perfil pendiente de aprobación</span>';
+      const perfilBtn = perfilAprobado
+        ? `<button type="button" class="btn-secondary" id="aspirante-quitar-aprobacion">Quitar aprobación</button>`
+        : `<button type="button" class="btn-secondary" id="aspirante-aprobar-perfil">Aprobar perfil</button>`;
+      acciones = `
+        ${perfilBadge}
+        <button type="button" class="btn-secondary" id="aspirante-link">Ver link de perfil</button>
+        ${perfilBtn}
+        <button type="button" class="btn-secondary" id="aspirante-deshacer-seleccion">Deshacer selección</button>
+        <button type="button" class="btn-secondary" id="aspirante-descartar" style="color:var(--danger-text)">Descartar</button>
+      `;
+    } else if (a.estado === 'Descartado') {
+      acciones = `<button type="button" class="btn-secondary" id="aspirante-reabrir">Reabrir</button>`;
+    } else {
+      acciones = `
+        <button type="button" class="btn-secondary" id="aspirante-seleccionar">Seleccionar candidato</button>
+        <button type="button" class="btn-secondary" id="aspirante-descartar" style="color:var(--danger-text)">Descartar</button>
+      `;
+    }
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detalle-header">
+        <span class="person-avatar detalle-avatar">${this._iniciales(a.nombre)}</span>
+        <div class="detalle-header-info">
+          <div class="detalle-nombre">${a.nombre}</div>
+          <div class="detalle-sub">CC ${a.cedula}${a.telefono ? ' · ' + a.telefono : ''}</div>
+        </div>
+        <div class="detalle-tags"><span class="tag ${estadoTag}">${a.estado}</span></div>
+      </div>
+
+      <div class="detalle-facts">
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${a.cargo_aspirado || '—'}</div>
+          <div class="detalle-fact-label">Cargo al que aspira</div>
+        </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${a.area_aspirada || '—'}</div>
+          <div class="detalle-fact-label">Área</div>
+        </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${formatFechaHoraAspirante(a.created_at)}</div>
+          <div class="detalle-fact-label">Fecha de registro</div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h3 class="modal-section-title">Hoja de vida</h3>
+        ${a.hoja_vida_url
+          ? `<button type="button" class="btn-secondary" id="aspirante-ver-hoja">Ver hoja de vida</button>`
+          : '<p class="muted">Sin archivo adjunto.</p>'}
+      </div>
+
+      ${a.observaciones ? `
+        <div class="modal-section">
+          <h3 class="modal-section-title">Observaciones</h3>
+          <p class="prose-p">${a.observaciones}</p>
+        </div>
+      ` : ''}
+
+      <div class="modal-section">
+        <h3 class="modal-section-title">Acciones</h3>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center">
+          ${acciones}
+        </div>
+      </div>
+
+      <button type="button" id="aspirante-eliminar" class="btn-secondary" style="margin-top:1.2rem; color:var(--danger-text)">Eliminar aspirante</button>
+    `;
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+
+    const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    on('aspirante-ver-hoja', () => this._verHoja(a));
+    on('aspirante-seleccionar', () => this._seleccionar(a.id));
+    on('aspirante-descartar', () => this._descartar(a.id));
+    on('aspirante-reabrir', () => this._cambiarEstado(a.id, 'En proceso'));
+    on('aspirante-link', () => this._verLink(a.id));
+    on('aspirante-deshacer-seleccion', () => this._deshacerSeleccion(a.id));
+    on('aspirante-aprobar-perfil', () => this._aprobarPerfil(a.id));
+    on('aspirante-quitar-aprobacion', () => this._quitarAprobacionPerfil(a.id));
+    on('aspirante-eliminar', () => this._eliminar(a.id));
   },
 
   // Mismo visor compartido (imagen inline / PDF en iframe) que ya usa

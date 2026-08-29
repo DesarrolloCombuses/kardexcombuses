@@ -943,7 +943,7 @@ tbody tr:hover { background: var(--slate-50); }
   font-weight: 700; font-size: 0.9rem; color: var(--slate-900);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.person-meta { display: flex; gap: 0.9rem; font-size: 0.78rem; color: var(--slate-500); margin-top: 0.15rem; }
+.person-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.78rem; color: var(--slate-500); margin-top: 0.15rem; }
 .person-row.inactivo { opacity: 0.6; }
 .person-inactive-flag {
   display: inline-block; font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
