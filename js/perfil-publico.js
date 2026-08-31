@@ -65,10 +65,10 @@ const SECCIONES_PUBLICAS = [
   {
     titulo: 'Afiliaciones',
     campos: [
-      { id: 'eps', label: 'EPS', type: 'text' },
-      { id: 'arl', label: 'ARL', type: 'text' },
-      { id: 'fondo_pension', label: 'Fondo de pensión', type: 'text' },
-      { id: 'caja_compensacion', label: 'Caja de compensación', type: 'text' },
+      { id: 'eps', label: 'EPS', type: 'select', options: EPS_COLOMBIA },
+      { id: 'arl', label: 'ARL', type: 'select', options: ARL_COLOMBIA },
+      { id: 'fondo_pension', label: 'Fondo de pensión', type: 'select', options: FONDOS_PENSION_COLOMBIA },
+      { id: 'caja_compensacion', label: 'Caja de compensación', type: 'select', options: CAJAS_COMPENSACION_COLOMBIA },
     ],
   },
 ];

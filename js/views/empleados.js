@@ -26,10 +26,10 @@ const CAMPOS_SOCIODEMOGRAFICOS = [
   { id: 'talla_camisa', label: 'Talla de camisa', type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] },
   { id: 'talla_pantalon', label: 'Talla de pantalón', type: 'select', options: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'] },
   { id: 'talla_calzado', label: 'Talla de calzado', type: 'select', options: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'] },
-  { id: 'eps', label: 'EPS', type: 'text' },
-  { id: 'arl', label: 'ARL', type: 'text' },
-  { id: 'fondo_pension', label: 'Fondo de pensión', type: 'text' },
-  { id: 'caja_compensacion', label: 'Caja de compensación', type: 'text' },
+  { id: 'eps', label: 'EPS', type: 'select', options: EPS_COLOMBIA },
+  { id: 'arl', label: 'ARL', type: 'select', options: ARL_COLOMBIA },
+  { id: 'fondo_pension', label: 'Fondo de pensión', type: 'select', options: FONDOS_PENSION_COLOMBIA },
+  { id: 'caja_compensacion', label: 'Caja de compensación', type: 'select', options: CAJAS_COMPENSACION_COLOMBIA },
   { id: 'observaciones', label: 'Observaciones', type: 'textarea' },
 ];
 
