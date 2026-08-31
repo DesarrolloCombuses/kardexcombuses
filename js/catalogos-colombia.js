@@ -1,13 +1,13 @@
 // Catálogos de entidades colombianas (EPS, ARL, fondos de pensión y cajas de
 // compensación) para los campos de afiliación del perfil sociodemográfico.
-// Antes eran campos de texto libre -- quedan como listas para evitar
-// digitación manual y errores de tipeo. Cada lista termina en una opción
-// "Otra"/"Otro" por si alguien está afiliado a una entidad que no aparece
-// (el sistema de salud/pensiones colombiano cambia con frecuencia: fusiones,
-// intervenciones, liquidaciones).
+// Antes eran campos de texto libre -- ahora son campos de texto con sugerencias
+// (datalist): al escribir o pegar el nombre, el navegador filtra la lista por
+// las palabras que coincidan, y si la respuesta no está en la lista se puede
+// seguir escribiendo libremente (el sistema de salud/pensiones colombiano
+// cambia con frecuencia: fusiones, intervenciones, liquidaciones).
 // Compartido entre el formulario interno (js/views/empleados.js) y el link
 // público de autodiligenciamiento (js/perfil-publico.js) para que ambos
-// muestren siempre las mismas opciones.
+// muestren siempre las mismas sugerencias.
 // Fuentes (verificadas 2026): Supersalud/Portafolio y La República para EPS,
 // Superfinanciera para ARL, listado oficial UGPP de cajas de compensación
 // (14-ene-2026, excluye las que están en intervención administrativa total).
@@ -24,7 +24,6 @@ const EPS_COLOMBIA = [
   'Aliansalud EPS',
   'S.O.S. (Servicio Occidental de Salud)',
   'Comfenalco Valle EPS',
-  'Otra',
 ];
 
 const ARL_COLOMBIA = [
@@ -35,7 +34,6 @@ const ARL_COLOMBIA = [
   'ARL Colpatria (AXA Colpatria)',
   'ARL La Equidad',
   'ARL Aurora (antes Liberty Seguros)',
-  'Otra',
 ];
 
 const FONDOS_PENSION_COLOMBIA = [
@@ -44,7 +42,6 @@ const FONDOS_PENSION_COLOMBIA = [
   'Protección',
   'Colfondos',
   'Skandia',
-  'Otro',
 ];
 
 const CAJAS_COMPENSACION_COLOMBIA = [
@@ -78,5 +75,4 @@ const CAJAS_COMPENSACION_COLOMBIA = [
   'Comfatolima',
   'Comfenalco Valle (Valle del Cauca)',
   'Comfandi (Valle del Cauca)',
-  'Otra',
 ];

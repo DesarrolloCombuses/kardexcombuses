@@ -26,10 +26,10 @@ const CAMPOS_SOCIODEMOGRAFICOS = [
   { id: 'talla_camisa', label: 'Talla de camisa', type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] },
   { id: 'talla_pantalon', label: 'Talla de pantalón', type: 'select', options: ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'] },
   { id: 'talla_calzado', label: 'Talla de calzado', type: 'select', options: ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'] },
-  { id: 'eps', label: 'EPS', type: 'select', options: EPS_COLOMBIA },
-  { id: 'arl', label: 'ARL', type: 'select', options: ARL_COLOMBIA },
-  { id: 'fondo_pension', label: 'Fondo de pensión', type: 'select', options: FONDOS_PENSION_COLOMBIA },
-  { id: 'caja_compensacion', label: 'Caja de compensación', type: 'select', options: CAJAS_COMPENSACION_COLOMBIA },
+  { id: 'eps', label: 'EPS', type: 'datalist', options: EPS_COLOMBIA },
+  { id: 'arl', label: 'ARL', type: 'datalist', options: ARL_COLOMBIA },
+  { id: 'fondo_pension', label: 'Fondo de pensión', type: 'datalist', options: FONDOS_PENSION_COLOMBIA },
+  { id: 'caja_compensacion', label: 'Caja de compensación', type: 'datalist', options: CAJAS_COMPENSACION_COLOMBIA },
   { id: 'observaciones', label: 'Observaciones', type: 'textarea' },
 ];
 
@@ -95,6 +95,10 @@ function campoSociodemograficoHtml(campo, valor) {
       .concat(campo.options.map((o) => `<option value="${o}" ${valor === o ? 'selected' : ''}>${o}</option>`))
       .join('');
     return `<label>${campo.label}<select id="${id}">${opciones}</select></label>`;
+  }
+  if (campo.type === 'datalist') {
+    const opciones = campo.options.map((o) => `<option value="${o}"></option>`).join('');
+    return `<label>${campo.label}<input type="text" id="${id}" list="${id}-list" value="${valor || ''}" autocomplete="off" /><datalist id="${id}-list">${opciones}</datalist></label>`;
   }
   if (campo.type === 'checkbox') {
     return `<label class="checkbox-label"><input type="checkbox" id="${id}" ${valor ? 'checked' : ''} /> ${campo.label}</label>`;
