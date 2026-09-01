@@ -74,7 +74,16 @@ const SECCIONES_PUBLICAS = [
   },
 ];
 
-const TODOS_LOS_CAMPOS = SECCIONES_PUBLICAS.flatMap((s) => s.campos);
+// "Experiencia como conductor" solo se pregunta si el cargo al que aspiró
+// (ya asignado por Selección de personal antes de generar este link) es de
+// conductor -- a nadie más le corresponde esa sección.
+function esCargoConductor(cargo) {
+  return /conductor/i.test(cargo || '');
+}
+
+function seccionesVisibles(cargo) {
+  return SECCIONES_PUBLICAS.filter((s) => s.titulo !== 'Experiencia como conductor' || esCargoConductor(cargo));
+}
 
 function campoPublicoHtml(campo, valor) {
   const id = `pp-${campo.id}`;
@@ -147,6 +156,7 @@ function validarFechaNacimiento(iso) {
 
   let cedulaVerificada = null;
   let fotoCamera = null;
+  let cargoActual = null;
 
   const formatFecha = (iso) => {
     if (!iso) return '—';
@@ -196,14 +206,17 @@ function validarFechaNacimiento(iso) {
     wrap.querySelector('.linea-remove').addEventListener('click', () => wrap.remove());
   }
 
+  const MSG_EN_REVISION = 'Tu información quedó guardada. El auxiliar de vinculaciones la va a revisar y va a continuar con tu proceso de ingreso. Puedes volver a entrar por este mismo link para ver cuándo quede aprobada.';
+
   function bannerAprobacionHtml(perfil) {
     return perfil.perfil_aprobado_at
       ? '<div class="pp-banner aprobado" id="pp-estado-banner">✓ Tu perfil fue aprobado. ¡Bienvenido(a) a Combuses!</div>'
-      : '<div class="pp-banner pendiente" id="pp-estado-banner">Tu información está en revisión. Puedes volver a entrar por este mismo link para ver cuándo quede aprobada.</div>';
+      : `<div class="pp-banner pendiente" id="pp-estado-banner">${MSG_EN_REVISION}</div>`;
   }
 
   function renderFormulario(perfil) {
-    const seccionesHtml = SECCIONES_PUBLICAS.map((s) => seccionPublicaHtml(s, perfil)).join('');
+    cargoActual = perfil.cargo;
+    const seccionesHtml = seccionesVisibles(perfil.cargo).map((s) => seccionPublicaHtml(s, perfil)).join('');
     const inicial = (perfil.nombre || '?').trim().charAt(0).toUpperCase();
 
     formCard.innerHTML = `
@@ -327,7 +340,10 @@ function validarFechaNacimiento(iso) {
         telefono: document.getElementById('pp-telefono').value.trim() || null,
         email_personal: document.getElementById('pp-email-personal').value.trim() || null,
       };
-      TODOS_LOS_CAMPOS.forEach((c) => { perfil[c.id] = leerValorCampo(c); });
+      // Solo se leen los campos que de verdad se mostraron (ver
+      // seccionesVisibles) -- si "Experiencia como conductor" no aplicó,
+      // esos inputs ni existen en el DOM.
+      seccionesVisibles(cargoActual).flatMap((s) => s.campos).forEach((c) => { perfil[c.id] = leerValorCampo(c); });
 
       const contactos = Array.from(document.querySelectorAll('#pp-contactos .linea-row'))
         .map((row) => ({
@@ -346,7 +362,7 @@ function validarFechaNacimiento(iso) {
         .filter((h) => h.nombre);
 
       await DB.guardarPerfilPublico(employeeId, cedulaVerificada, perfil, contactos, hijos, fotoUrl);
-      msg.textContent = 'Datos guardados. ¡Gracias!';
+      msg.textContent = '¡Datos guardados! El auxiliar de vinculaciones va a continuar con tu proceso.';
       msg.className = 'form-msg success';
 
       // guardarPerfilPublico() siempre deja el perfil pendiente de nuevo
@@ -355,7 +371,7 @@ function validarFechaNacimiento(iso) {
       const banner = document.getElementById('pp-estado-banner');
       if (banner) {
         banner.className = 'pp-banner pendiente';
-        banner.textContent = 'Tu información está en revisión. Puedes volver a entrar por este mismo link para ver cuándo quede aprobada.';
+        banner.textContent = MSG_EN_REVISION;
       }
     } catch (err) {
       msg.textContent = 'No se pudo guardar: ' + err.message;

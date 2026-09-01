@@ -74,8 +74,12 @@ function esRutaSonar(ruta) {
   return RUTAS_SONAR.includes(String(ruta || '').replace(/\D/g, ''));
 }
 
+function esCargoConductor(cargo) {
+  return /conductor/i.test(cargo || '');
+}
+
 function esConductorRutaSonar(empleado) {
-  return /conductor/i.test(empleado?.cargo || '') && esRutaSonar(empleado?.ruta);
+  return esCargoConductor(empleado?.cargo) && esRutaSonar(empleado?.ruta);
 }
 
 function formatFecha(iso) {
@@ -368,7 +372,13 @@ Router.register('empleados', {
     // los datos que primero se buscan al abrir la ficha de alguien. El resto
     // va abajo en tarjetas por sección (ver SECCIONES_DETALLE), sin repetir
     // fecha_nacimiento ni fecha_ingreso (ya están en los destacados).
-    const seccionesHtml = SECCIONES_DETALLE.map((s) => this._seccionDetalleHtml(s, perfil)).join('');
+    //
+    // "Experiencia como conductor" solo aplica a cargos de conductor -- para
+    // el resto no es que falte llenar, es que no corresponde, así que ni
+    // siquiera se muestra (antes salía como "2 pendientes" para cualquier
+    // cargo, lo cual era ruido, no una alerta real).
+    const seccionesAplicables = SECCIONES_DETALLE.filter((s) => s.titulo !== 'Experiencia como conductor' || esCargoConductor(empleado.cargo));
+    const seccionesHtml = seccionesAplicables.map((s) => this._seccionDetalleHtml(s, perfil)).join('');
     const campoObservaciones = CAMPOS_SOCIODEMOGRAFICOS.find((c) => c.id === 'observaciones');
     const observacionesHtml = perfil.observaciones ? this._campoDetalle(campoObservaciones, perfil.observaciones, 'detalle-field-full') : '';
 
