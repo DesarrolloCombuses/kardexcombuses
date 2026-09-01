@@ -528,6 +528,8 @@ Router.register('empleados', {
         this._cambiarEstado(empleado, true, null, null);
       });
     }
+    const pazYSalvoBtn = document.getElementById('empleado-pazysalvo-btn');
+    if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
@@ -570,9 +572,245 @@ Router.register('empleados', {
     return `
       <div style="margin-bottom:1.2rem">
         <button type="button" id="empleado-activar-btn" class="btn-secondary">Marcar como activo</button>
+        <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
         <p id="empleado-estado-msg" class="form-msg"></p>
       </div>
     `;
+  },
+
+  // Paz y salvo (formato FO-SV-002): documento que se entrega a un
+  // conductor/empleado al retirarse. Varios de sus datos (afiliado
+  // responsable, siniestros durante su vinculación, quién lo emite) no
+  // existen en ningún lado del sistema -- no hay un módulo de siniestros --
+  // así que se piden en un mini-formulario justo antes de generarlo, en vez
+  // de intentar adivinarlos o guardarlos como si fueran parte de la ficha
+  // del empleado.
+  _filaSiniestroHtml(fila) {
+    const f = fila || {};
+    return `
+      <div class="siniestro-row${f.pendiente ? ' siniestro-pendiente' : ''}" data-siniestro-row>
+        <input type="text" data-siniestro-fecha value="${f.fecha ?? ''}" placeholder="dd/mm/aaaa" />
+        <input type="text" data-siniestro-lesionados value="${f.lesionados ?? 'N/N'}" />
+        <input type="text" data-siniestro-conciliacion value="${f.conciliacion ?? 'N/N'}" />
+        <input type="text" data-siniestro-definicion value="${f.definicion ?? 'N/N'}" />
+        <input type="text" data-siniestro-hipotesis value="${f.hipotesis ?? 'N/N'}" />
+        <button type="button" class="btn-icon-danger" data-siniestro-quitar aria-label="Quitar fila">✕</button>
+      </div>
+    `;
+  },
+
+  async _abrirPazYSalvo(empleado) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detalle-header">
+        <div class="detalle-header-info">
+          <div class="detalle-nombre">Paz y salvo — ${empleado.nombre}</div>
+          <div class="detalle-sub">CC ${empleado.cedula}${empleado.cargo ? ' · ' + empleado.cargo : ''}</div>
+        </div>
+      </div>
+      <p class="view-intro">Completa los datos que no maneja el sistema. Los siniestros se cruzan automáticamente por cédula contra la base de SST.</p>
+      <form id="pazysalvo-form" class="form">
+        <div class="fieldset-grid">
+          <label>Afiliado responsable<input type="text" id="pazysalvo-afiliado" placeholder="Ej: INVEME SAS" /></label>
+          <label>Placa / interno<input type="text" id="pazysalvo-placa" value="${empleado.numero_interno || ''}" /></label>
+        </div>
+
+        <label>Siniestros</label>
+        <p id="pazysalvo-siniestros-resumen" class="form-msg">Buscando siniestros registrados para esta cédula…</p>
+        <div class="siniestro-table">
+          <div class="siniestro-row siniestro-head">
+            <span>Fecha de siniestro</span><span>Lesionados</span><span>Conciliación</span><span>Definición</span><span>Hipótesis</span><span></span>
+          </div>
+          <div id="pazysalvo-siniestros">
+            ${this._filaSiniestroHtml()}
+          </div>
+        </div>
+        <button type="button" id="pazysalvo-add-fila" class="btn-secondary">+ Agregar fila</button>
+
+        <div class="fieldset-grid">
+          <label>Responsable (quien emite)<input type="text" id="pazysalvo-responsable" /></label>
+          <label>Fecha de emisión<input type="date" id="pazysalvo-fecha-emision" value="${hoy}" /></label>
+        </div>
+
+        <div style="display:flex;gap:0.5rem">
+          <button type="submit">Generar documento</button>
+          <button type="button" id="pazysalvo-cancelar" class="btn-secondary">Cancelar</button>
+        </div>
+        <p id="pazysalvo-msg" class="form-msg"></p>
+      </form>
+    `;
+
+    const siniestrosWrap = document.getElementById('pazysalvo-siniestros');
+    document.getElementById('pazysalvo-add-fila').addEventListener('click', () => {
+      siniestrosWrap.insertAdjacentHTML('beforeend', this._filaSiniestroHtml({ fecha: '', lesionados: '', conciliacion: '', definicion: '', hipotesis: '' }));
+    });
+    siniestrosWrap.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-siniestro-quitar]')) return;
+      const filas = siniestrosWrap.querySelectorAll('[data-siniestro-row]');
+      if (filas.length <= 1) return;
+      e.target.closest('[data-siniestro-row]').remove();
+    });
+
+    document.getElementById('pazysalvo-cancelar').addEventListener('click', () => this._verDetalle(empleado));
+
+    document.getElementById('pazysalvo-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const siniestros = [...siniestrosWrap.querySelectorAll('[data-siniestro-row]')].map((row) => ({
+        fecha: row.querySelector('[data-siniestro-fecha]').value.trim() || 'N/N',
+        lesionados: row.querySelector('[data-siniestro-lesionados]').value.trim() || 'N/N',
+        conciliacion: row.querySelector('[data-siniestro-conciliacion]').value.trim() || 'N/N',
+        definicion: row.querySelector('[data-siniestro-definicion]').value.trim() || 'N/N',
+        hipotesis: row.querySelector('[data-siniestro-hipotesis]').value.trim() || 'N/N',
+      }));
+      const datos = {
+        afiliado: document.getElementById('pazysalvo-afiliado').value.trim(),
+        placa: document.getElementById('pazysalvo-placa').value.trim(),
+        responsable: document.getElementById('pazysalvo-responsable').value.trim(),
+        fechaEmision: document.getElementById('pazysalvo-fecha-emision').value,
+        siniestros,
+      };
+      const msg = document.getElementById('pazysalvo-msg');
+      if (!datos.responsable) {
+        msg.textContent = 'Indica quién emite el documento (responsable).';
+        msg.className = 'form-msg error';
+        document.getElementById('pazysalvo-responsable').focus();
+        return;
+      }
+      const pendientes = this._pazYSalvoPendientes || 0;
+      if (pendientes > 0 && !confirm(`Esta persona tiene ${pendientes} siniestro(s) pendientes de conciliación. ¿Deseas generar el paz y salvo de todas formas?`)) {
+        return;
+      }
+      this._generarDocumentoPazYSalvo(empleado, datos);
+    });
+
+    // Cruce automático contra la base de siniestros de SST (Google Sheet
+    // publicado, ver js/siniestros.js) -- se hace después de pintar el
+    // formulario para no bloquear la apertura del modal mientras carga.
+    const resumen = document.getElementById('pazysalvo-siniestros-resumen');
+    this._pazYSalvoPendientes = 0;
+    try {
+      const registros = await Siniestros.buscarPorCedula(empleado.cedula);
+      const pendientes = registros.filter((r) => r.pendiente).length;
+      this._pazYSalvoPendientes = pendientes;
+      if (registros.length) {
+        siniestrosWrap.innerHTML = registros.map((r) => this._filaSiniestroHtml(r)).join('');
+        resumen.textContent = pendientes > 0
+          ? `Se encontraron ${registros.length} siniestro(s), ${pendientes} pendiente(s) de conciliación (resaltados abajo).`
+          : `Se encontraron ${registros.length} siniestro(s), ninguno pendiente de conciliación.`;
+        resumen.className = pendientes > 0 ? 'form-msg error' : 'form-msg success';
+      } else {
+        resumen.textContent = 'No se encontraron siniestros registrados para esta cédula.';
+        resumen.className = 'form-msg success';
+      }
+    } catch (err) {
+      resumen.textContent = 'No se pudo consultar la base de siniestros (revisa tu conexión). Completa manualmente si aplica.';
+      resumen.className = 'form-msg error';
+    }
+  },
+
+  _generarDocumentoPazYSalvo(empleado, datos) {
+    const filasSiniestros = datos.siniestros.length ? datos.siniestros : [{ fecha: 'N/N', lesionados: 'N/N', conciliacion: 'N/N', definicion: 'N/N', hipotesis: 'N/N' }];
+    const filaHtml = (f) => `
+      <tr>
+        <td>${f.fecha || 'N/N'}</td>
+        <td>${f.lesionados || 'N/N'}</td>
+        <td>${f.conciliacion || 'N/N'}</td>
+        <td>${f.definicion || 'N/N'}</td>
+        <td>${f.hipotesis || 'N/N'}</td>
+      </tr>
+    `;
+    const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Paz y salvo — ${empleado.nombre}</title>
+<style>
+  @page { size: letter; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1.5px solid #000; padding: 8px 10px; font-size: 13px; vertical-align: middle; }
+  .doc-header td { vertical-align: middle; }
+  .doc-header .brand-cell { width: 26%; }
+  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: #0a1930; }
+  .doc-header .brand svg { flex: none; }
+  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 15px; letter-spacing: 0.02em; }
+  .doc-header .meta-cell { width: 22%; font-size: 11.5px; line-height: 1.55; }
+  .doc-header .meta-cell b { font-weight: 700; }
+  .label-cell { font-weight: 700; background: #f3f4f6; width: 22%; }
+  th { font-weight: 700; text-transform: uppercase; font-size: 11.5px; background: #f3f4f6; }
+  .value-cell { font-weight: 600; }
+  .siniestros-table td, .siniestros-table th { text-align: center; }
+  .print-actions { margin-bottom: 16px; }
+  .print-actions button { font: inherit; padding: 8px 16px; border-radius: 6px; border: none; background: #2f6fed; color: #fff; font-weight: 600; cursor: pointer; }
+  @media print { .print-actions { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+  <div class="print-actions"><button type="button" onclick="window.print()">Imprimir / Guardar PDF</button></div>
+  <table>
+    <tr class="doc-header">
+      <td class="brand-cell">
+        <div class="brand">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          COMBUSES
+        </div>
+      </td>
+      <td class="title-cell">PAZ Y SALVO CONDUCTOR</td>
+      <td class="meta-cell">
+        <div><b>Código:</b> FO-SV-002</div>
+        <div><b>Versión:</b> 00</div>
+        <div><b>Fecha:</b> 24/10/2025</div>
+      </td>
+    </tr>
+    <tr>
+      <td class="label-cell">Nombre del colaborador</td>
+      <td class="value-cell" colspan="2">${empleado.nombre}</td>
+    </tr>
+    <tr>
+      <td class="label-cell">N° documento</td>
+      <td class="value-cell" colspan="2">${empleado.cedula}</td>
+    </tr>
+    <tr>
+      <td class="label-cell">Afiliado responsable</td>
+      <td class="value-cell" colspan="2">${datos.afiliado || '—'}</td>
+    </tr>
+    <tr>
+      <td class="label-cell">Placa / interno</td>
+      <td class="value-cell" colspan="2">${datos.placa || '—'}</td>
+    </tr>
+  </table>
+
+  <table class="siniestros-table" style="margin-top:-1.5px">
+    <tr>
+      <th>Fecha de siniestro</th><th>Lesionados</th><th>Conciliación</th><th>Definición</th><th>Hipótesis</th>
+    </tr>
+    ${filasSiniestros.map(filaHtml).join('')}
+  </table>
+
+  <table style="margin-top:-1.5px">
+    <tr>
+      <td class="label-cell">Responsable:</td>
+      <td class="value-cell">${datos.responsable}</td>
+    </tr>
+    <tr>
+      <td class="label-cell">Fecha de emisión:</td>
+      <td class="value-cell">${formatFecha(datos.fechaEmision)}</td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const ventana = window.open('', '_blank');
+    if (!ventana) {
+      const msg = document.getElementById('pazysalvo-msg');
+      msg.textContent = 'El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.';
+      msg.className = 'form-msg error';
+      return;
+    }
+    ventana.document.open();
+    ventana.document.write(html);
+    ventana.document.close();
   },
 
   async _cambiarEstado(empleado, activo, fechaSalida, motivoRenuncia) {

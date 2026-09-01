@@ -1259,3 +1259,21 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
 .swatch.critico { background: var(--danger); }
 .swatch.alerta { background: #d68a06; }
 .swatch.ok { background: #2f9e58; }
+
+/* Tabla de siniestros del formulario de Paz y salvo (js/views/empleados.js) */
+.siniestro-table { border: 1px solid var(--slate-200); border-radius: var(--radius-sm); overflow: hidden; margin-top: 0.4rem; }
+.siniestro-row {
+  display: grid; grid-template-columns: 1.1fr 1fr 1fr 1.3fr 1.3fr auto;
+  gap: 0.4rem; align-items: center; padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--slate-200);
+}
+.siniestro-row:last-child { border-bottom: none; }
+.siniestro-row input { padding: 0.4rem 0.5rem; font-size: 0.82rem; border: 1px solid var(--slate-200); border-radius: 6px; }
+.siniestro-head { background: var(--slate-50); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--slate-600); }
+.siniestro-pendiente { background: var(--danger-bg); }
+.btn-icon-danger { background: var(--danger-bg); color: var(--danger-text); border: none; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem; line-height: 1; }
+.btn-icon-danger:hover { background: #fbdad6; }
+@media (max-width: 720px) {
+  .siniestro-row { grid-template-columns: 1fr; }
+  .siniestro-head { display: none; }
+}
