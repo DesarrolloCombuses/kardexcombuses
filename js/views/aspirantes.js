@@ -284,11 +284,14 @@ Router.register('aspirantes', {
   },
 
   async _cambiarEstado(id, estado) {
+    Loading.show('Guardando…');
     try {
       await DB.updateAspiranteEstado(id, estado);
       await this._load();
     } catch (err) {
       alert('No se pudo actualizar el estado: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -305,12 +308,15 @@ Router.register('aspirantes', {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante) return;
     if (!confirm(`¿Seleccionar a ${aspirante.nombre} y crear su registro de empleado?`)) return;
+    Loading.show('Creando empleado…');
     try {
       const empleado = await DB.seleccionarAspirante(aspirante);
       await this._load();
       this._mostrarLinkModal(aspirante.nombre, this._linkPerfil(empleado.id));
     } catch (err) {
       alert('No se pudo seleccionar: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -388,11 +394,14 @@ Router.register('aspirantes', {
       `Esto elimina el registro que se creó en Empleados (y lo que ya se le haya cargado ahí: perfil, foto, contactos). ` +
       `El aspirante vuelve a quedar "En proceso".`
     )) return;
+    Loading.show('Deshaciendo…');
     try {
       await DB.revertirAprobacion(aspirante, 'En proceso');
       await this._load();
     } catch (err) {
       alert('No se pudo deshacer: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -408,6 +417,7 @@ Router.register('aspirantes', {
       ? `¿Descartar a ${aspirante.nombre}?\n\nComo ya estaba seleccionado, esto también elimina el registro que se creó en Empleados (perfil, foto, contactos incluidos).`
       : `¿Descartar a ${aspirante.nombre}?`;
     if (!confirm(advertencia)) return;
+    Loading.show('Descartando…');
     try {
       if (aspirante.employee_id) {
         await DB.revertirAprobacion(aspirante, 'Descartado');
@@ -417,6 +427,8 @@ Router.register('aspirantes', {
       await this._load();
     } catch (err) {
       alert('No se pudo descartar: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -428,11 +440,14 @@ Router.register('aspirantes', {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante || !aspirante.employee_id) return;
     if (!confirm(`¿Aprobar el perfil de ${aspirante.nombre}?`)) return;
+    Loading.show('Aprobando…');
     try {
       await DB.aprobarPerfilEmpleado(aspirante.employee_id);
       await this._load();
     } catch (err) {
       alert('No se pudo aprobar el perfil: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -440,21 +455,27 @@ Router.register('aspirantes', {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante || !aspirante.employee_id) return;
     if (!confirm(`¿Quitar la aprobación del perfil de ${aspirante.nombre}?`)) return;
+    Loading.show('Guardando…');
     try {
       await DB.quitarAprobacionPerfil(aspirante.employee_id);
       await this._load();
     } catch (err) {
       alert('No se pudo quitar la aprobación: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
   async _eliminar(id) {
     if (!confirm('¿Eliminar este aspirante? Esta acción no se puede deshacer.')) return;
+    Loading.show('Eliminando…');
     try {
       await DB.deleteAspirante(id);
       await this._load();
     } catch (err) {
       alert('No se pudo eliminar: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -481,6 +502,7 @@ Router.register('aspirantes', {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     msg.textContent = 'Guardando…';
+    Loading.show('Guardando…');
 
     try {
       await DB.createAspirante({ nombre, cedula, telefono, cargoAspirado, areaAspirada, hojaVidaFile, observaciones });
@@ -494,6 +516,7 @@ Router.register('aspirantes', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
     }
   },
 });

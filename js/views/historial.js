@@ -204,6 +204,7 @@ Router.register('historial', {
     const tipo = document.getElementById('historial-tipo').value || undefined;
     const periodo = this._periodoSeleccionado();
     btn.disabled = true;
+    Loading.show('Preparando Excel…');
     try {
       const { movements } = await DB.getMovements({ tipo, fechaEntregaFrom: periodo?.from, fechaEntregaTo: periodo?.to });
       if (movements.length === 0) {
@@ -213,6 +214,7 @@ Router.register('historial', {
       this._buildExcel(movements);
     } finally {
       btn.disabled = false;
+      Loading.hide();
     }
   },
 
@@ -375,12 +377,15 @@ Router.register('historial', {
     );
     if (!confirmado) return;
 
+    Loading.show('Anulando…');
     try {
       await DB.anularMovimiento(m.id);
       this._closeModal();
       await this._load();
     } catch (err) {
       alert('No se pudo anular el movimiento: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 

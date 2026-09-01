@@ -328,11 +328,14 @@ function validarFechaNacimiento(iso) {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     msg.textContent = 'Guardando…';
+    Loading.show('Guardando…');
 
     try {
       let fotoUrl = null;
       if (fotoCamera && fotoCamera.hasPhoto()) {
+        Loading.setMessage('Subiendo foto…');
         fotoUrl = await DB.uploadFotoPublico(employeeId, fotoCamera.getFile());
+        Loading.setMessage('Guardando…');
       }
 
       const perfil = {
@@ -378,6 +381,7 @@ function validarFechaNacimiento(iso) {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
     }
   }
 
@@ -391,6 +395,7 @@ function validarFechaNacimiento(iso) {
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
+    Loading.show('Verificando…');
     try {
       const perfil = await DB.obtenerPerfilPublico(employeeId, cedula);
       cedulaVerificada = cedula;
@@ -402,6 +407,7 @@ function validarFechaNacimiento(iso) {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
     }
   });
 })();

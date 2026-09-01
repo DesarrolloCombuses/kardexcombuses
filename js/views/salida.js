@@ -332,6 +332,7 @@ Router.register('salida', {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     msg.textContent = 'Guardando…';
+    Loading.show('Subiendo firma y foto…');
 
     try {
       const session = await Auth.getSession();
@@ -346,6 +347,7 @@ Router.register('salida', {
         DB.uploadToBucket('fotos-entrega', this._camera.getFile(), (this._camera.getFile().name.split('.').pop() || 'jpg')),
       ]);
 
+      Loading.setMessage('Registrando entrega…');
       await DB.createMovement({
         header: {
           tipo: 'salida',

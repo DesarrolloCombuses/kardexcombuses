@@ -1164,6 +1164,42 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
 .update-banner button:hover { background: #5c3a06; }
 
 /* =====================================================================
+   Conexión e indicador de carga global -- se inyectan solos por JS
+   (js/connectivity.js, js/loading-overlay.js), así que viven fuera del
+   flujo normal del documento en vez de en app.html/index.html/
+   perfil-publico.html por separado.
+   ===================================================================== */
+
+.connectivity-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 70;
+  padding: 0.6rem 1rem; text-align: center; font-size: 0.85rem; font-weight: 600;
+  box-shadow: var(--shadow-md);
+}
+.connectivity-banner.offline { background: var(--danger); color: var(--white); }
+.connectivity-banner.restored { background: var(--success-text); color: var(--white); }
+
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(10, 20, 40, 0.45);
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-overlay-box {
+  background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  padding: 1.5rem 2rem; display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+  min-width: 180px;
+}
+.loading-spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid var(--blue-50); border-top-color: var(--blue-600);
+  animation: loading-spin 0.75s linear infinite;
+}
+.loading-overlay-msg { font-size: 0.85rem; font-weight: 600; color: var(--slate-700); text-align: center; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner { animation-duration: 2.4s; }
+}
+
+/* =====================================================================
    Ayuda: manual de usuario dentro de la app
    ===================================================================== */
 

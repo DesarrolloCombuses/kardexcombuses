@@ -89,11 +89,14 @@ Router.register('facturas', {
 
   async _eliminar(id) {
     if (!confirm('¿Eliminar esta factura? Esta acción no se puede deshacer.')) return;
+    Loading.show('Eliminando…');
     try {
       await DB.deleteFactura(id);
       await this._load();
     } catch (err) {
       alert('No se pudo eliminar: ' + err.message);
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -122,6 +125,7 @@ Router.register('facturas', {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     msg.textContent = 'Guardando…';
+    Loading.show('Subiendo factura…');
 
     try {
       const session = await Auth.getSession();
@@ -142,6 +146,7 @@ Router.register('facturas', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
     }
   },
 });

@@ -579,6 +579,7 @@ Router.register('empleados', {
     const msg = document.getElementById('empleado-estado-msg');
     msg.textContent = 'Guardando…';
     msg.className = 'form-msg';
+    Loading.show('Guardando…');
     try {
       await DB.updateEmployee(empleado.id, { activo, fecha_salida: fechaSalida, motivo_renuncia: motivoRenuncia });
       await this._load();
@@ -587,6 +588,8 @@ Router.register('empleados', {
     } catch (err) {
       msg.textContent = 'No se pudo actualizar: ' + err.message;
       msg.className = 'form-msg error';
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -617,6 +620,7 @@ Router.register('empleados', {
   async _enviarASonar(employeeId, msgEl) {
     msgEl.textContent = 'Conectando con Sonar…';
     msgEl.className = 'form-msg';
+    Loading.show('Conectando con Sonar…');
     try {
       const res = await DB.enviarConductorASonar(employeeId);
       msgEl.textContent = res.ok ? '✓ Conectado con Sonar: el conductor quedó creado.' : `No se pudo conectar con Sonar: ${res.message}`;
@@ -626,6 +630,8 @@ Router.register('empleados', {
       msgEl.textContent = 'No se pudo conectar con Sonar: ' + err.message;
       msgEl.className = 'form-msg error';
       return null;
+    } finally {
+      Loading.hide();
     }
   },
 
@@ -861,61 +867,67 @@ Router.register('empleados', {
       return;
     }
 
-    // La foto es opcional: si no se tocó nada, se conserva la que ya tenía
-    // (this._fotoUrlOriginal); si se marcó "Quitar foto" queda en null; si
-    // se capturó una nueva, se sube al bucket y se guarda su path.
-    if (this._fotoQuitada) {
-      basico.foto_url = null;
-    } else if (this._fotoCamera.hasPhoto()) {
-      msg.textContent = 'Subiendo foto…';
-      try {
-        const file = this._fotoCamera.getFile();
-        const ext = file.name.split('.').pop() || 'jpg';
-        basico.foto_url = await DB.uploadToBucket('fotos-empleados', file, ext);
-      } catch (err) {
-        msg.textContent = 'No se pudo subir la foto: ' + err.message;
-        msg.className = 'form-msg error';
-        return;
-      }
-      msg.textContent = 'Guardando…';
-    } else {
-      basico.foto_url = this._fotoUrlOriginal;
-    }
-
-    // Filas vacías (nadie escribió nombre) se descartan en vez de guardarse
-    // como un contacto/hijo en blanco -- pasa seguido si alguien le da
-    // "+ Agregar" y se arrepiente sin usar "Quitar".
-    const contactos = Array.from(document.querySelectorAll('#empleado-contactos .linea-row')).map((row) => ({
-      nombre: row.querySelector('.contacto-nombre').value.trim(),
-      parentesco: row.querySelector('.contacto-parentesco').value || null,
-      telefono: row.querySelector('.contacto-telefono').value.trim() || null,
-    })).filter((c) => c.nombre);
-
-    const hijos = Array.from(document.querySelectorAll('#empleado-hijos .linea-row')).map((row) => ({
-      nombre: row.querySelector('.hijo-nombre').value.trim(),
-      fecha_nacimiento: row.querySelector('.hijo-fecha-nacimiento').value || null,
-      sexo: row.querySelector('.hijo-sexo').value || null,
-    })).filter((h) => h.nombre);
-
-    const perfil = {};
-    let perfilTieneDatos = false;
-    CAMPOS_SOCIODEMOGRAFICOS.forEach((c) => {
-      const el = document.getElementById(`socio-${c.id}`);
-      let valor;
-      if (c.type === 'checkbox') {
-        valor = el.checked;
-        if (valor) perfilTieneDatos = true;
-      } else if (c.type === 'number') {
-        valor = el.value ? parseInt(el.value, 10) : null;
-        if (valor !== null) perfilTieneDatos = true;
-      } else {
-        valor = el.value.trim() || null;
-        if (valor !== null) perfilTieneDatos = true;
-      }
-      perfil[c.id] = valor;
-    });
-
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    Loading.show('Guardando…');
     try {
+      // La foto es opcional: si no se tocó nada, se conserva la que ya
+      // tenía (this._fotoUrlOriginal); si se marcó "Quitar foto" queda en
+      // null; si se capturó una nueva, se sube al bucket y se guarda su
+      // path.
+      if (this._fotoQuitada) {
+        basico.foto_url = null;
+      } else if (this._fotoCamera.hasPhoto()) {
+        msg.textContent = 'Subiendo foto…';
+        Loading.setMessage('Subiendo foto…');
+        try {
+          const file = this._fotoCamera.getFile();
+          const ext = file.name.split('.').pop() || 'jpg';
+          basico.foto_url = await DB.uploadToBucket('fotos-empleados', file, ext);
+        } catch (err) {
+          msg.textContent = 'No se pudo subir la foto: ' + err.message;
+          msg.className = 'form-msg error';
+          return;
+        }
+        msg.textContent = 'Guardando…';
+        Loading.setMessage('Guardando…');
+      } else {
+        basico.foto_url = this._fotoUrlOriginal;
+      }
+
+      // Filas vacías (nadie escribió nombre) se descartan en vez de
+      // guardarse como un contacto/hijo en blanco -- pasa seguido si
+      // alguien le da "+ Agregar" y se arrepiente sin usar "Quitar".
+      const contactos = Array.from(document.querySelectorAll('#empleado-contactos .linea-row')).map((row) => ({
+        nombre: row.querySelector('.contacto-nombre').value.trim(),
+        parentesco: row.querySelector('.contacto-parentesco').value || null,
+        telefono: row.querySelector('.contacto-telefono').value.trim() || null,
+      })).filter((c) => c.nombre);
+
+      const hijos = Array.from(document.querySelectorAll('#empleado-hijos .linea-row')).map((row) => ({
+        nombre: row.querySelector('.hijo-nombre').value.trim(),
+        fecha_nacimiento: row.querySelector('.hijo-fecha-nacimiento').value || null,
+        sexo: row.querySelector('.hijo-sexo').value || null,
+      })).filter((h) => h.nombre);
+
+      const perfil = {};
+      let perfilTieneDatos = false;
+      CAMPOS_SOCIODEMOGRAFICOS.forEach((c) => {
+        const el = document.getElementById(`socio-${c.id}`);
+        let valor;
+        if (c.type === 'checkbox') {
+          valor = el.checked;
+          if (valor) perfilTieneDatos = true;
+        } else if (c.type === 'number') {
+          valor = el.value ? parseInt(el.value, 10) : null;
+          if (valor !== null) perfilTieneDatos = true;
+        } else {
+          valor = el.value.trim() || null;
+          if (valor !== null) perfilTieneDatos = true;
+        }
+        perfil[c.id] = valor;
+      });
+
       let id = employeeId;
       if (id) {
         await DB.updateEmployee(id, basico);
@@ -953,6 +965,9 @@ Router.register('empleados', {
     } catch (err) {
       msg.textContent = 'No se pudo guardar: ' + err.message;
       msg.className = 'form-msg error';
+    } finally {
+      submitBtn.disabled = false;
+      Loading.hide();
     }
   },
 

@@ -81,6 +81,9 @@ Router.register('entrada', {
       return;
     }
 
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    Loading.show('Registrando entrada…');
     try {
       const [session, nombreRegistro] = await Promise.all([Auth.getSession(), DB.getMyDisplayName()]);
       await DB.createMovement({
@@ -100,6 +103,9 @@ Router.register('entrada', {
     } catch (err) {
       msg.textContent = 'No se pudo registrar la entrada: ' + err.message;
       msg.className = 'form-msg error';
+    } finally {
+      submitBtn.disabled = false;
+      Loading.hide();
     }
   },
 });

@@ -672,3 +672,25 @@ const DB = {
     if (channel) window.supabaseClient.removeChannel(channel);
   },
 };
+
+// Todas las funciones async de esta capa pasan por acá para traducir
+// errores de red (no hay internet, o la conexión se cae a medias) a un
+// mensaje claro en español -- antes el error crudo del navegador (ej.
+// "Failed to fetch") quedaba tal cual en el "No se pudo guardar: ..." de
+// cada formulario, que no le dice nada a quien lo lee. No toca
+// subscribeToChanges/unsubscribe (no son async, no hacen una petición que
+// pueda fallar así).
+Object.keys(DB).forEach((key) => {
+  const original = DB[key];
+  if (typeof original !== 'function' || original.constructor.name !== 'AsyncFunction') return;
+  DB[key] = async function (...args) {
+    try {
+      return await original.apply(DB, args);
+    } catch (err) {
+      if (err instanceof TypeError && /fetch/i.test(err.message || '')) {
+        throw new Error('Sin conexión a internet. Verifica tu red e intenta de nuevo.');
+      }
+      throw err;
+    }
+  };
+});

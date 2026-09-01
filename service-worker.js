@@ -1,6 +1,6 @@
 // Service Worker con caché versionado. Al liberar una nueva versión:
 // 1) subir el número en version.json, 2) actualizar APP_VERSION aquí abajo.
-const APP_VERSION = '1.57.0';
+const APP_VERSION = '1.58.0';
 const CACHE_NAME = `kardex-cache-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -10,6 +10,8 @@ const APP_SHELL = [
   'css/styles.css',
   'js/config.js',
   'js/supabase-client.js',
+  'js/connectivity.js',
+  'js/loading-overlay.js',
   'js/permissions.js',
   'js/auth.js',
   'js/db.js',

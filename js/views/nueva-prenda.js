@@ -145,6 +145,7 @@ Router.register('nueva-prenda', {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     msg.textContent = 'Guardando…';
+    Loading.show('Guardando…');
 
     try {
       const session = await Auth.getSession();
@@ -168,6 +169,7 @@ Router.register('nueva-prenda', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
     }
   },
 });
