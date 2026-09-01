@@ -34,8 +34,27 @@ const CAMPOS_SOCIODEMOGRAFICOS = [
   { id: 'observaciones', label: 'Observaciones', type: 'textarea' },
 ];
 
+// Agrupa CAMPOS_SOCIODEMOGRAFICOS en tarjetas para el detalle -- antes era
+// una sola grilla plana de ~27 campos, difícil de escanear para ver qué
+// falta. fecha_nacimiento, fecha_ingreso y observaciones no van acá: las dos
+// fechas ya se destacan arriba como "hecho" y observaciones es texto libre
+// sin sentido de "pendiente".
+const SECCIONES_DETALLE = [
+  { titulo: 'Datos personales', campos: ['tipo_identificacion', 'sexo', 'estado_civil', 'grado_escolaridad', 'raza', 'tipo_sangre'] },
+  { titulo: 'Composición familiar', campos: ['composicion_familiar', 'personas_a_cargo', 'cabeza_familia'] },
+  { titulo: 'Vivienda y ubicación', campos: ['estrato_socioeconomico', 'lugar_residencia', 'direccion_residencia', 'barrio', 'tipo_vivienda', 'medio_desplazamiento'] },
+  { titulo: 'Vinculación laboral', campos: ['turno_trabajo', 'tipo_vinculacion'] },
+  { titulo: 'Experiencia como conductor', campos: ['conduce', 'tipo_vehiculo_conduce', 'anios_experiencia_conduccion'] },
+  { titulo: 'Dotación (tallas)', campos: ['talla_camisa', 'talla_pantalon', 'talla_calzado'] },
+  { titulo: 'Afiliaciones', campos: ['eps', 'arl', 'fondo_pension', 'caja_compensacion'] },
+];
+
+function campoVacio(valor) {
+  return valor === null || valor === undefined || valor === '';
+}
+
 function valorCampoDetalle(campo, valor) {
-  if (valor === null || valor === undefined || valor === '') return '—';
+  if (campoVacio(valor)) return '—';
   if (campo.type === 'checkbox') return valor ? 'Sí' : 'No';
   if (campo.type === 'date') return formatFecha(valor);
   return valor;
@@ -302,10 +321,30 @@ Router.register('empleados', {
   },
 
   _campoDetalle(campo, valor, claseExtra) {
+    const vacio = campoVacio(valor);
     return `
       <div class="detalle-field ${claseExtra || ''}">
         <div class="detalle-field-label">${campo.label}</div>
-        <div class="detalle-field-value">${valorCampoDetalle(campo, valor)}</div>
+        <div class="detalle-field-value ${vacio ? 'pendiente' : ''}">${vacio ? 'Pendiente' : valorCampoDetalle(campo, valor)}</div>
+      </div>
+    `;
+  },
+
+  // Cada sección de SECCIONES_DETALLE se pinta como su propia tarjeta, con
+  // un contador de cuántos de sus campos faltan por llenar -- antes era una
+  // sola grilla plana de ~27 campos donde un "—" perdido entre puros datos
+  // llenos era fácil de pasar por alto.
+  _seccionDetalleHtml(seccion, perfil) {
+    const campos = seccion.campos.map((id) => CAMPOS_SOCIODEMOGRAFICOS.find((c) => c.id === id)).filter(Boolean);
+    const pendientes = campos.filter((c) => campoVacio(perfil[c.id])).length;
+    const camposHtml = campos.map((c) => this._campoDetalle(c, perfil[c.id])).join('');
+    return `
+      <div class="detalle-card">
+        <div class="detalle-card-header">
+          <h4 class="detalle-card-title">${seccion.titulo}</h4>
+          <span class="tag ${pendientes ? 'pendiente' : 'completo'}">${pendientes ? `${pendientes} pendiente${pendientes === 1 ? '' : 's'}` : 'Completo'}</span>
+        </div>
+        <div class="detalle-grid">${camposHtml}</div>
       </div>
     `;
   },
@@ -327,10 +366,9 @@ Router.register('empleados', {
 
     // Fecha de ingreso, antigüedad y edad se destacan arriba de todo -- son
     // los datos que primero se buscan al abrir la ficha de alguien. El resto
-    // de campos va abajo en una grilla, sin repetir fecha_nacimiento ni
-    // fecha_ingreso (ya están en los destacados).
-    const camposGrid = CAMPOS_SOCIODEMOGRAFICOS.filter((c) => !['fecha_nacimiento', 'fecha_ingreso', 'observaciones'].includes(c.id));
-    const gridHtml = camposGrid.map((c) => this._campoDetalle(c, perfil[c.id])).join('');
+    // va abajo en tarjetas por sección (ver SECCIONES_DETALLE), sin repetir
+    // fecha_nacimiento ni fecha_ingreso (ya están en los destacados).
+    const seccionesHtml = SECCIONES_DETALLE.map((s) => this._seccionDetalleHtml(s, perfil)).join('');
     const campoObservaciones = CAMPOS_SOCIODEMOGRAFICOS.find((c) => c.id === 'observaciones');
     const observacionesHtml = perfil.observaciones ? this._campoDetalle(campoObservaciones, perfil.observaciones, 'detalle-field-full') : '';
 
@@ -432,7 +470,8 @@ Router.register('empleados', {
 
       <div class="modal-section">
         <h3 class="modal-section-title">Perfil sociodemográfico</h3>
-        <div class="detalle-grid">${gridHtml}${observacionesHtml}</div>
+        <div class="detalle-cards">${seccionesHtml}</div>
+        ${observacionesHtml ? `<div class="detalle-grid" style="margin-top:0.9rem">${observacionesHtml}</div>` : ''}
       </div>
 
       ${contactosHtml}

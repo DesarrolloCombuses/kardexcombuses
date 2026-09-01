@@ -1034,8 +1034,21 @@ tbody tr:hover { background: var(--slate-50); }
 .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem 1.5rem; }
 .detalle-field-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--slate-500); margin-bottom: 0.25rem; }
 .detalle-field-value { font-size: 0.9rem; color: var(--slate-900); font-weight: 500; }
+.detalle-field-value.pendiente { color: #8a5a04; font-weight: 600; }
 .detalle-field-full { grid-column: 1/-1; padding-top: 0.9rem; border-top: 1px solid var(--slate-100); }
 @media (max-width: 640px) { .detalle-grid { grid-template-columns: 1fr; } }
+
+/* Perfil sociodemográfico agrupado en tarjetas por sección (en vez de una
+   sola grilla plana de ~27 campos) -- cada una con su propio contador de
+   pendientes, para ver de un vistazo qué le falta a la ficha. */
+.detalle-cards { display: flex; flex-direction: column; gap: 0.9rem; }
+.detalle-card {
+  background: var(--slate-50); border: 1px solid var(--slate-200);
+  border-radius: var(--radius); padding: 0.9rem 1.1rem 1.05rem;
+}
+.detalle-card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.85rem; }
+.detalle-card-title { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; letter-spacing: 0.03em; }
+.detalle-card .detalle-grid { gap: 0.9rem 1.5rem; }
 
 .detalle-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .detalle-list-item {
