@@ -375,6 +375,8 @@ Router.register('empleados', {
         ` : ''}
       </div>
 
+      ${this._estadoBloqueHtml(empleado)}
+
       ${empleado.perfil_aprobado_at ? `
       <p class="view-intro" style="margin:0 0 1.2rem">Perfil aprobado el ${new Date(empleado.perfil_aprobado_at).toLocaleString('es-CO')}${empleado.perfil_aprobado_por ? ' por ' + empleado.perfil_aprobado_por : ''}.</p>
       ` : ''}
@@ -400,6 +402,29 @@ Router.register('empleados', {
     const sonarBtn = document.getElementById('empleado-sonar-btn');
     if (sonarBtn) sonarBtn.addEventListener('click', () => this._reenviarSonar(empleado));
 
+    const inactivarBtn = document.getElementById('empleado-inactivar-btn');
+    if (inactivarBtn) {
+      inactivarBtn.addEventListener('click', () => {
+        inactivarBtn.classList.add('hidden');
+        document.getElementById('empleado-inactivar-form').classList.remove('hidden');
+      });
+      document.getElementById('empleado-inactivar-cancelar').addEventListener('click', () => {
+        document.getElementById('empleado-inactivar-form').classList.add('hidden');
+        inactivarBtn.classList.remove('hidden');
+      });
+      document.getElementById('empleado-inactivar-confirmar').addEventListener('click', () => {
+        const fechaSalida = document.getElementById('empleado-inactivar-fecha').value || null;
+        this._cambiarEstado(empleado, false, fechaSalida);
+      });
+    }
+    const activarBtn = document.getElementById('empleado-activar-btn');
+    if (activarBtn) {
+      activarBtn.addEventListener('click', () => {
+        if (!confirm(`¿Marcar a ${empleado.nombre} como activo de nuevo?`)) return;
+        this._cambiarEstado(empleado, true, null);
+      });
+    }
+
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
         this._pintarFoto(document.getElementById('empleado-detalle-avatar'), url);
@@ -412,6 +437,51 @@ Router.register('empleados', {
         btn.classList.add('clickeable');
         btn.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
       });
+    }
+  },
+
+  // Cambiar activo/inactivo directo desde el detalle -- antes solo se podía
+  // tocando "Editar" y guardando todo el formulario. Al inactivar se pide la
+  // fecha de salida ahí mismo (con el día de hoy como valor por defecto,
+  // editable) para que quede registrada desde el primer momento en vez de
+  // depender de que alguien la agregue después a mano.
+  _estadoBloqueHtml(empleado) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    if (empleado.activo) {
+      return `
+        <div style="margin-bottom:1.2rem">
+          <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
+          <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
+            <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
+            <div style="display:flex;gap:0.5rem">
+              <button type="button" id="empleado-inactivar-confirmar">Confirmar</button>
+              <button type="button" id="empleado-inactivar-cancelar" class="btn-secondary">Cancelar</button>
+            </div>
+          </div>
+          <p id="empleado-estado-msg" class="form-msg"></p>
+        </div>
+      `;
+    }
+    return `
+      <div style="margin-bottom:1.2rem">
+        <button type="button" id="empleado-activar-btn" class="btn-secondary">Marcar como activo</button>
+        <p id="empleado-estado-msg" class="form-msg"></p>
+      </div>
+    `;
+  },
+
+  async _cambiarEstado(empleado, activo, fechaSalida) {
+    const msg = document.getElementById('empleado-estado-msg');
+    msg.textContent = 'Guardando…';
+    msg.className = 'form-msg';
+    try {
+      await DB.updateEmployee(empleado.id, { activo, fecha_salida: fechaSalida });
+      await this._load();
+      const actualizado = this._employees.find((e) => e.id === empleado.id);
+      if (actualizado) this._verDetalle(actualizado);
+    } catch (err) {
+      msg.textContent = 'No se pudo actualizar: ' + err.message;
+      msg.className = 'form-msg error';
     }
   },
 
