@@ -249,12 +249,12 @@ Router.register('empleados', {
       btn.addEventListener('click', () => {
         const emp = this._employees.find((x) => x.id === btn.dataset.editar);
         if (!emp) return;
-        // Con perfil ya cargado: primero se muestra en solo lectura (menos
-        // riesgo de modificar algo sin querer) y desde ahí se entra a
-        // editar. Sin perfil todavía: no hay nada que "ver", va directo al
-        // formulario para completarlo.
-        if (emp.perfil_sociodemografico) this._verDetalle(emp);
-        else this._abrirModal(emp);
+        // Siempre se muestra primero en solo lectura (menos riesgo de
+        // modificar algo sin querer), tenga o no perfil sociodemográfico
+        // completo -- antes, sin perfil, se saltaba directo al formulario de
+        // edición y con eso se perdían datos que sí existen aunque el
+        // perfil esté pendiente (activo/inactivo, vehículo asignado, etc.).
+        this._verDetalle(emp);
       });
     });
 
@@ -350,7 +350,7 @@ Router.register('empleados', {
         </div>
         <div class="detalle-tags">
           <span class="tag ${empleado.activo ? 'activo' : 'inactivo-tag'}">${empleado.activo ? 'Activo' : 'Inactivo'}</span>
-          <span class="tag completo">Perfil completo</span>
+          <span class="tag ${empleado.perfil_sociodemografico ? 'completo' : 'pendiente'}">${empleado.perfil_sociodemografico ? 'Perfil completo' : 'Perfil pendiente'}</span>
         </div>
       </div>
 
@@ -367,7 +367,17 @@ Router.register('empleados', {
           <div class="detalle-fact-value">${edadTexto(perfil.fecha_nacimiento)}</div>
           <div class="detalle-fact-label">Edad</div>
         </div>
+        ${!empleado.activo ? `
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${formatFecha(empleado.fecha_salida)}</div>
+          <div class="detalle-fact-label">Fecha de salida</div>
+        </div>
+        ` : ''}
       </div>
+
+      ${empleado.perfil_aprobado_at ? `
+      <p class="view-intro" style="margin:0 0 1.2rem">Perfil aprobado el ${new Date(empleado.perfil_aprobado_at).toLocaleString('es-CO')}${empleado.perfil_aprobado_por ? ' por ' + empleado.perfil_aprobado_por : ''}.</p>
+      ` : ''}
 
       ${vehiculoHtml}
       ${sonarHtml}
@@ -537,6 +547,7 @@ Router.register('empleados', {
             <label>Área<input type="text" id="empleado-area" value="${empleado?.area || ''}" /></label>
             <label>Teléfono<input type="tel" id="empleado-telefono" value="${empleado?.telefono || ''}" /></label>
             <label>Correo personal<input type="email" id="empleado-email-personal" value="${empleado?.email_personal || ''}" /></label>
+            <label>Fecha de salida<input type="date" id="empleado-fecha-salida" value="${empleado?.fecha_salida || ''}" /></label>
           </div>
           <label class="checkbox-label"><input type="checkbox" id="empleado-activo" ${!empleado || empleado.activo ? 'checked' : ''} /> Empleado activo</label>
         </fieldset>
@@ -651,6 +662,7 @@ Router.register('empleados', {
       area: document.getElementById('empleado-area').value.trim() || null,
       telefono: document.getElementById('empleado-telefono').value.trim() || null,
       email_personal: document.getElementById('empleado-email-personal').value.trim() || null,
+      fecha_salida: document.getElementById('empleado-fecha-salida').value || null,
       activo: document.getElementById('empleado-activo').checked,
       numero_interno: document.getElementById('empleado-numero-interno').value.trim() || null,
       ruta: document.getElementById('empleado-ruta').value.trim() || null,

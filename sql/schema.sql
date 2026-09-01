@@ -128,6 +128,12 @@ alter table employees add column if not exists foto_url text;
 alter table employees add column if not exists sonar_synced_at timestamptz;
 alter table employees add column if not exists sonar_sync_error text;
 
+-- Fecha de salida del empleado (cuando aplica). Vive acá -- igual que
+-- "activo" -- y no en perfil_sociodemografico, porque no depende de que el
+-- empleado haya llenado su perfil (uno inactivo/retirado puede no tener
+-- perfil_sociodemografico en absoluto).
+alter table employees add column if not exists fecha_salida date;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);
