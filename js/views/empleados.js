@@ -62,6 +62,11 @@ function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
 
+function formatSalario(valor) {
+  if (valor === null || valor === undefined || valor === '') return '—';
+  return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+}
+
 // Antigüedad y edad son datos que se leen de un vistazo (no hay que ir
 // campo por campo a calcularlos a mano), por eso se destacan aparte en el
 // detalle en vez de quedar mezclados en la grilla con todo lo demás.
@@ -367,6 +372,10 @@ Router.register('empleados', {
           <div class="detalle-fact-value">${edadTexto(perfil.fecha_nacimiento)}</div>
           <div class="detalle-fact-label">Edad</div>
         </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${formatSalario(empleado.salario)}</div>
+          <div class="detalle-fact-label">Salario</div>
+        </div>
         ${!empleado.activo ? `
         <div class="detalle-fact">
           <div class="detalle-fact-value">${formatFecha(empleado.fecha_salida)}</div>
@@ -617,6 +626,7 @@ Router.register('empleados', {
             <label>Área<input type="text" id="empleado-area" value="${empleado?.area || ''}" /></label>
             <label>Teléfono<input type="tel" id="empleado-telefono" value="${empleado?.telefono || ''}" /></label>
             <label>Correo personal<input type="email" id="empleado-email-personal" value="${empleado?.email_personal || ''}" /></label>
+            <label>Salario<input type="number" id="empleado-salario" value="${empleado?.salario ?? ''}" min="0" step="1000" placeholder="Ej: 1300000" /></label>
             <label>Fecha de salida<input type="date" id="empleado-fecha-salida" value="${empleado?.fecha_salida || ''}" /></label>
           </div>
           <label class="checkbox-label"><input type="checkbox" id="empleado-activo" ${!empleado || empleado.activo ? 'checked' : ''} /> Empleado activo</label>
@@ -732,6 +742,7 @@ Router.register('empleados', {
       area: document.getElementById('empleado-area').value.trim() || null,
       telefono: document.getElementById('empleado-telefono').value.trim() || null,
       email_personal: document.getElementById('empleado-email-personal').value.trim() || null,
+      salario: document.getElementById('empleado-salario').value ? Number(document.getElementById('empleado-salario').value) : null,
       fecha_salida: document.getElementById('empleado-fecha-salida').value || null,
       activo: document.getElementById('empleado-activo').checked,
       numero_interno: document.getElementById('empleado-numero-interno').value.trim() || null,

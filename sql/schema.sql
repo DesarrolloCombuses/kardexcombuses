@@ -134,6 +134,14 @@ alter table employees add column if not exists sonar_sync_error text;
 -- perfil_sociodemografico en absoluto).
 alter table employees add column if not exists fecha_salida date;
 
+-- Salario. Mismo motivo que fecha_salida para vivir acá y no en
+-- perfil_sociodemografico. No se expone en el link público de
+-- autodiligenciamiento -- es un dato administrativo interno, no algo que la
+-- persona autoreporte. La carga masiva de salarios reales NUNCA se hace con
+-- un script que quede commiteado (este repo es público) -- se hace directo
+-- contra producción con `supabase db query --linked`.
+alter table employees add column if not exists salario numeric;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);
