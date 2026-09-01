@@ -951,6 +951,7 @@ tbody tr:hover { background: var(--slate-50); }
 .person-meta-dates { color: var(--slate-400); }
 .person-meta-dates .persona-salida { color: var(--slate-600); }
 .person-meta-vehiculo { color: var(--blue-700); font-weight: 600; }
+.person-actions { display: flex; gap: 0.5rem; flex: none; }
 
 /* Fila inactiva: antes se apagaba toda la tarjeta con opacity (botón y tags
    ilegibles incluidos); ahora el estado se marca con el borde/fondo y el
@@ -1063,7 +1064,7 @@ tbody tr:hover { background: var(--slate-50); }
   .person-row { flex-wrap: wrap; }
   .person-info { flex: 1 1 100%; order: 1; }
   .person-avatar { order: 0; }
-  .person-row > button { order: 3; margin-left: auto; }
+  .person-actions { order: 3; margin-left: auto; }
 }
 
 .movement-card.anulado { opacity: 0.6; }

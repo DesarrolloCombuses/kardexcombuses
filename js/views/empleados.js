@@ -299,7 +299,10 @@ Router.register('empleados', {
             <div class="person-meta"><span>CC ${e.cedula}</span><span>${e.cargo || 'Sin cargo'}</span>${e.area && e.area !== e.cargo ? `<span>${e.area}</span>` : ''}</div>
             <div class="person-meta person-meta-dates">${fechasHtml}${vehiculoHtml}</div>
           </div>
-          <button type="button" class="btn-secondary" data-editar="${e.id}">${completo ? 'Ver perfil' : 'Completar perfil'}</button>
+          <div class="person-actions">
+            <button type="button" class="btn-secondary" data-editar="${e.id}">${completo ? 'Ver perfil' : 'Completar perfil'}</button>
+            ${!e.activo ? `<button type="button" class="btn-secondary" data-pazysalvo="${e.id}">Paz y salvo</button>` : ''}
+          </div>
         </div>
       `;
     }).join('');
@@ -314,6 +317,15 @@ Router.register('empleados', {
         // edición y con eso se perdían datos que sí existen aunque el
         // perfil esté pendiente (activo/inactivo, vehículo asignado, etc.).
         this._verDetalle(emp);
+      });
+    });
+
+    // Acceso directo al paz y salvo desde la lista -- sin esto había que
+    // entrar primero al detalle de cada inactivo solo para llegar al botón.
+    lista.querySelectorAll('[data-pazysalvo]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const emp = this._employees.find((x) => x.id === btn.dataset.pazysalvo);
+        if (emp) this._abrirPazYSalvo(emp);
       });
     });
 
@@ -601,6 +613,11 @@ Router.register('empleados', {
 
   async _abrirPazYSalvo(empleado) {
     const hoy = new Date().toISOString().slice(0, 10);
+    // Se puede llegar acá desde el detalle ya abierto o directo desde la
+    // lista (botón rápido en la fila de un inactivo) -- asegurar que el
+    // modal quede visible en ambos casos.
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
     document.getElementById('modal-body').innerHTML = `
       <div class="detalle-header">
         <div class="detalle-header-info">
@@ -822,7 +839,12 @@ Router.register('empleados', {
       await DB.updateEmployee(empleado.id, { activo, fecha_salida: fechaSalida, motivo_renuncia: motivoRenuncia });
       await this._load();
       const actualizado = this._employees.find((e) => e.id === empleado.id);
-      if (actualizado) this._verDetalle(actualizado);
+      if (!actualizado) return;
+      // Justo al retirar a alguien es el momento en que se necesita el paz y
+      // salvo -- en vez de dejarlo enterrado en el detalle y que haya que
+      // volver a entrar a buscarlo, se salta directo al formulario.
+      if (activo === false) this._abrirPazYSalvo(actualizado);
+      else this._verDetalle(actualizado);
     } catch (err) {
       msg.textContent = 'No se pudo actualizar: ' + err.message;
       msg.className = 'form-msg error';
