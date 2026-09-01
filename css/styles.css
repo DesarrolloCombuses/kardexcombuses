@@ -1278,3 +1278,15 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
   .siniestro-row { grid-template-columns: 1fr; }
   .siniestro-head { display: none; }
 }
+
+/* Detalle completo de un siniestro (todas las columnas del sheet de SST
+   con datos, no solo las 5 del formato oficial) -- colapsado por defecto,
+   ocupa todo el ancho de la fila en vez de encajar en una sola columna. */
+.siniestro-detalle { grid-column: 1 / -1; margin-top: 0.3rem; }
+.siniestro-detalle summary { cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--blue-700); user-select: none; }
+.siniestro-detalle-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.7rem 1rem;
+  margin-top: 0.6rem; padding: 0.7rem 0.8rem; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-sm);
+}
+.siniestro-detalle-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--slate-500); }
+.siniestro-detalle-valor { font-size: 0.8rem; color: var(--slate-900); margin-top: 0.15rem; overflow-wrap: break-word; }

@@ -82,6 +82,14 @@ function esConductorRutaSonar(empleado) {
   return esCargoConductor(empleado?.cargo) && esRutaSonar(empleado?.ruta);
 }
 
+// Los datos de siniestros vienen de un Google Sheet externo que llena a
+// mano el equipo de SST (texto libre en varios campos) -- se escapan antes
+// de insertarlos como HTML para no romper el layout si alguien escribe
+// comillas, < o & en una descripción.
+function escapeHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
@@ -601,6 +609,25 @@ Router.register('empleados', {
   // o guardarlos como si fueran parte de la ficha del empleado.
   _filaSiniestroHtml(fila) {
     const f = fila || {};
+    const detalle = f.detalle || [];
+    // El detalle completo (todas las columnas del sheet de SST con datos
+    // para este siniestro) va colapsado por defecto -- son ~15-25 campos
+    // por caso y mostrarlos siempre haría la tabla ilegible. Sirve para
+    // verificar/corregir Definición e Hipótesis, que el sheet no siempre
+    // llena de forma consistente (ver comentario en js/siniestros.js).
+    const detalleHtml = detalle.length ? `
+      <details class="siniestro-detalle">
+        <summary>Ver toda la información de este siniestro (${detalle.length} campos)</summary>
+        <div class="siniestro-detalle-grid">
+          ${detalle.map((c) => `
+            <div>
+              <div class="siniestro-detalle-label">${escapeHtml(c.label)}</div>
+              <div class="siniestro-detalle-valor">${escapeHtml(c.valor)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </details>
+    ` : '';
     return `
       <div class="siniestro-row${f.pendiente ? ' siniestro-pendiente' : ''}" data-siniestro-row>
         <input type="text" data-siniestro-fecha value="${f.fecha ?? ''}" placeholder="dd/mm/aaaa" />
@@ -609,6 +636,7 @@ Router.register('empleados', {
         <input type="text" data-siniestro-definicion value="${f.definicion ?? 'N/N'}" />
         <input type="text" data-siniestro-hipotesis value="${f.hipotesis ?? 'N/N'}" />
         <button type="button" class="btn-icon-danger" data-siniestro-quitar aria-label="Quitar fila">✕</button>
+        ${detalleHtml}
       </div>
     `;
   },
