@@ -926,12 +926,14 @@ tbody tr:hover { background: var(--slate-50); }
   gap: 0.9rem;
   background: var(--white);
   border: 1px solid var(--slate-200);
+  border-left: 4px solid var(--blue-600);
   border-radius: var(--radius);
   padding: 0.75rem 1.1rem;
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .person-row:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md); }
+.person-row:hover { border-left-color: var(--blue-700); }
 .person-avatar {
   width: 42px; height: 42px; flex: none; border-radius: 50%;
   background: var(--blue-50); color: var(--blue-700);
@@ -939,17 +941,24 @@ tbody tr:hover { background: var(--slate-50); }
   display: flex; align-items: center; justify-content: center;
 }
 .person-info { flex: 1; min-width: 0; }
+.person-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.5rem; }
 .person-name {
   font-weight: 700; font-size: 0.9rem; color: var(--slate-900);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.person-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.78rem; color: var(--slate-500); margin-top: 0.15rem; }
-.person-row.inactivo { opacity: 0.6; }
-.person-inactive-flag {
-  display: inline-block; font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.03em; color: var(--slate-500); background: var(--slate-100);
-  padding: 0.12rem 0.45rem; border-radius: 999px; margin-left: 0.4rem; vertical-align: middle;
-}
+.person-name-row .tag { padding: 0.1rem 0.5rem; font-size: 0.64rem; }
+.person-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.78rem; color: var(--slate-500); margin-top: 0.25rem; }
+.person-meta-dates { color: var(--slate-400); }
+.person-meta-dates .persona-salida { color: var(--slate-600); }
+.person-meta-vehiculo { color: var(--blue-700); font-weight: 600; }
+
+/* Fila inactiva: antes se apagaba toda la tarjeta con opacity (botón y tags
+   ilegibles incluidos); ahora el estado se marca con el borde/fondo y el
+   texto se mantiene legible -- el estado se lee en la forma, no solo en el
+   texto "Inactivo". */
+.person-row.inactivo { background: var(--slate-50); border-left-color: var(--slate-300); }
+.person-row.inactivo:hover { border-left-color: var(--slate-400); }
+.person-row.inactivo .person-name { color: var(--slate-600); }
 
 #empleados-nuevo-btn { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; }
 @media (max-width: 480px) { #empleados-nuevo-btn { margin-left: 0; width: 100%; justify-content: center; } }
@@ -1041,8 +1050,7 @@ tbody tr:hover { background: var(--slate-50); }
   .person-row { flex-wrap: wrap; }
   .person-info { flex: 1 1 100%; order: 1; }
   .person-avatar { order: 0; }
-  .tag { order: 2; }
-  .person-row button { order: 3; margin-left: auto; }
+  .person-row > button { order: 3; margin-left: auto; }
 }
 
 .movement-card.anulado { opacity: 0.6; }

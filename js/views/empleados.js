@@ -251,14 +251,31 @@ Router.register('empleados', {
     }
     lista.innerHTML = filtrados.map((e) => {
       const completo = !!e.perfil_sociodemografico;
+      const fechaIngreso = e.perfil_sociodemografico?.fecha_ingreso;
+
+      // Activo: ingreso + antigüedad (dato que se lee de un vistazo, ver
+      // antiguedadTexto). Inactivo: la fecha relevante para el vistazo es
+      // cuándo salió, no cuándo entró -- calcular antigüedad contra "hoy"
+      // para alguien que ya se fue daría un número engañoso.
+      const fechasHtml = e.activo
+        ? `<span>Ingreso: ${formatFecha(fechaIngreso)}${fechaIngreso ? ` · ${antiguedadTexto(fechaIngreso)}` : ''}</span>`
+        : `<span class="persona-salida">Salida: ${formatFecha(e.fecha_salida)}</span>${e.motivo_renuncia ? `<span>${e.motivo_renuncia}</span>` : ''}`;
+
+      const vehiculoPartes = [e.numero_interno ? `Vehículo ${e.numero_interno}` : '', e.ruta ? `Ruta ${e.ruta}` : ''].filter(Boolean);
+      const vehiculoHtml = vehiculoPartes.length ? `<span class="person-meta-vehiculo">${vehiculoPartes.join(' · ')}</span>` : '';
+
       return `
         <div class="person-row ${e.activo ? '' : 'inactivo'}">
           <span class="person-avatar" data-avatar-id="${e.id}">${this._iniciales(e.nombre)}</span>
           <div class="person-info">
-            <div class="person-name">${e.nombre}${e.activo ? '' : ' <span class="person-inactive-flag">Inactivo</span>'}</div>
-            <div class="person-meta"><span>CC ${e.cedula}</span><span>${e.cargo || 'Sin cargo'}</span><span>Ingreso: ${formatFecha(e.perfil_sociodemografico?.fecha_ingreso)}</span></div>
+            <div class="person-name-row">
+              <span class="person-name">${e.nombre}</span>
+              <span class="tag ${e.activo ? 'activo' : 'inactivo-tag'}">${e.activo ? 'Activo' : 'Inactivo'}</span>
+              <span class="tag ${completo ? 'completo' : 'pendiente'}">${completo ? 'Completo' : 'Pendiente'}</span>
+            </div>
+            <div class="person-meta"><span>CC ${e.cedula}</span><span>${e.cargo || 'Sin cargo'}</span>${e.area && e.area !== e.cargo ? `<span>${e.area}</span>` : ''}</div>
+            <div class="person-meta person-meta-dates">${fechasHtml}${vehiculoHtml}</div>
           </div>
-          <span class="tag ${completo ? 'completo' : 'pendiente'}">${completo ? 'Completo' : 'Pendiente'}</span>
           <button type="button" class="btn-secondary" data-editar="${e.id}">${completo ? 'Ver perfil' : 'Completar perfil'}</button>
         </div>
       `;
