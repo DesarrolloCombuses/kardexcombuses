@@ -112,9 +112,56 @@ alter table employees add column if not exists vehiculo_asociado text;
 alter table employees add column if not exists ruta text;
 
 -- Base/afiliado del vehículo asignado (a qué empresa/base va dirigido el
--- vehículo del conductor). Se carga por número interno de vehículo, no por
--- empleado -- ver sql/update_base_vehiculo_2026-08-27.sql.
+-- vehículo del conductor). No se escribe a mano por empleado: se mantiene
+-- sola con el trigger de abajo, a partir de vehiculo_bases (tabla de
+-- referencia por número interno de vehículo -- datos en
+-- sql/vehiculo_bases_2026-09-01.sql). Antes era una copia estática que solo
+-- quedaba bien el día que se corría el UPDATE una vez (ver
+-- sql/update_base_vehiculo_2026-08-27.sql) -- cualquier empleado que
+-- llegara después a un vehículo ya conocido se quedaba sin base hasta que
+-- alguien la escribiera a mano.
 alter table employees add column if not exists base text;
+
+create table if not exists vehiculo_bases (
+  numero_interno text primary key,
+  base text not null
+);
+
+alter table vehiculo_bases enable row level security;
+
+drop policy if exists "vehiculo_bases access" on vehiculo_bases;
+create policy "vehiculo_bases access" on vehiculo_bases
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+create or replace function sync_employee_base_from_vehiculo()
+returns trigger
+language plpgsql
+as $$
+declare
+  base_encontrada text;
+begin
+  if new.numero_interno is null then
+    new.base := null;
+  else
+    select vb.base into base_encontrada
+    from vehiculo_bases vb
+    where vb.numero_interno = new.numero_interno;
+
+    if found then
+      new.base := base_encontrada;
+    end if;
+    -- si el vehículo no está en vehiculo_bases todavía, se deja lo que
+    -- haya llegado en el guardado (permite completar a mano mientras se
+    -- agrega ese vehículo a la tabla de referencia).
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_employee_base on employees;
+create trigger trg_sync_employee_base
+  before insert or update on employees
+  for each row execute function sync_employee_base_from_vehiculo();
 
 -- Foto de perfil del empleado (opcional). Guarda solo el path dentro del
 -- bucket "fotos-empleados" (ver más abajo), igual que firma_receptor_url /
