@@ -227,6 +227,19 @@ Router.register('empleados', {
     if (fechaHasta) filtrados = filtrados.filter((e) => e.perfil_sociodemografico?.fecha_ingreso && e.perfil_sociodemografico.fecha_ingreso <= fechaHasta);
     if (q) filtrados = filtrados.filter((e) => e.nombre.toLowerCase().includes(q) || e.cedula.includes(q));
 
+    // Organizada por fecha de ingreso (más reciente primero), igual para
+    // activos e inactivos -- antes quedaba en el orden alfabético que trae
+    // la consulta (DB.getEmployeesConPerfil ordena por nombre). Sin fecha de
+    // ingreso (perfil pendiente) va al final.
+    filtrados = [...filtrados].sort((a, b) => {
+      const fa = a.perfil_sociodemografico?.fecha_ingreso;
+      const fb = b.perfil_sociodemografico?.fecha_ingreso;
+      if (!fa && !fb) return a.nombre.localeCompare(b.nombre, 'es');
+      if (!fa) return 1;
+      if (!fb) return -1;
+      return fb.localeCompare(fa);
+    });
+
     const total = this._employees.length;
     document.getElementById('empleados-contador').textContent =
       filtrados.length === total ? `${total} empleado(s)` : `Mostrando ${filtrados.length} de ${total} empleado(s)`;
@@ -243,7 +256,7 @@ Router.register('empleados', {
           <span class="person-avatar" data-avatar-id="${e.id}">${this._iniciales(e.nombre)}</span>
           <div class="person-info">
             <div class="person-name">${e.nombre}${e.activo ? '' : ' <span class="person-inactive-flag">Inactivo</span>'}</div>
-            <div class="person-meta"><span>CC ${e.cedula}</span><span>${e.cargo || 'Sin cargo'}</span></div>
+            <div class="person-meta"><span>CC ${e.cedula}</span><span>${e.cargo || 'Sin cargo'}</span><span>Ingreso: ${formatFecha(e.perfil_sociodemografico?.fecha_ingreso)}</span></div>
           </div>
           <span class="tag ${completo ? 'completo' : 'pendiente'}">${completo ? 'Completo' : 'Pendiente'}</span>
           <button type="button" class="btn-secondary" data-editar="${e.id}">${completo ? 'Ver perfil' : 'Completar perfil'}</button>
@@ -429,8 +442,16 @@ Router.register('empleados', {
         inactivarBtn.classList.remove('hidden');
       });
       document.getElementById('empleado-inactivar-confirmar').addEventListener('click', () => {
+        const motivoInput = document.getElementById('empleado-inactivar-motivo');
+        const motivo = motivoInput.value.trim();
+        if (!motivo) {
+          const msg = document.getElementById('empleado-estado-msg');
+          msg.textContent = 'El motivo de salida es obligatorio.';
+          msg.className = 'form-msg error';
+          motivoInput.focus();
+          return;
+        }
         const fechaSalida = document.getElementById('empleado-inactivar-fecha').value || null;
-        const motivo = document.getElementById('empleado-inactivar-motivo').value.trim() || null;
         this._cambiarEstado(empleado, false, fechaSalida, motivo);
       });
     }
@@ -470,7 +491,7 @@ Router.register('empleados', {
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
-            <label>Motivo de salida<input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" /></label>
+            <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
             <div style="display:flex;gap:0.5rem">
               <button type="button" id="empleado-inactivar-confirmar">Confirmar</button>
               <button type="button" id="empleado-inactivar-cancelar" class="btn-secondary">Cancelar</button>
