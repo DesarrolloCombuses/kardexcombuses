@@ -29,6 +29,7 @@ const SECCIONES_PUBLICAS = [
     titulo: 'Vivienda y ubicación',
     campos: [
       { id: 'lugar_residencia', label: 'Municipio de residencia', type: 'text' },
+      { id: 'direccion_residencia', label: 'Dirección de residencia', type: 'text' },
       { id: 'barrio', label: 'Barrio', type: 'text' },
       { id: 'tipo_vivienda', label: 'Tipo de vivienda', type: 'select', options: ['Propia urbana', 'En arriendo urbano', 'Familiar urbano', 'Propia rural', 'En arriendo rural', 'Familiar rural'] },
       { id: 'estrato_socioeconomico', label: 'Estrato socioeconómico', type: 'select', options: ['1', '2', '3', '4', '5', '6'] },

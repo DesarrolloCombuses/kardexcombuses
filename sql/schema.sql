@@ -142,6 +142,11 @@ alter table employees add column if not exists fecha_salida date;
 -- contra producción con `supabase db query --linked`.
 alter table employees add column if not exists salario numeric;
 
+-- Motivo de salida (renuncia/terminación). Vive acá -- igual que fecha_salida
+-- -- por el mismo motivo: no depende de que el empleado tenga perfil
+-- sociodemografico. Solo aplica cuando activo = false.
+alter table employees add column if not exists motivo_renuncia text;
+
 create index if not exists idx_item_variants_category on item_variants(item_category_id);
 create index if not exists idx_movements_employee on kardex_movements(employee_id);
 create index if not exists idx_movements_fecha on kardex_movements(fecha);
@@ -438,6 +443,10 @@ alter table perfil_sociodemografico add column if not exists arl text;
 alter table perfil_sociodemografico add column if not exists fondo_pension text;
 alter table perfil_sociodemografico add column if not exists caja_compensacion text;
 
+-- Dirección completa de residencia, distinta de lugar_residencia (municipio)
+-- y barrio -- la hoja de RRHH la trae como columna aparte.
+alter table perfil_sociodemografico add column if not exists direccion_residencia text;
+
 drop function if exists public.perfil_publico_obtener(uuid, text);
 drop function if exists public.perfil_publico_guardar(uuid, text, date, text, text, text, text);
 drop function if exists public.perfil_publico_guardar(uuid, text, jsonb, jsonb, text);
@@ -477,6 +486,7 @@ begin
     'cabeza_familia', ps.cabeza_familia,
     'estrato_socioeconomico', ps.estrato_socioeconomico,
     'lugar_residencia', ps.lugar_residencia,
+    'direccion_residencia', ps.direccion_residencia,
     'barrio', ps.barrio,
     'tipo_vivienda', ps.tipo_vivienda,
     'medio_desplazamiento', ps.medio_desplazamiento,
@@ -563,7 +573,7 @@ begin
   insert into perfil_sociodemografico (
     employee_id, tipo_identificacion, fecha_nacimiento, sexo, estado_civil, grado_escolaridad,
     composicion_familiar, personas_a_cargo, cabeza_familia, estrato_socioeconomico,
-    lugar_residencia, barrio, tipo_vivienda, medio_desplazamiento, raza, tipo_sangre,
+    lugar_residencia, direccion_residencia, barrio, tipo_vivienda, medio_desplazamiento, raza, tipo_sangre,
     conduce, tipo_vehiculo_conduce, anios_experiencia_conduccion,
     talla_camisa, talla_pantalon, talla_calzado, eps, arl, fondo_pension, caja_compensacion,
     updated_at
@@ -579,6 +589,7 @@ begin
     coalesce((p_perfil->>'cabeza_familia')::boolean, false),
     p_perfil->>'estrato_socioeconomico',
     p_perfil->>'lugar_residencia',
+    p_perfil->>'direccion_residencia',
     p_perfil->>'barrio',
     p_perfil->>'tipo_vivienda',
     p_perfil->>'medio_desplazamiento',
@@ -607,6 +618,7 @@ begin
     cabeza_familia = excluded.cabeza_familia,
     estrato_socioeconomico = excluded.estrato_socioeconomico,
     lugar_residencia = excluded.lugar_residencia,
+    direccion_residencia = excluded.direccion_residencia,
     barrio = excluded.barrio,
     tipo_vivienda = excluded.tipo_vivienda,
     medio_desplazamiento = excluded.medio_desplazamiento,

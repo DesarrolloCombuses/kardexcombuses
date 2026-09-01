@@ -12,6 +12,7 @@ const CAMPOS_SOCIODEMOGRAFICOS = [
   { id: 'cabeza_familia', label: '¿Es cabeza de familia?', type: 'checkbox' },
   { id: 'estrato_socioeconomico', label: 'Estrato socioeconómico', type: 'select', options: ['1', '2', '3', '4', '5', '6'] },
   { id: 'lugar_residencia', label: 'Lugar de residencia (municipio)', type: 'text' },
+  { id: 'direccion_residencia', label: 'Dirección de residencia', type: 'text' },
   { id: 'barrio', label: 'Barrio', type: 'text' },
   { id: 'tipo_vivienda', label: 'Tipo de vivienda', type: 'select', options: ['Propia urbana', 'En arriendo urbano', 'Familiar urbano', 'Propia rural', 'En arriendo rural', 'Familiar rural'] },
   { id: 'medio_desplazamiento', label: 'Medio de desplazamiento', type: 'select', options: ['A pie', 'Bicicleta', 'Moto propia', 'Vehículo propio', 'Transporte público', 'Transporte de la empresa', 'Otro'] },
@@ -382,6 +383,12 @@ Router.register('empleados', {
           <div class="detalle-fact-label">Fecha de salida</div>
         </div>
         ` : ''}
+        ${!empleado.activo && empleado.motivo_renuncia ? `
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${empleado.motivo_renuncia}</div>
+          <div class="detalle-fact-label">Motivo de salida</div>
+        </div>
+        ` : ''}
       </div>
 
       ${this._estadoBloqueHtml(empleado)}
@@ -423,14 +430,15 @@ Router.register('empleados', {
       });
       document.getElementById('empleado-inactivar-confirmar').addEventListener('click', () => {
         const fechaSalida = document.getElementById('empleado-inactivar-fecha').value || null;
-        this._cambiarEstado(empleado, false, fechaSalida);
+        const motivo = document.getElementById('empleado-inactivar-motivo').value.trim() || null;
+        this._cambiarEstado(empleado, false, fechaSalida, motivo);
       });
     }
     const activarBtn = document.getElementById('empleado-activar-btn');
     if (activarBtn) {
       activarBtn.addEventListener('click', () => {
         if (!confirm(`¿Marcar a ${empleado.nombre} como activo de nuevo?`)) return;
-        this._cambiarEstado(empleado, true, null);
+        this._cambiarEstado(empleado, true, null, null);
       });
     }
 
@@ -462,6 +470,7 @@ Router.register('empleados', {
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
+            <label>Motivo de salida<input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" /></label>
             <div style="display:flex;gap:0.5rem">
               <button type="button" id="empleado-inactivar-confirmar">Confirmar</button>
               <button type="button" id="empleado-inactivar-cancelar" class="btn-secondary">Cancelar</button>
@@ -479,12 +488,12 @@ Router.register('empleados', {
     `;
   },
 
-  async _cambiarEstado(empleado, activo, fechaSalida) {
+  async _cambiarEstado(empleado, activo, fechaSalida, motivoRenuncia) {
     const msg = document.getElementById('empleado-estado-msg');
     msg.textContent = 'Guardando…';
     msg.className = 'form-msg';
     try {
-      await DB.updateEmployee(empleado.id, { activo, fecha_salida: fechaSalida });
+      await DB.updateEmployee(empleado.id, { activo, fecha_salida: fechaSalida, motivo_renuncia: motivoRenuncia });
       await this._load();
       const actualizado = this._employees.find((e) => e.id === empleado.id);
       if (actualizado) this._verDetalle(actualizado);
@@ -628,6 +637,7 @@ Router.register('empleados', {
             <label>Correo personal<input type="email" id="empleado-email-personal" value="${empleado?.email_personal || ''}" /></label>
             <label>Salario<input type="number" id="empleado-salario" value="${empleado?.salario ?? ''}" min="0" step="1000" placeholder="Ej: 1300000" /></label>
             <label>Fecha de salida<input type="date" id="empleado-fecha-salida" value="${empleado?.fecha_salida || ''}" /></label>
+            <label>Motivo de salida<input type="text" id="empleado-motivo-renuncia" value="${empleado?.motivo_renuncia || ''}" /></label>
           </div>
           <label class="checkbox-label"><input type="checkbox" id="empleado-activo" ${!empleado || empleado.activo ? 'checked' : ''} /> Empleado activo</label>
         </fieldset>
@@ -744,6 +754,7 @@ Router.register('empleados', {
       email_personal: document.getElementById('empleado-email-personal').value.trim() || null,
       salario: document.getElementById('empleado-salario').value ? Number(document.getElementById('empleado-salario').value) : null,
       fecha_salida: document.getElementById('empleado-fecha-salida').value || null,
+      motivo_renuncia: document.getElementById('empleado-motivo-renuncia').value.trim() || null,
       activo: document.getElementById('empleado-activo').checked,
       numero_interno: document.getElementById('empleado-numero-interno').value.trim() || null,
       ruta: document.getElementById('empleado-ruta').value.trim() || null,
