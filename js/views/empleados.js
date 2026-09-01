@@ -301,7 +301,7 @@ Router.register('empleados', {
           </div>
           <div class="person-actions">
             <button type="button" class="btn-secondary" data-editar="${e.id}">${completo ? 'Ver perfil' : 'Completar perfil'}</button>
-            ${!e.activo ? `<button type="button" class="btn-secondary" data-pazysalvo="${e.id}">Paz y salvo</button>` : ''}
+            <button type="button" class="btn-secondary" data-pazysalvo="${e.id}">Paz y salvo</button>
           </div>
         </div>
       `;
@@ -569,6 +569,7 @@ Router.register('empleados', {
       return `
         <div style="margin-bottom:1.2rem">
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
+          <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
             <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
@@ -591,12 +592,13 @@ Router.register('empleados', {
   },
 
   // Paz y salvo (formato FO-SV-002): documento que se entrega a un
-  // conductor/empleado al retirarse. Varios de sus datos (afiliado
-  // responsable, siniestros durante su vinculación, quién lo emite) no
-  // existen en ningún lado del sistema -- no hay un módulo de siniestros --
-  // así que se piden en un mini-formulario justo antes de generarlo, en vez
-  // de intentar adivinarlos o guardarlos como si fueran parte de la ficha
-  // del empleado.
+  // conductor/empleado, típicamente al retirarse, aunque también se puede
+  // generar con alguien todavía activo (ej. para revisar su historial de
+  // siniestros). Varios de sus datos (afiliado responsable, siniestros
+  // durante su vinculación, quién lo emite) no existen en ningún lado del
+  // sistema -- no hay un módulo de siniestros -- así que se piden en un
+  // mini-formulario justo antes de generarlo, en vez de intentar adivinarlos
+  // o guardarlos como si fueran parte de la ficha del empleado.
   _filaSiniestroHtml(fila) {
     const f = fila || {};
     return `
