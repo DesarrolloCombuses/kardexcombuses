@@ -489,6 +489,10 @@ Router.register('empleados', {
           <div class="detalle-fact-label">Antigüedad</div>
         </div>
         <div class="detalle-fact">
+          <div class="detalle-fact-value">${formatFecha(perfil.fecha_nacimiento)}</div>
+          <div class="detalle-fact-label">Fecha de nacimiento</div>
+        </div>
+        <div class="detalle-fact">
           <div class="detalle-fact-value">${edadTexto(perfil.fecha_nacimiento)}</div>
           <div class="detalle-fact-label">Edad</div>
         </div>
@@ -1039,7 +1043,7 @@ Router.register('empleados', {
             <label>Área<input type="text" id="empleado-area" value="${empleado?.area || ''}" /></label>
             <label>Teléfono<input type="tel" id="empleado-telefono" value="${empleado?.telefono || ''}" /></label>
             <label>Correo personal<input type="email" id="empleado-email-personal" value="${empleado?.email_personal || ''}" /></label>
-            <label>Salario<input type="number" id="empleado-salario" value="${empleado?.salario ?? ''}" min="0" step="1000" placeholder="Ej: 1300000" /></label>
+            <label>Salario<input type="number" id="empleado-salario" value="${empleado?.salario ?? ''}" min="0" step="1" placeholder="Ej: 1300000" /></label>
             <label>Fecha de salida<input type="date" id="empleado-fecha-salida" value="${empleado?.fecha_salida || ''}" /></label>
             <label>Motivo de salida<input type="text" id="empleado-motivo-renuncia" value="${empleado?.motivo_renuncia || ''}" /></label>
           </div>
@@ -1082,6 +1086,8 @@ Router.register('empleados', {
 
     document.getElementById('empleado-cargo').addEventListener('input', () => this._actualizarRequeridoVehiculo());
     this._actualizarRequeridoVehiculo();
+
+    document.getElementById('empleado-numero-interno').addEventListener('input', () => this._autocompletarBaseVehiculo());
 
     document.getElementById('empleado-contacto-add').addEventListener('click', () => this._addContactoRow());
     document.getElementById('empleado-hijo-add').addEventListener('click', () => this._addHijoRow());
@@ -1134,6 +1140,33 @@ Router.register('empleados', {
     const esConductor = /conductor/i.test(document.getElementById('empleado-cargo').value);
     document.getElementById('req-numero-interno').classList.toggle('hidden', !esConductor);
     document.getElementById('req-ruta').classList.toggle('hidden', !esConductor);
+  },
+
+  // Autocompleta "Base" en vivo apenas se digita el número interno del
+  // vehículo, en vez de que el usuario solo se entere del afiliado correcto
+  // hasta después de guardar (que es cuando corre el trigger de la BD que
+  // lo calcula de verdad). Es solo una ayuda visual: si el vehículo no está
+  // en vehiculo_bases, no toca el campo y el usuario lo llena a mano.
+  _autocompletarBaseVehiculo() {
+    clearTimeout(this._baseVehiculoTimer);
+    const numInternoEl = document.getElementById('empleado-numero-interno');
+    const baseEl = document.getElementById('empleado-base');
+    if (!numInternoEl || !baseEl) return;
+    const numeroInterno = numInternoEl.value.trim();
+    if (!numeroInterno) return;
+    this._baseVehiculoTimer = setTimeout(async () => {
+      try {
+        const base = await DB.buscarBaseVehiculo(numeroInterno);
+        // El usuario pudo seguir escribiendo mientras la consulta iba y
+        // venía -- solo aplicar el resultado si el número no cambió mientras tanto.
+        if (base && numInternoEl.value.trim() === numeroInterno) {
+          baseEl.value = base;
+        }
+      } catch (err) {
+        // Falla silenciosa: es solo una ayuda, no bloquea el guardado -- el
+        // trigger de la base de datos igual corrige el valor real al guardar.
+      }
+    }, 400);
   },
 
   async _guardar(e, employeeId) {

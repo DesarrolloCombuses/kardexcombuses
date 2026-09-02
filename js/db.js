@@ -272,6 +272,19 @@ const DB = {
     return data;
   },
 
+  // Base/afiliado al que está asignado un vehículo, para autocompletar el
+  // campo "Base" en vivo apenas se digita el número interno (en vez de
+  // esperar a guardar y que lo corrija el trigger sync_employee_base_from_vehiculo).
+  async buscarBaseVehiculo(numeroInterno) {
+    const { data, error } = await window.supabaseClient
+      .from('vehiculo_bases')
+      .select('base')
+      .eq('numero_interno', numeroInterno)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? data.base : null;
+  },
+
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
   // cédula, cargo al que aspiraba) y deja el vínculo guardado en
   // aspirantes.employee_id -- así no se puede convertir dos veces por error
