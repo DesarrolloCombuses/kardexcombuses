@@ -43,7 +43,18 @@ const RUTA_A_CUENTA: Record<string, string> = {
   "700": "urbana",
   "2": "urbana2",
   "41": "urbana2",
+  AEROPUERTO: "urbana",
 };
+
+// La ruta puede llegar como "700", "Ruta 700" o "R700" según quién la
+// digitó -- si tiene dígitos se usa solo esos; las rutas con nombre (ej.
+// "AEROPUERTO", sin dígitos) se comparan por el texto completo. Debe
+// coincidir con normalizaRuta() en js/views/empleados.js.
+function normalizaRuta(ruta: string): string {
+  const texto = String(ruta || "").trim().toUpperCase();
+  const digitos = texto.replace(/\D/g, "");
+  return digitos || texto;
+}
 
 function xmlEscape(s: unknown): string {
   return String(s ?? "")
@@ -218,7 +229,7 @@ export default {
       return Response.json({ ok: false, message: "No se encontró el empleado." }, { status: 404 });
     }
 
-    const rutaNormalizada = String(empleado.ruta || "").replace(/\D/g, "");
+    const rutaNormalizada = normalizaRuta(empleado.ruta);
     const esConductor = /conductor/i.test(empleado.cargo || "");
     const cuentaKey = RUTA_A_CUENTA[rutaNormalizada];
     if (!esConductor || !cuentaKey) {
