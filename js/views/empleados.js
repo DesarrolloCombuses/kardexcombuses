@@ -202,6 +202,19 @@ Router.register('empleados', {
     llenarSelect('empleados-filtro-area', employees.map((e) => e.area));
   },
 
+  // Opciones sugeridas para el campo "Ruta" del formulario -- combina las
+  // rutas que ya existen en los datos con RUTAS_SONAR (para que 700/2/41/
+  // AEROPUERTO siempre aparezcan, aunque todavía no haya nadie con esa
+  // ruta exacta). Es un <datalist>, no un <select>: sigue permitiendo
+  // escribir una ruta nueva, pero evita que alguien escriba "Ruta 700" o
+  // "aereopuerto" (con error) cuando ya existe la forma correcta para
+  // elegir -- ese tipo de variantes es justo lo que rompía el cruce con
+  // Sonar antes de normalizar la comparación.
+  _rutaOpciones() {
+    const existentes = (this._employees || []).map((e) => e.ruta);
+    return [...new Set([...RUTAS_SONAR, ...existentes].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  },
+
   _limpiarFiltros() {
     document.getElementById('empleados-search').value = '';
     document.getElementById('empleados-estado').value = 'activos';
@@ -1037,7 +1050,7 @@ Router.register('empleados', {
           <p class="view-intro" style="margin:0">Solo aplica a conductores. Se usa en la Entrega para confirmar que se entrega al conductor correcto.</p>
           <div class="fieldset-grid">
             <label><span>Número interno de vehículo <span class="req-star hidden" id="req-numero-interno">*</span></span><input type="text" id="empleado-numero-interno" value="${empleado?.numero_interno || ''}" /></label>
-            <label><span>Ruta <span class="req-star hidden" id="req-ruta">*</span></span><input type="text" id="empleado-ruta" value="${empleado?.ruta || ''}" /></label>
+            <label><span>Ruta <span class="req-star hidden" id="req-ruta">*</span></span><input type="text" id="empleado-ruta" list="empleado-ruta-list" value="${empleado?.ruta || ''}" /><datalist id="empleado-ruta-list">${this._rutaOpciones().map((r) => `<option value="${r}"></option>`).join('')}</datalist></label>
             <label>Base<input type="text" id="empleado-base" value="${empleado?.base || ''}" /></label>
           </div>
         </fieldset>
