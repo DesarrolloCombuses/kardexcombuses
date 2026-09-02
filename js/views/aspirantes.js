@@ -316,15 +316,16 @@ Router.register('aspirantes', {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante) return;
 
-    // La cédula es única en employees -- si ya existe un registro con esta
-    // misma cédula, puede ser un reingreso (alguien que ya trabajó acá y
-    // vuelve) en vez de un error de digitación. Se revisa antes de intentar
-    // crear, para no toparse con el "duplicate key" de la base de datos.
-    let reingresoEmployeeId = null;
+    // La cédula solo tiene que ser única ENTRE ACTIVOS (ver
+    // employees_cedula_activo_unique en schema.sql) -- así que puede haber
+    // historial inactivo con esta misma cédula (reingreso: alguien que ya
+    // trabajó acá) y aun así se crea un empleado NUEVO, sin tocar ese
+    // historial. Solo se bloquea si hay un ACTIVO con la misma cédula --
+    // eso sí sería un choque real, probable error de digitación.
     Loading.show('Verificando cédula…');
-    let existente;
+    let coincidencias;
     try {
-      existente = await DB.buscarEmpleadoPorCedula(aspirante.cedula);
+      coincidencias = await DB.buscarEmpleadosPorCedula(aspirante.cedula);
     } catch (err) {
       Loading.hide();
       alert('No se pudo verificar la cédula: ' + err.message);
@@ -332,27 +333,29 @@ Router.register('aspirantes', {
     }
     Loading.hide();
 
-    if (existente) {
-      if (existente.activo) {
-        alert(`Ya existe un empleado ACTIVO con la cédula ${aspirante.cedula} (${existente.nombre}). Revisa si la cédula está bien digitada antes de continuar -- no se puede seleccionar mientras ese registro siga activo.`);
-        return;
-      }
-      const esReingreso = confirm(
-        `Ya existe un registro de "${existente.nombre}" con la cédula ${aspirante.cedula}, marcado como inactivo` +
-        (existente.fecha_salida ? ` (salió el ${formatFechaAspirante(existente.fecha_salida)}${existente.motivo_renuncia ? ', motivo: ' + existente.motivo_renuncia : ''})` : '') +
-        `.\n\n¿Es esta misma persona que vuelve a la empresa (reingreso)? Si confirmas, se reactiva ese registro con los datos de este aspirante en vez de crear uno nuevo.`
+    const activoExistente = coincidencias.find((e) => e.activo);
+    if (activoExistente) {
+      alert(`Ya existe un empleado ACTIVO con la cédula ${aspirante.cedula} (${activoExistente.nombre}). Revisa si la cédula está bien digitada antes de continuar -- no se puede seleccionar mientras ese registro siga activo.`);
+      return;
+    }
+
+    if (coincidencias.length) {
+      const masReciente = coincidencias[0];
+      const continuar = confirm(
+        `Ya existe un registro de "${masReciente.nombre}" con la cédula ${aspirante.cedula}, marcado como inactivo` +
+        (masReciente.fecha_salida ? ` (salió el ${formatFechaAspirante(masReciente.fecha_salida)}${masReciente.motivo_renuncia ? ', motivo: ' + masReciente.motivo_renuncia : ''})` : '') +
+        `.\n\n¿Es esta misma persona que vuelve a la empresa (reingreso)? Si confirmas, se crea un registro NUEVO de empleado -- el historial anterior se queda intacto, sin modificarlo.`
       );
-      if (!esReingreso) {
+      if (!continuar) {
         alert('No se seleccionó al candidato. Si la cédula está mal escrita, corrígela en su ficha de aspirante antes de reintentar.');
         return;
       }
-      reingresoEmployeeId = existente.id;
     }
 
-    if (!confirm(`¿Seleccionar a ${aspirante.nombre} y ${reingresoEmployeeId ? 'reactivar su registro de empleado' : 'crear su registro de empleado'}?`)) return;
-    Loading.show(reingresoEmployeeId ? 'Reactivando empleado…' : 'Creando empleado…');
+    if (!confirm(`¿Seleccionar a ${aspirante.nombre} y crear su registro de empleado?`)) return;
+    Loading.show('Creando empleado…');
     try {
-      const empleado = await DB.seleccionarAspirante(aspirante, { reingresoEmployeeId });
+      const empleado = await DB.seleccionarAspirante(aspirante);
       await this._load();
       this._mostrarLinkModal(aspirante.nombre, this._linkPerfil(empleado.id));
     } catch (err) {

@@ -28,7 +28,11 @@ create table if not exists item_variants (
 create table if not exists employees (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
-  cedula text not null unique,
+  -- No "unique" acá: la cédula solo tiene que ser única ENTRE ACTIVOS (ver
+  -- índice parcial employees_cedula_activo_unique más abajo) -- así se
+  -- permite un reingreso (alguien que ya trabajó acá) como empleado nuevo,
+  -- sin tocar su historial inactivo anterior.
+  cedula text not null,
   cargo text,
   area text,
   activo boolean not null default true,
@@ -37,6 +41,15 @@ create table if not exists employees (
   vehiculo_asociado text,
   ruta text
 );
+
+-- Reingresos: la regla de negocio no es "cédula única siempre" sino "no
+-- puede haber dos empleados ACTIVOS con la misma cédula al mismo tiempo".
+-- Puede haber varios registros inactivos con la misma cédula (una fila por
+-- cada paso de esa persona por la empresa).
+alter table employees drop constraint if exists employees_cedula_key;
+create unique index if not exists employees_cedula_activo_unique
+  on employees (cedula)
+  where activo = true;
 
 -- Perfil del usuario del sistema (1:1 con auth.users). Si este proyecto ya
 -- tiene una tabla profiles de otro sistema, se reutiliza tal cual (Kardex
