@@ -5,8 +5,16 @@
 // etc.) que como una categoría limpia, y estas 5 no aparecían solas.
 const AREAS_VACANTE_FIJAS = ['CONTABILIDAD', 'GERENCIA', 'GESTION Y CONTROL DE FLOTA', 'GESTION HUMANA', 'NOMINA'];
 
+// Esta función recibe tanto fechas puras ("2026-01-01", ej. fecha_salida)
+// como timestamps completos (ej. created_at). Ojo con new Date("2026-01-01")
+// a secas: lo interpreta como medianoche UTC, que en Colombia (UTC-5)
+// muestra el día anterior -- forzar hora local con T00:00:00 evita ese
+// corrimiento, pero solo cuando no hay hora ya incluida (ver mismo fix en
+// empleados.js para fechas puras).
 function formatFechaAspirante(iso) {
-  return iso ? new Date(iso).toLocaleDateString('es-CO') : '—';
+  if (!iso) return '—';
+  const conHora = iso.includes('T') ? iso : `${iso}T00:00:00`;
+  return new Date(conHora).toLocaleDateString('es-CO');
 }
 
 function formatFechaHoraAspirante(iso) {
@@ -307,10 +315,44 @@ Router.register('aspirantes', {
   async _seleccionar(id) {
     const aspirante = this._aspirantes.find((a) => a.id === id);
     if (!aspirante) return;
-    if (!confirm(`¿Seleccionar a ${aspirante.nombre} y crear su registro de empleado?`)) return;
-    Loading.show('Creando empleado…');
+
+    // La cédula es única en employees -- si ya existe un registro con esta
+    // misma cédula, puede ser un reingreso (alguien que ya trabajó acá y
+    // vuelve) en vez de un error de digitación. Se revisa antes de intentar
+    // crear, para no toparse con el "duplicate key" de la base de datos.
+    let reingresoEmployeeId = null;
+    Loading.show('Verificando cédula…');
+    let existente;
     try {
-      const empleado = await DB.seleccionarAspirante(aspirante);
+      existente = await DB.buscarEmpleadoPorCedula(aspirante.cedula);
+    } catch (err) {
+      Loading.hide();
+      alert('No se pudo verificar la cédula: ' + err.message);
+      return;
+    }
+    Loading.hide();
+
+    if (existente) {
+      if (existente.activo) {
+        alert(`Ya existe un empleado ACTIVO con la cédula ${aspirante.cedula} (${existente.nombre}). Revisa si la cédula está bien digitada antes de continuar -- no se puede seleccionar mientras ese registro siga activo.`);
+        return;
+      }
+      const esReingreso = confirm(
+        `Ya existe un registro de "${existente.nombre}" con la cédula ${aspirante.cedula}, marcado como inactivo` +
+        (existente.fecha_salida ? ` (salió el ${formatFechaAspirante(existente.fecha_salida)}${existente.motivo_renuncia ? ', motivo: ' + existente.motivo_renuncia : ''})` : '') +
+        `.\n\n¿Es esta misma persona que vuelve a la empresa (reingreso)? Si confirmas, se reactiva ese registro con los datos de este aspirante en vez de crear uno nuevo.`
+      );
+      if (!esReingreso) {
+        alert('No se seleccionó al candidato. Si la cédula está mal escrita, corrígela en su ficha de aspirante antes de reintentar.');
+        return;
+      }
+      reingresoEmployeeId = existente.id;
+    }
+
+    if (!confirm(`¿Seleccionar a ${aspirante.nombre} y ${reingresoEmployeeId ? 'reactivar su registro de empleado' : 'crear su registro de empleado'}?`)) return;
+    Loading.show(reingresoEmployeeId ? 'Reactivando empleado…' : 'Creando empleado…');
+    try {
+      const empleado = await DB.seleccionarAspirante(aspirante, { reingresoEmployeeId });
       await this._load();
       this._mostrarLinkModal(aspirante.nombre, this._linkPerfil(empleado.id));
     } catch (err) {

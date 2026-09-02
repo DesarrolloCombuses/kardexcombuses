@@ -256,33 +256,77 @@ const DB = {
     if (error) throw error;
   },
 
+  // Para detectar reingresos (alguien que ya trabajó acá) antes de intentar
+  // crear el empleado -- employees.cedula es unique, así que un aspirante
+  // con la misma cédula de alguien que ya existe (activo o inactivo) hace
+  // fallar el INSERT con "duplicate key" si no se maneja antes.
+  async buscarEmpleadoPorCedula(cedula) {
+    const { data, error } = await window.supabaseClient
+      .from('employees')
+      .select('id, nombre, activo, fecha_salida, motivo_renuncia')
+      .eq('cedula', cedula)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  // Reingreso: en vez de un empleado nuevo, reactiva el registro que ya
+  // existía con esa cédula -- conserva su id (y por lo tanto su historial de
+  // entregas/movimientos en Kardex) en vez de crear un empleado duplicado.
+  // La aprobación del perfil anterior no aplica a esta nueva vinculación, así
+  // que se limpia igual que en quitarAprobacionPerfil.
+  async reactivarEmpleadoParaReingreso(employeeId, aspirante) {
+    const { data, error } = await window.supabaseClient
+      .from('employees')
+      .update({
+        nombre: aspirante.nombre,
+        cargo: aspirante.cargo_aspirado || null,
+        area: aspirante.area_aspirada || null,
+        activo: true,
+        fecha_salida: null,
+        motivo_renuncia: null,
+        perfil_aprobado_at: null,
+        perfil_aprobado_por: null,
+      })
+      .eq('id', employeeId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
   // cédula, cargo al que aspiraba) y deja el vínculo guardado en
   // aspirantes.employee_id -- así no se puede convertir dos veces por error
   // y la lista de Aspirantes puede mostrar "Ya es empleado" en vez del botón.
-  async convertirAspiranteAEmpleado(aspirante) {
-    const nuevoEmpleado = await this.createEmployee({
-      nombre: aspirante.nombre,
-      cedula: aspirante.cedula,
-      cargo: aspirante.cargo_aspirado || null,
-      area: aspirante.area_aspirada || null,
-      activo: true,
-    });
+  // reingresoEmployeeId: si el aspirante es alguien que ya trabajó acá, se
+  // reactiva ese registro existente en vez de crear uno nuevo (ver
+  // buscarEmpleadoPorCedula/reactivarEmpleadoParaReingreso en aspirantes.js).
+  async convertirAspiranteAEmpleado(aspirante, { reingresoEmployeeId } = {}) {
+    const empleado = reingresoEmployeeId
+      ? await this.reactivarEmpleadoParaReingreso(reingresoEmployeeId, aspirante)
+      : await this.createEmployee({
+          nombre: aspirante.nombre,
+          cedula: aspirante.cedula,
+          cargo: aspirante.cargo_aspirado || null,
+          area: aspirante.area_aspirada || null,
+          activo: true,
+        });
     const { error } = await window.supabaseClient
       .from('aspirantes')
-      .update({ employee_id: nuevoEmpleado.id, updated_at: new Date().toISOString() })
+      .update({ employee_id: empleado.id, updated_at: new Date().toISOString() })
       .eq('id', aspirante.id);
     if (error) throw error;
-    return nuevoEmpleado;
+    return empleado;
   },
 
   // "Seleccionar" en un solo paso: marca Contratado y convierte a empleado
   // de una vez, en vez de los dos pasos separados de antes. Ojo: esto NO es
   // la aprobación final del perfil (ver aprobarPerfilEmpleado) -- es elegir
   // a este candidato y dejarle listo el link para que llene sus datos.
-  async seleccionarAspirante(aspirante) {
+  async seleccionarAspirante(aspirante, opciones) {
     await this.updateAspiranteEstado(aspirante.id, 'Contratado');
-    return this.convertirAspiranteAEmpleado(aspirante);
+    return this.convertirAspiranteAEmpleado(aspirante, opciones);
   },
 
   // Aprobación final: la hace Gestión Humana una vez el empleado ya
