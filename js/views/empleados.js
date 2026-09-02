@@ -426,9 +426,11 @@ Router.register('empleados', {
     // Vehículo/ruta viven en "employees" (se usan también en Entrega e
     // Historial), no en perfil_sociodemografico -- pero para quien ve la
     // ficha son parte de la misma información completa del conductor, así
-    // que se muestran acá igual que un dato destacado más.
-    const tieneVehiculo = empleado.numero_interno || empleado.ruta || empleado.base;
-    const vehiculoHtml = tieneVehiculo ? `
+    // que se muestran acá igual que un dato destacado más. Se muestra
+    // siempre (no solo cuando ya hay algo cargado): antes, un empleado
+    // recién creado sin vehículo aún no mostraba ni la sección, y para
+    // verla/llenarla había que entrar a "Editar" a ciegas.
+    const vehiculoHtml = `
       <div class="detalle-field-label" style="margin:0 0 0.5rem">Vehículo asignado</div>
       <div class="detalle-facts" style="margin-bottom:1.4rem">
         <div class="detalle-fact">
@@ -444,25 +446,32 @@ Router.register('empleados', {
           <div class="detalle-fact-label">Base</div>
         </div>
       </div>
-    ` : '';
+    `;
 
     const sonarHtml = this._sonarBloqueHtml(empleado);
 
+    // Igual que "Vehículo asignado": la sección se muestra siempre (con un
+    // mensaje de "sin registrar" si está vacía) en vez de desaparecer del
+    // todo, para que quede claro que el dato existe y solo falta llenarlo.
     const contactos = empleado.contactos_emergencia || [];
-    const contactosHtml = contactos.length ? `
+    const contactosHtml = `
       <div class="modal-section">
         <h3 class="modal-section-title">Contactos de emergencia</h3>
-        <div class="detalle-list">${contactos.map((c) => this._contactoDetalleHtml(c)).join('')}</div>
+        ${contactos.length
+          ? `<div class="detalle-list">${contactos.map((c) => this._contactoDetalleHtml(c)).join('')}</div>`
+          : '<p class="empty-note">Sin contactos de emergencia registrados.</p>'}
       </div>
-    ` : '';
+    `;
 
     const hijos = empleado.hijos_empleado || [];
-    const hijosHtml = hijos.length ? `
+    const hijosHtml = `
       <div class="modal-section">
         <h3 class="modal-section-title">Hijos</h3>
-        <div class="detalle-list">${hijos.map((h) => this._hijoDetalleHtml(h)).join('')}</div>
+        ${hijos.length
+          ? `<div class="detalle-list">${hijos.map((h) => this._hijoDetalleHtml(h)).join('')}</div>`
+          : '<p class="empty-note">Sin hijos registrados.</p>'}
       </div>
-    ` : '';
+    `;
 
     document.getElementById('modal-body').innerHTML = `
       <div class="detalle-header">
@@ -471,7 +480,7 @@ Router.register('empleados', {
         </button>
         <div class="detalle-header-info">
           <div class="detalle-nombre">${empleado.nombre}</div>
-          <div class="detalle-sub">CC ${empleado.cedula}${empleado.cargo ? ' · ' + empleado.cargo : ''}${empleado.area ? ' · ' + empleado.area : ''}${empleado.telefono ? ' · ' + empleado.telefono : ''}${empleado.email_personal ? ' · ' + empleado.email_personal : ''}</div>
+          <div class="detalle-sub">CC ${empleado.cedula}</div>
         </div>
         <div class="detalle-tags">
           <span class="tag ${empleado.activo ? 'activo' : 'inactivo-tag'}">${empleado.activo ? 'Activo' : 'Inactivo'}</span>
@@ -480,6 +489,22 @@ Router.register('empleados', {
       </div>
 
       <div class="detalle-facts">
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${empleado.cargo || '—'}</div>
+          <div class="detalle-fact-label">Cargo</div>
+        </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${empleado.area || '—'}</div>
+          <div class="detalle-fact-label">Área</div>
+        </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${empleado.telefono || '—'}</div>
+          <div class="detalle-fact-label">Teléfono</div>
+        </div>
+        <div class="detalle-fact">
+          <div class="detalle-fact-value">${empleado.email_personal || '—'}</div>
+          <div class="detalle-fact-label">Correo personal</div>
+        </div>
         <div class="detalle-fact">
           <div class="detalle-fact-value">${formatFecha(perfil.fecha_ingreso)}</div>
           <div class="detalle-fact-label">Fecha de ingreso</div>
