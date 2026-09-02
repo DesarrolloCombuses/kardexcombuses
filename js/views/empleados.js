@@ -1178,6 +1178,23 @@ Router.register('empleados', {
       return;
     }
 
+    // La ruta solo se puede elegir de las que ya conocemos (el datalist es
+    // solo una sugerencia visual, no bloquea escribir cualquier cosa) --
+    // rutas mal escritas ("Ruta 700", "aereopuerto") son justo lo que
+    // rompía el envío a Sonar antes de este bloqueo.
+    if (basico.ruta) {
+      const opcionesRuta = this._rutaOpciones();
+      const rutaValida = opcionesRuta.some((r) => r.toUpperCase() === basico.ruta.toUpperCase());
+      if (!rutaValida) {
+        alert(`"${basico.ruta}" no es una ruta conocida. Elige una de la lista: ${opcionesRuta.join(', ')}.\n\nSi es una ruta nueva que de verdad no existe todavía, avísale a soporte para agregarla.`);
+        msg.textContent = 'Ruta no válida — elige una de la lista.';
+        msg.className = 'form-msg error';
+        rutaEl.classList.add('input-error');
+        rutaEl.focus();
+        return;
+      }
+    }
+
     const submitBtn = e.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     Loading.show('Guardando…');
