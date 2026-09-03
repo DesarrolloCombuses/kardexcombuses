@@ -1,6 +1,6 @@
 // Service Worker con caché versionado. Al liberar una nueva versión:
 // 1) subir el número en version.json, 2) actualizar APP_VERSION aquí abajo.
-const APP_VERSION = '1.64.1';
+const APP_VERSION = '1.65.0';
 const CACHE_NAME = `kardex-cache-v${APP_VERSION}`;
 
 const APP_SHELL = [
@@ -31,6 +31,7 @@ const APP_SHELL = [
   'js/views/aspirantes.js',
   'js/views/empleados.js',
   'js/views/estadisticas-personal.js',
+  'js/views/siniestros-transito.js',
   'js/views/historial.js',
   'js/views/facturas.js',
   'js/views/ayuda.js',

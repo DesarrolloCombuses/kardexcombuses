@@ -309,6 +309,26 @@ const DB = {
     return data;
   },
 
+  // Todos los comparendos/accidentes (no filtrados por una cédula puntual),
+  // para la vista de estadísticas de Siniestros de tránsito.
+  async getInfraccionesTransito() {
+    const { data, error } = await window.supabaseClient
+      .from('infracciones_transito')
+      .select('comparendo_nro, fecha_comparendo, placa, codigo_infraccion, infraccion, tipo_comparendo, cedula, nombre_infractor')
+      .order('fecha_comparendo', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async getAccidentesTransito() {
+    const { data, error } = await window.supabaseClient
+      .from('accidentes_transito')
+      .select('nro_croquis, fecha_accidente, direccion, placa, clase_accidente, gravedad_accidente, cedula, nombre_infractor')
+      .order('fecha_accidente', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
   // cédula, cargo al que aspiraba) y deja el vínculo guardado en
   // aspirantes.employee_id -- así no se puede convertir dos veces por error
