@@ -285,6 +285,30 @@ const DB = {
     return data ? data.base : null;
   },
 
+  // Comparendos (infracciones de tránsito) y accidentes por cédula, para el
+  // Paz y Salvo -- a diferencia de los siniestros (Google Sheet externo),
+  // este dato sí vive en Supabase porque el usuario lo sube a mano cada
+  // cierto tiempo (ver sql/accidentes_infracciones_import_*.sql).
+  async buscarInfraccionesPorCedula(cedula) {
+    const { data, error } = await window.supabaseClient
+      .from('infracciones_transito')
+      .select('comparendo_nro, fecha_comparendo, codigo_infraccion, infraccion, tipo_comparendo, placa')
+      .eq('cedula', cedula)
+      .order('fecha_comparendo', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async buscarAccidentesPorCedula(cedula) {
+    const { data, error } = await window.supabaseClient
+      .from('accidentes_transito')
+      .select('nro_croquis, fecha_accidente, clase_accidente, gravedad_accidente, direccion, placa')
+      .eq('cedula', cedula)
+      .order('fecha_accidente', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
   // cédula, cargo al que aspiraba) y deja el vínculo guardado en
   // aspirantes.employee_id -- así no se puede convertir dos veces por error

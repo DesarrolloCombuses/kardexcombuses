@@ -742,3 +742,59 @@ create policy "anon_update_foto_perfil_publico" on storage.objects
     bucket_id = 'fotos-empleados'
     and exists (select 1 from employees e where name = 'perfil-publico/' || e.id::text || '.jpg')
   );
+
+-- Comparendos (infracciones de tránsito) y accidentes de los conductores,
+-- cruzados por cédula en el Paz y Salvo (junto a los siniestros del Google
+-- Sheet externo). A diferencia de los siniestros, este archivo lo sube el
+-- usuario a mano cada cierto tiempo (no hay hoja publicada en vivo para
+-- consultar), así que sí vive como tabla acá en vez de consultarse por
+-- fuera -- ver sql/accidentes_infracciones_import_*.sql (con datos reales,
+-- nunca se sube a git) para la carga.
+create table if not exists infracciones_transito (
+  comparendo_nro text primary key,
+  fecha_comparendo timestamptz,
+  placa text,
+  -- Columna sin nombre en el archivo de origen (4ta, después de Placa). En
+  -- los datos vistos hasta ahora trae valores cortos que parecen número
+  -- interno de vehículo, pero casi siempre viene vacía -- sin confirmar con
+  -- el usuario todavía.
+  columna_sin_nombre text,
+  codigo_infraccion text,
+  infraccion text,
+  tipo_comparendo text,
+  cedula text,
+  nombre_infractor text,
+  id_empresa text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists accidentes_transito (
+  nro_croquis text primary key,
+  comparendo_nro text,
+  direccion text,
+  placa text,
+  clase_accidente text,
+  gravedad_accidente text,
+  cedula text,
+  nombre_infractor text,
+  fecha_accidente timestamptz,
+  id_empresa text,
+  -- Columna sin nombre en el archivo de origen (última, después de
+  -- ID_EMPRESA). Significado sin confirmar con el usuario todavía.
+  columna_sin_nombre text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_infracciones_transito_cedula on infracciones_transito(cedula);
+create index if not exists idx_accidentes_transito_cedula on accidentes_transito(cedula);
+
+alter table infracciones_transito enable row level security;
+alter table accidentes_transito enable row level security;
+
+drop policy if exists "authenticated_all" on infracciones_transito;
+create policy "authenticated_all" on infracciones_transito
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+drop policy if exists "authenticated_all" on accidentes_transito;
+create policy "authenticated_all" on accidentes_transito
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

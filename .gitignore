@@ -8,3 +8,7 @@ Thumbs.db
 # este repositorio, que es publico. Se corren a mano en el SQL Editor de
 # Supabase y se guardan solo localmente.
 sql/import_perfil_*.sql
+
+# Igual: comparendos/accidentes de tránsito reales (cédula, nombre, lesiones)
+# subidos a mano por el usuario -- nunca a git.
+sql/accidentes_infracciones_import_*.sql

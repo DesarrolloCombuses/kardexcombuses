@@ -691,6 +691,19 @@ Router.register('empleados', {
     `;
   },
 
+  // Comparendos y accidentes son de solo lectura acá (a diferencia de los
+  // siniestros): vienen de un archivo oficial que se importa a Supabase, no
+  // hay nada que editar a mano en el Paz y Salvo.
+  _filaTransitoHtml(item) {
+    const fecha = item.fecha ? new Date(item.fecha).toLocaleDateString('es-CO') : '—';
+    return `
+      <div class="detalle-list-item">
+        <span class="detalle-list-item-main">${fecha} · ${escapeHtml(item.tipo)}</span>
+        <span class="detalle-list-item-sub">${escapeHtml(item.detalle)}</span>
+      </div>
+    `;
+  },
+
   async _abrirPazYSalvo(empleado) {
     const hoy = new Date().toISOString().slice(0, 10);
     // Se puede llegar acá desde el detalle ya abierto o directo desde la
@@ -723,6 +736,10 @@ Router.register('empleados', {
           </div>
         </div>
         <button type="button" id="pazysalvo-add-fila" class="btn-secondary">+ Agregar fila</button>
+
+        <label>Comparendos y accidentes</label>
+        <p id="pazysalvo-transito-resumen" class="form-msg">Buscando comparendos y accidentes registrados para esta cédula…</p>
+        <div id="pazysalvo-transito-lista" class="detalle-list"></div>
 
         <div class="fieldset-grid">
           <label>Responsable (quien emite)<input type="text" id="pazysalvo-responsable" /></label>
@@ -765,6 +782,7 @@ Router.register('empleados', {
         responsable: document.getElementById('pazysalvo-responsable').value.trim(),
         fechaEmision: document.getElementById('pazysalvo-fecha-emision').value,
         siniestros,
+        transito: this._pazYSalvoTransito || [],
       };
       const msg = document.getElementById('pazysalvo-msg');
       if (!datos.responsable) {
@@ -781,28 +799,70 @@ Router.register('empleados', {
     });
 
     // Cruce automático contra la base de siniestros de SST (Google Sheet
-    // publicado, ver js/siniestros.js) -- se hace después de pintar el
-    // formulario para no bloquear la apertura del modal mientras carga.
+    // publicado, ver js/siniestros.js) y contra comparendos/accidentes
+    // (Supabase, ver sql/accidentes_infracciones_2026-09-02.sql) -- ambos se
+    // hacen después de pintar el formulario para no bloquear la apertura del
+    // modal, y en paralelo entre sí (uno no debe esperar al otro).
     const resumen = document.getElementById('pazysalvo-siniestros-resumen');
     this._pazYSalvoPendientes = 0;
-    try {
-      const registros = await Siniestros.buscarPorCedula(empleado.cedula);
-      const pendientes = registros.filter((r) => r.pendiente).length;
-      this._pazYSalvoPendientes = pendientes;
-      if (registros.length) {
-        siniestrosWrap.innerHTML = registros.map((r) => this._filaSiniestroHtml(r)).join('');
-        resumen.textContent = pendientes > 0
-          ? `Se encontraron ${registros.length} siniestro(s), ${pendientes} pendiente(s) de conciliación (resaltados abajo).`
-          : `Se encontraron ${registros.length} siniestro(s), ninguno pendiente de conciliación.`;
-        resumen.className = pendientes > 0 ? 'form-msg error' : 'form-msg success';
-      } else {
-        resumen.textContent = 'No se encontraron siniestros registrados para esta cédula.';
-        resumen.className = 'form-msg success';
+    const cargarSiniestros = (async () => {
+      try {
+        const registros = await Siniestros.buscarPorCedula(empleado.cedula);
+        const pendientes = registros.filter((r) => r.pendiente).length;
+        this._pazYSalvoPendientes = pendientes;
+        if (registros.length) {
+          siniestrosWrap.innerHTML = registros.map((r) => this._filaSiniestroHtml(r)).join('');
+          resumen.textContent = pendientes > 0
+            ? `Se encontraron ${registros.length} siniestro(s), ${pendientes} pendiente(s) de conciliación (resaltados abajo).`
+            : `Se encontraron ${registros.length} siniestro(s), ninguno pendiente de conciliación.`;
+          resumen.className = pendientes > 0 ? 'form-msg error' : 'form-msg success';
+        } else {
+          resumen.textContent = 'No se encontraron siniestros registrados para esta cédula.';
+          resumen.className = 'form-msg success';
+        }
+      } catch (err) {
+        resumen.textContent = 'No se pudo consultar la base de siniestros (revisa tu conexión). Completa manualmente si aplica.';
+        resumen.className = 'form-msg error';
       }
-    } catch (err) {
-      resumen.textContent = 'No se pudo consultar la base de siniestros (revisa tu conexión). Completa manualmente si aplica.';
-      resumen.className = 'form-msg error';
-    }
+    })();
+
+    const transitoResumen = document.getElementById('pazysalvo-transito-resumen');
+    const transitoLista = document.getElementById('pazysalvo-transito-lista');
+    this._pazYSalvoTransito = [];
+    const cargarTransito = (async () => {
+      try {
+        const [infracciones, accidentes] = await Promise.all([
+          DB.buscarInfraccionesPorCedula(empleado.cedula),
+          DB.buscarAccidentesPorCedula(empleado.cedula),
+        ]);
+        const items = [
+          ...infracciones.map((i) => ({
+            fecha: i.fecha_comparendo,
+            tipo: 'Comparendo',
+            detalle: [i.codigo_infraccion, i.infraccion].filter(Boolean).join(' — ') || i.tipo_comparendo || '—',
+          })),
+          ...accidentes.map((a) => ({
+            fecha: a.fecha_accidente,
+            tipo: 'Accidente',
+            detalle: [a.clase_accidente, a.gravedad_accidente].filter(Boolean).join(' — ') || a.direccion || '—',
+          })),
+        ].sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+        this._pazYSalvoTransito = items;
+        if (items.length) {
+          transitoLista.innerHTML = items.map((it) => this._filaTransitoHtml(it)).join('');
+          transitoResumen.textContent = `Se encontraron ${infracciones.length} comparendo(s) y ${accidentes.length} accidente(s) registrados.`;
+          transitoResumen.className = 'form-msg error';
+        } else {
+          transitoResumen.textContent = 'No se encontraron comparendos ni accidentes registrados para esta cédula.';
+          transitoResumen.className = 'form-msg success';
+        }
+      } catch (err) {
+        transitoResumen.textContent = 'No se pudo consultar comparendos/accidentes (revisa tu conexión).';
+        transitoResumen.className = 'form-msg error';
+      }
+    })();
+
+    await Promise.all([cargarSiniestros, cargarTransito]);
   },
 
   _generarDocumentoPazYSalvo(empleado, datos) {
@@ -814,6 +874,16 @@ Router.register('empleados', {
         <td>${f.conciliacion || 'N/N'}</td>
         <td>${f.definicion || 'N/N'}</td>
         <td>${f.hipotesis || 'N/N'}</td>
+      </tr>
+    `;
+    const filasTransito = (datos.transito && datos.transito.length)
+      ? datos.transito
+      : [{ fecha: null, tipo: 'N/N', detalle: 'N/N' }];
+    const filaTransitoHtml = (it) => `
+      <tr>
+        <td>${it.fecha ? new Date(it.fecha).toLocaleDateString('es-CO') : 'N/N'}</td>
+        <td>${escapeHtml(it.tipo || 'N/N')}</td>
+        <td>${escapeHtml(it.detalle || 'N/N')}</td>
       </tr>
     `;
     const html = `<!doctype html>
@@ -883,6 +953,13 @@ Router.register('empleados', {
       <th>Fecha de siniestro</th><th>Lesionados</th><th>Conciliación</th><th>Definición</th><th>Hipótesis</th>
     </tr>
     ${filasSiniestros.map(filaHtml).join('')}
+  </table>
+
+  <table class="siniestros-table" style="margin-top:-1.5px">
+    <tr>
+      <th>Fecha</th><th>Tipo</th><th>Detalle</th>
+    </tr>
+    ${filasTransito.map(filaTransitoHtml).join('')}
   </table>
 
   <table style="margin-top:-1.5px">
