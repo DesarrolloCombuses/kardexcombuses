@@ -197,8 +197,8 @@ button svg { width: 16px; height: 16px; flex: none; }
    Entrada): la regla base "button" de arriba no le aplica a un <a>, así
    que aquí se repite lo mínimo para que se vea igual de botón. */
 a.btn-secondary { text-decoration: none; border-radius: var(--radius-sm); padding: 0.65rem 1.1rem; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; }
-.btn-ghost { background: transparent; color: var(--slate-300); border: 1px solid rgba(255, 255, 255, 0.14); }
-.btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.btn-ghost { background: transparent; color: rgba(255, 255, 255, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
 
 /* Checkbox dentro de un .form: por defecto un <label> ahí queda en columna
    (texto arriba, input abajo, ver ".form label" arriba) porque los demás
@@ -366,18 +366,23 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .sidebar {
   width: var(--sidebar-w);
   flex: none;
-  background: linear-gradient(180deg, var(--navy-800), var(--navy-900));
+  /* Colores de la empresa: verde con degradado a blanco. El text-shadow se
+     hereda a todo el texto de adentro (y el filter de abajo a los svg) para
+     que siga siendo legible incluso sobre el tramo más claro del degradado. */
+  background: linear-gradient(165deg, #0a5c30 0%, #1f9153 40%, #6cc793 75%, #eafbf1 100%);
   color: #fff;
+  text-shadow: 0 1px 2px rgba(4, 40, 20, 0.4);
   display: flex;
   flex-direction: column;
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 40;
 }
+.sidebar svg { filter: drop-shadow(0 1px 1.5px rgba(4, 40, 20, 0.35)); }
 
-.sidebar-brand { display: flex; align-items: center; gap: 0.7rem; padding: 1.4rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.sidebar-brand { display: flex; align-items: center; gap: 0.7rem; padding: 1.4rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
 .sidebar-brand-title { font-weight: 700; font-size: 0.95rem; line-height: 1.2; }
-.sidebar-brand-sub { font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); }
+.sidebar-brand-sub { font-size: 0.75rem; color: rgba(255, 255, 255, 0.65); }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 0.15rem; padding: 1rem 0.85rem; flex: 1; overflow-y: auto; }
 .sidebar-nav a {
@@ -393,16 +398,17 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   transition: background 0.15s, color 0.15s;
 }
 .sidebar-nav a svg { width: 19px; height: 19px; flex: none; }
-.sidebar-nav a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
-.sidebar-nav a.active { background: var(--blue-600); color: #fff; box-shadow: var(--shadow-sm); }
-
-/* Siniestros: colores de la empresa (verde con degradado a blanco) en vez
-   del azul genérico, para que resalte como su propia sección. */
-.sidebar-nav a.active[data-nav="siniestros-transito"] {
-  background: linear-gradient(115deg, #0b6e39 0%, #2fa864 55%, #d9f5e3 100%);
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(6, 44, 23, 0.45);
+.sidebar-nav a:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+/* Página activa: ficha blanca con texto verde -- el contraste "verde y
+   blanco" se ve tanto en el fondo del menú como en su propio ítem activo,
+   y queda legible sin importar en qué tramo del degradado caiga. */
+.sidebar-nav a.active {
+  background: #fff;
+  color: #0a5c30;
+  text-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
+.sidebar-nav a.active svg { filter: none; }
 
 .nav-group summary {
   display: flex;
@@ -411,7 +417,7 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   padding: 0.55rem 0.75rem;
   margin-top: 0.35rem;
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.55);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -428,7 +434,7 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .nav-group-items { display: flex; flex-direction: column; gap: 0.15rem; }
 .nav-group-items a { padding-left: 2rem; }
 
-.sidebar-footer { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 0.85rem; }
+.sidebar-footer { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.2); display: flex; flex-direction: column; gap: 0.85rem; }
 .sidebar-user { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 .sidebar-user-avatar {
   width: 32px; height: 32px; flex: none; border-radius: 50%;
