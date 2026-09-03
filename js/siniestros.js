@@ -119,16 +119,26 @@ async function _cargar() {
     });
 }
 
+function _obtenerRegistros() {
+  if (!_cachePromise) {
+    _cachePromise = _cargar().catch((err) => {
+      _cachePromise = null;
+      throw err;
+    });
+  }
+  return _cachePromise;
+}
+
 window.Siniestros = {
   async buscarPorCedula(cedula) {
     const cedulaDigits = _soloDigitos(cedula);
-    if (!_cachePromise) {
-      _cachePromise = _cargar().catch((err) => {
-        _cachePromise = null;
-        throw err;
-      });
-    }
-    const registros = await _cachePromise;
+    const registros = await _obtenerRegistros();
     return registros.filter((r) => r.cedula === cedulaDigits);
+  },
+
+  // Todos los siniestros del sheet, sin filtrar por cédula -- para la vista
+  // de estadísticas de Siniestros (junto a comparendos/accidentes).
+  async listarTodos() {
+    return _obtenerRegistros();
   },
 };

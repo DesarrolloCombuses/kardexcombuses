@@ -1,7 +1,13 @@
-// Comparendos (infracciones de tránsito) y accidentes de los conductores,
-// vistos todos juntos con sus estadísticas -- mismos datos que ya se cruzan
-// por cédula uno por uno en el Paz y Salvo (ver js/views/empleados.js), pero
-// acá se ve la foto completa sin tener que revisar empleado por empleado.
+// Comparendos (infracciones de tránsito), accidentes y siniestros de SST de
+// los conductores, vistos todos juntos con sus estadísticas -- mismos datos
+// que ya se cruzan por cédula uno por uno en el Paz y Salvo (ver
+// js/views/empleados.js y js/siniestros.js), pero acá se ve la foto completa
+// sin tener que revisar empleado por empleado.
+//
+// Comparendos/accidentes viven en Supabase (archivo que sube RRHH); los
+// siniestros de SST se consultan en vivo de un Google Sheet publicado (ver
+// js/siniestros.js) y por eso pueden fallar por separado -- esta vista no
+// debe quedar en blanco solo porque ese Sheet esté caído.
 
 const ORDEN_GRAVEDAD_ACCIDENTE = ['SOLO DAÑOS', 'HERIDO', 'MUERTO', 'Sin dato'];
 
@@ -48,12 +54,36 @@ function stRenderBarChart(elId, dist) {
   });
 }
 
-// fecha_comparendo/fecha_accidente son timestamptz completos (con hora), a
-// diferencia de las columnas de solo fecha del resto de la app -- por eso
-// acá se formatean directo con new Date(iso), sin el truco de anexar
-// "T00:00:00" que usan formatFecha/formatFechaAspirante para columnas date.
-function stFormatFecha(iso) {
-  return iso ? new Date(iso).toLocaleDateString('es-CO') : '—';
+// Comparendos/accidentes traen fecha_comparendo/fecha_accidente como
+// timestamptz ISO (de Supabase); los siniestros de SST traen la fecha como
+// texto libre del Sheet, normalmente "dd/mm/aaaa" pero sin garantía de
+// formato. Se intentan ambos formatos y, si no calza ninguno, se devuelve
+// null -- mejor un dato "sin fecha reconocible" que una fecha inventada.
+function stParseFecha(valor) {
+  if (!valor) return null;
+  const s = String(valor).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let [, dd, mm, yyyy] = m;
+    if (yyyy.length === 2) yyyy = '20' + yyyy;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+// Si no se puede interpretar la fecha, se muestra el texto crudo tal cual
+// (nunca "—" en silencio) -- así se nota si el Sheet trae un formato raro,
+// en vez de que el dato desaparezca sin explicación.
+function stFormatFecha(valor) {
+  const d = stParseFecha(valor);
+  if (d) return d.toLocaleDateString('es-CO');
+  return valor ? String(valor) : '—';
 }
 
 function stEscapeHtml(v) {
@@ -71,16 +101,32 @@ Router.register('siniestros-transito', {
       document.getElementById('st-filtro-tipo').addEventListener('change', () => this._aplicarFiltro());
       this._bound = true;
     }
-    const [infracciones, accidentes] = await Promise.all([
+
+    const [infracciones, accidentes, empleados] = await Promise.all([
       DB.getInfraccionesTransito(),
       DB.getAccidentesTransito(),
+      DB.getEmployees({ onlyActive: false }),
     ]);
     this._infracciones = infracciones;
     this._accidentes = accidentes;
 
-    // Lista unificada para la tabla/búsqueda -- comparendos y accidentes
-    // comparten muy pocas columnas, así que cada uno arma su propio texto de
-    // "detalle" en vez de forzar una fila con columnas siempre vacías.
+    // Los siniestros de SST no traen nombre (solo cédula) -- se resuelve
+    // contra la planta para poder mostrarlo igual que comparendos/accidentes.
+    const nombrePorCedula = new Map(empleados.map((e) => [e.cedula, e.nombre]));
+
+    const sstMsg = document.getElementById('st-sst-msg');
+    try {
+      this._siniestros = await Siniestros.listarTodos();
+      sstMsg.classList.add('hidden');
+    } catch (err) {
+      this._siniestros = [];
+      sstMsg.textContent = 'No se pudieron cargar los siniestros de SST en este momento (puede que el Google Sheet publicado esté caído o su link haya cambiado). Comparendos y accidentes sí se muestran normalmente.';
+      sstMsg.classList.remove('hidden');
+    }
+
+    // Lista unificada para la tabla/búsqueda/ranking -- las tres fuentes
+    // comparten muy pocas columnas, así que cada una arma su propio texto de
+    // "detalle" en vez de forzar columnas que casi siempre quedarían vacías.
     this._items = [
       ...infracciones.map((i) => ({
         fecha: i.fecha_comparendo,
@@ -98,7 +144,20 @@ Router.register('siniestros-transito', {
         placa: a.placa,
         detalle: [a.clase_accidente, a.gravedad_accidente].filter(Boolean).join(' — ') || a.direccion || '—',
       })),
-    ].sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+      ...this._siniestros.map((s) => ({
+        fecha: s.fecha,
+        tipo: 'Siniestro SST',
+        cedula: s.cedula,
+        nombre: nombrePorCedula.get(s.cedula) || null,
+        placa: null,
+        detalle: [s.definicion, s.hipotesis].filter((v) => v && v !== 'N/N').join(' — ')
+          || (s.pendiente ? 'Pendiente de conciliación' : 'Sin más detalle'),
+      })),
+    ].sort((a, b) => {
+      const ta = stParseFecha(a.fecha)?.getTime() ?? -Infinity;
+      const tb = stParseFecha(b.fecha)?.getTime() ?? -Infinity;
+      return tb - ta;
+    });
 
     this._render();
     this._aplicarFiltro();
@@ -107,6 +166,7 @@ Router.register('siniestros-transito', {
   _render() {
     document.getElementById('st-kpi-comparendos').textContent = this._infracciones.length;
     document.getElementById('st-kpi-accidentes').textContent = this._accidentes.length;
+    document.getElementById('st-kpi-siniestros').textContent = this._siniestros.length;
 
     // "Con lesión" = cualquier accidente con gravedad distinta de "SOLO
     // DAÑOS" (típicamente HERIDO o MUERTO) -- el dato real que le importa a
@@ -118,25 +178,31 @@ Router.register('siniestros-transito', {
     }).length;
     document.getElementById('st-kpi-lesion').textContent = conLesion;
 
-    const cedulasUnicas = new Set([...this._infracciones, ...this._accidentes].map((r) => r.cedula).filter(Boolean));
+    const pendientes = this._siniestros.filter((s) => s.pendiente).length;
+    document.getElementById('st-kpi-pendientes').textContent = pendientes;
+
+    const cedulasUnicas = new Set([...this._infracciones, ...this._accidentes, ...this._siniestros].map((r) => r.cedula).filter(Boolean));
     document.getElementById('st-kpi-conductores').textContent = cedulasUnicas.size;
 
     stRenderBarChart('st-bars-tipo-comparendo', stDistribucion(this._infracciones, (i) => i.tipo_comparendo));
     stRenderBarChart('st-bars-gravedad', stDistribucion(this._accidentes, (a) => a.gravedad_accidente, ORDEN_GRAVEDAD_ACCIDENTE));
+    stRenderBarChart('st-bars-conciliacion', stDistribucion(this._siniestros, (s) => s.conciliacion));
+    stRenderBarChart('st-bars-definicion', stDistribucion(this._siniestros, (s) => (s.definicion === 'N/N' ? null : s.definicion)));
 
     this._renderRanking();
   },
 
   // Leaderboard de conductores con más incidentes (comparendos + accidentes
-  // sumados) -- el dato que más le sirve a SST para saber a quién llamar
-  // primero a una charla de seguridad vial.
+  // + siniestros sumados) -- el dato que más le sirve a SST para saber a
+  // quién llamar primero a una charla de seguridad vial.
   _renderRanking() {
     const porCedula = new Map();
-    [...this._infracciones, ...this._accidentes].forEach((r) => {
-      if (!r.cedula) return;
-      const actual = porCedula.get(r.cedula) || { nombre: r.nombre_infractor, count: 0 };
+    this._items.forEach((it) => {
+      if (!it.cedula) return;
+      const actual = porCedula.get(it.cedula) || { nombre: it.nombre, count: 0 };
+      if (!actual.nombre && it.nombre) actual.nombre = it.nombre;
       actual.count++;
-      porCedula.set(r.cedula, actual);
+      porCedula.set(it.cedula, actual);
     });
     const ranking = [...porCedula.entries()]
       .map(([cedula, v]) => ({ label: `${v.nombre || 'Sin nombre'} (CC ${cedula})`, count: v.count }))
@@ -194,10 +260,11 @@ Router.register('siniestros-transito', {
       tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Sin resultados con estos filtros.</td></tr>';
       return;
     }
+    const tagPorTipo = { Accidente: 'salida', Comparendo: 'activo', 'Siniestro SST': 'pendiente' };
     tbody.innerHTML = items.map((it) => `
       <tr>
-        <td>${stFormatFecha(it.fecha)}</td>
-        <td><span class="tag ${it.tipo === 'Accidente' ? 'salida' : 'activo'}">${it.tipo}</span></td>
+        <td>${stEscapeHtml(stFormatFecha(it.fecha))}</td>
+        <td><span class="tag ${tagPorTipo[it.tipo] || ''}">${stEscapeHtml(it.tipo)}</span></td>
         <td>${stEscapeHtml(it.nombre || '—')}</td>
         <td>${stEscapeHtml(it.cedula || '—')}</td>
         <td>${stEscapeHtml(it.placa || '—')}</td>
