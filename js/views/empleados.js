@@ -821,7 +821,7 @@ Router.register('empleados', {
           resumen.className = 'form-msg success';
         }
       } catch (err) {
-        resumen.textContent = 'No se pudo consultar la base de siniestros (revisa tu conexión). Completa manualmente si aplica.';
+        resumen.textContent = 'No se pudo consultar la base de siniestros en este momento (puede que el Google Sheet publicado esté caído o su link haya cambiado). Completa manualmente si aplica.';
         resumen.className = 'form-msg error';
       }
     })();
