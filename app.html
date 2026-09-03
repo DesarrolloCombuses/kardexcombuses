@@ -802,90 +802,113 @@
           <p class="view-intro">Comparendos y accidentes de tránsito (archivo que sube RRHH) más siniestros de SST (Google Sheet, en vivo), todos cruzados por cédula -- los mismos datos que ya se consultan uno por uno en el Paz y Salvo.</p>
           <p id="st-sst-msg" class="form-msg error hidden"></p>
 
-          <div class="cards">
-            <div class="card">
-              <span class="card-icon" data-tone="amber">
-                <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2.5" width="12" height="15" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-comparendos">0</div>
-                <div class="card-label">Comparendos</div>
+          <div class="st-section" data-tone="blue">
+            <div class="st-section-head">
+              <h2>Resumen general</h2>
+              <span class="muted">Comparendos + accidentes + siniestros SST combinados</span>
+            </div>
+            <div class="cards cards--compact">
+              <div class="card">
+                <span class="card-icon" data-tone="blue">
+                  <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-conductores">0</div>
+                  <div class="card-label">Conductores involucrados</div>
+                </div>
               </div>
             </div>
-            <div class="card">
-              <span class="card-icon" data-tone="red">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2L2.5 16.5h15L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.2v3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="14.2" r="0.9" fill="currentColor"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-accidentes">0</div>
-                <div class="card-label">Accidentes</div>
-              </div>
-            </div>
-            <div class="card">
-              <span class="card-icon" data-tone="amber">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l6.5 2.3v4.9c0 4-2.7 7.1-6.5 8.3-3.8-1.2-6.5-4.3-6.5-8.3V4.8L10 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 7v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="13.3" r="0.9" fill="currentColor"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-siniestros">0</div>
-                <div class="card-label">Siniestros SST</div>
-              </div>
-            </div>
-            <div class="card">
-              <span class="card-icon" data-tone="red">
-                <svg viewBox="0 0 20 20" fill="none"><path d="M3 10.5h3l1.5-3.2 2 6 1.5-2.8H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-lesion">0</div>
-                <div class="card-label">Accidentes con lesión</div>
-              </div>
-            </div>
-            <div class="card">
-              <span class="card-icon" data-tone="amber">
-                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.3l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-pendientes">0</div>
-                <div class="card-label">Siniestros pendientes de conciliación</div>
-              </div>
-            </div>
-            <div class="card">
-              <span class="card-icon" data-tone="blue">
-                <svg viewBox="0 0 20 20" fill="none"><circle cx="7" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 17c0-2.9 2-4.5 4.5-4.5s4.5 1.6 4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="14.5" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.7c2-.2 4.5 1.2 4.5 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              </span>
-              <div>
-                <div class="card-value" id="st-kpi-conductores">0</div>
-                <div class="card-label">Conductores involucrados</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel-card chart-card">
             <div class="section-heading"><h2>Conductores con más incidentes</h2></div>
             <div id="st-ranking" class="ranked-bars"></div>
           </div>
 
-          <div class="stat-grid">
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Comparendos por tipo</h2></div>
-              <div id="st-bars-tipo-comparendo" class="bar-chart"></div>
+          <div class="st-section" data-tone="amber">
+            <div class="st-section-head">
+              <h2>Comparendos</h2>
+              <span class="muted">Infracciones de tránsito reportadas por RRHH</span>
             </div>
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Accidentes por gravedad</h2></div>
-              <div id="st-bars-gravedad" class="bar-chart"></div>
+            <div class="cards cards--compact">
+              <div class="card">
+                <span class="card-icon" data-tone="amber">
+                  <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2.5" width="12" height="15" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-comparendos">0</div>
+                  <div class="card-label">Total comparendos</div>
+                </div>
+              </div>
+            </div>
+            <div class="section-heading"><h2>Comparendos por tipo</h2></div>
+            <div id="st-bars-tipo-comparendo" class="bar-chart"></div>
+          </div>
+
+          <div class="st-section" data-tone="red">
+            <div class="st-section-head">
+              <h2>Accidentes</h2>
+              <span class="muted">Accidentes de tránsito reportados por RRHH</span>
+            </div>
+            <div class="cards cards--compact">
+              <div class="card">
+                <span class="card-icon" data-tone="red">
+                  <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2L2.5 16.5h15L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.2v3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="14.2" r="0.9" fill="currentColor"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-accidentes">0</div>
+                  <div class="card-label">Total accidentes</div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="card-icon" data-tone="red">
+                  <svg viewBox="0 0 20 20" fill="none"><path d="M3 10.5h3l1.5-3.2 2 6 1.5-2.8H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-lesion">0</div>
+                  <div class="card-label">Con lesión</div>
+                </div>
+              </div>
+            </div>
+            <div class="section-heading"><h2>Accidentes por gravedad</h2></div>
+            <div id="st-bars-gravedad" class="bar-chart"></div>
+          </div>
+
+          <div class="st-section" data-tone="green">
+            <div class="st-section-head">
+              <h2>Siniestros SST</h2>
+              <span class="muted">Google Sheet publicado, en vivo</span>
+            </div>
+            <div class="cards cards--compact">
+              <div class="card">
+                <span class="card-icon" data-tone="green">
+                  <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l6.5 2.3v4.9c0 4-2.7 7.1-6.5 8.3-3.8-1.2-6.5-4.3-6.5-8.3V4.8L10 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 7v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="13.3" r="0.9" fill="currentColor"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-siniestros">0</div>
+                  <div class="card-label">Total siniestros</div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="card-icon" data-tone="green">
+                  <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.3l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <div>
+                  <div class="card-value" id="st-kpi-pendientes">0</div>
+                  <div class="card-label">Pendientes de conciliación</div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-grid">
+              <div class="panel-card chart-card">
+                <div class="section-heading"><h2>Por conciliación</h2></div>
+                <div id="st-bars-conciliacion" class="bar-chart"></div>
+              </div>
+              <div class="panel-card chart-card">
+                <div class="section-heading"><h2>Por estado</h2></div>
+                <div id="st-bars-definicion" class="bar-chart"></div>
+              </div>
             </div>
           </div>
 
-          <div class="stat-grid">
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Siniestros por conciliación</h2></div>
-              <div id="st-bars-conciliacion" class="bar-chart"></div>
-            </div>
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Siniestros por estado</h2></div>
-              <div id="st-bars-definicion" class="bar-chart"></div>
-            </div>
-          </div>
-
+          <div class="section-heading"><h2>Detalle de registros</h2></div>
           <div class="toolbar">
             <div class="search-input">
               <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>

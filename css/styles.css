@@ -396,6 +396,14 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .sidebar-nav a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 .sidebar-nav a.active { background: var(--blue-600); color: #fff; box-shadow: var(--shadow-sm); }
 
+/* Siniestros: colores de la empresa (verde con degradado a blanco) en vez
+   del azul genérico, para que resalte como su propia sección. */
+.sidebar-nav a.active[data-nav="siniestros-transito"] {
+  background: linear-gradient(115deg, #0b6e39 0%, #2fa864 55%, #d9f5e3 100%);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(6, 44, 23, 0.45);
+}
+
 .nav-group summary {
   display: flex;
   align-items: center;
@@ -536,6 +544,29 @@ a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md);
 .alert-link { color: inherit; font-weight: 700; text-decoration: underline; font-size: 0.82rem; }
 
 .section-heading { margin: 0 0 0.85rem; }
+
+/* Bloques que agrupan KPIs + gráficas de un mismo tipo de dato (ej.
+   Comparendos vs. Accidentes vs. Siniestros SST) para que no queden
+   todos mezclados en una sola grilla sin distinción visual. */
+.st-section {
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-top: 3px solid var(--slate-300);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.35rem 1.5rem;
+  margin-bottom: 1.75rem;
+  box-shadow: var(--shadow-sm);
+}
+.st-section[data-tone="amber"] { border-top-color: #e0a415; }
+.st-section[data-tone="red"] { border-top-color: var(--danger); }
+.st-section[data-tone="green"] { border-top-color: var(--success-text); }
+.st-section[data-tone="blue"] { border-top-color: var(--blue-600); }
+.st-section-head { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.st-section-head h2 { font-size: 1.05rem; }
+.st-section-head .muted { font-size: 0.82rem; }
+.st-section .cards:last-child { margin-bottom: 0; }
+.cards--compact { grid-template-columns: repeat(auto-fit, minmax(200px, 260px)); }
+.st-section .stat-grid:last-child { margin-bottom: 0; }
 
 /* =====================================================================
    Estadísticas: gráficas de inventario
