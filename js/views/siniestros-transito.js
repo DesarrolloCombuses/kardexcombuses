@@ -102,17 +102,27 @@ Router.register('siniestros-transito', {
       this._bound = true;
     }
 
-    const [infracciones, accidentes, empleados] = await Promise.all([
+    const [infracciones, accidentes] = await Promise.all([
       DB.getInfraccionesTransito(),
       DB.getAccidentesTransito(),
-      DB.getEmployees({ onlyActive: false }),
     ]);
     this._infracciones = infracciones;
     this._accidentes = accidentes;
 
     // Los siniestros de SST no traen nombre (solo cédula) -- se resuelve
     // contra la planta para poder mostrarlo igual que comparendos/accidentes.
-    const nombrePorCedula = new Map(empleados.map((e) => [e.cedula, e.nombre]));
+    // Aparte del resto a propósito: si esto falla, lo único que se pierde es
+    // el nombre de los siniestros de SST (quedan como "Sin nombre"), no toda
+    // la vista -- antes iba en el mismo Promise.all de arriba y una falla
+    // acá tumbaba también comparendos y accidentes, que no tienen nada que
+    // ver con esta consulta.
+    let nombrePorCedula = new Map();
+    try {
+      const empleados = await DB.getEmployees({ onlyActive: false });
+      nombrePorCedula = new Map(empleados.map((e) => [e.cedula, e.nombre]));
+    } catch (err) {
+      // silencioso: es solo para completar nombres, no bloquea nada más
+    }
 
     const sstMsg = document.getElementById('st-sst-msg');
     try {
