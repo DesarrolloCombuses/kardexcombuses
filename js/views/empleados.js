@@ -102,6 +102,19 @@ function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
 
+// Para Excel: number de serie de fecha (días desde 1899-12-30, la misma
+// cuenta que usa Excel), calculado a mano con Date.UTC en vez de entregarle
+// un objeto Date de JS a SheetJS. Se probó con un objeto Date normal
+// (new Date(`${iso}T00:00:00`)) y el redondeo de SheetJS al pasarlo a
+// número de serie corría la fecha casi un día completo (quedaba
+// "2026-09-06 23:59:44" en vez de 7/9/2026) -- con el cálculo manual sale
+// exacto, sin residuo de hora, y el formato d/m/aaaa se fija en _buildExcel.
+function fechaCeldaExcel(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
+}
+
 function formatSalario(valor) {
   if (valor === null || valor === undefined || valor === '') return '—';
   return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -166,6 +179,7 @@ Router.register('empleados', {
       });
       document.getElementById('empleados-nuevo-btn').addEventListener('click', () => this._abrirModal(null));
       document.getElementById('empleados-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
+      document.getElementById('empleados-export-btn').addEventListener('click', () => this._exportExcel());
       this._bound = true;
     }
     await this._load();
@@ -224,6 +238,86 @@ Router.register('empleados', {
     document.getElementById('empleados-filtro-fecha-desde').value = '';
     document.getElementById('empleados-filtro-fecha-hasta').value = '';
     this._render();
+  },
+
+  // Exporta justo lo que está filtrado en pantalla (ver _render), para que
+  // "todos" o un subconjunto (ej. solo activos de un área) coincida con lo
+  // que el usuario está viendo cuando lo pide.
+  async _exportExcel() {
+    const btn = document.getElementById('empleados-export-btn');
+    const empleados = this._filtrados || [];
+    if (empleados.length === 0) {
+      alert('No hay empleados para exportar con estos filtros.');
+      return;
+    }
+    btn.disabled = true;
+    Loading.show('Preparando Excel…');
+    try {
+      this._buildExcel(empleados);
+    } finally {
+      btn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  // Una fila por empleado, con las columnas agrupadas igual que el detalle
+  // en pantalla (datos laborales primero, luego el perfil sociodemográfico
+  // completo tomado de CAMPOS_SOCIODEMOGRAFICOS para no repetir esa lista).
+  // Las fechas van como números de serie de Excel (ver fechaCeldaExcel) con
+  // formato d/m/aaaa, para que en Excel se puedan ordenar/filtrar como
+  // fecha de verdad y no como texto.
+  _buildExcel(empleados) {
+    const header = [
+      'Cédula', 'Nombre', 'Estado', 'Cargo', 'Área', 'Base', 'Ruta', 'Vehículo',
+      'Teléfono', 'Email personal', 'Fecha de ingreso', 'Fecha de salida', 'Motivo de renuncia',
+      ...CAMPOS_SOCIODEMOGRAFICOS.filter((c) => c.id !== 'fecha_ingreso').map((c) => c.label),
+      'Perfil completo',
+    ];
+    const camposFecha = new Set(['Fecha de ingreso', 'Fecha de salida', 'Fecha de nacimiento']);
+
+    const filas = empleados.map((e) => {
+      const p = e.perfil_sociodemografico || {};
+      const fila = {
+        'Cédula': e.cedula,
+        'Nombre': e.nombre,
+        'Estado': e.activo ? 'Activo' : 'Retirado',
+        'Cargo': e.cargo || '',
+        'Área': e.area || '',
+        'Base': e.base || '',
+        'Ruta': e.ruta || '',
+        'Vehículo': e.numero_interno || '',
+        'Teléfono': e.telefono || '',
+        'Email personal': e.email_personal || '',
+        'Fecha de ingreso': fechaCeldaExcel(p.fecha_ingreso),
+        'Fecha de salida': fechaCeldaExcel(e.fecha_salida),
+        'Motivo de renuncia': e.motivo_renuncia || '',
+      };
+      CAMPOS_SOCIODEMOGRAFICOS.forEach((campo) => {
+        if (campo.id === 'fecha_ingreso') return; // ya va arriba con los demás datos laborales
+        const valor = p[campo.id];
+        if (campo.type === 'date') fila[campo.label] = fechaCeldaExcel(valor);
+        else if (campo.type === 'checkbox') fila[campo.label] = valor ? 'Sí' : 'No';
+        else fila[campo.label] = campoVacio(valor) ? '' : valor;
+      });
+      fila['Perfil completo'] = e.perfil_sociodemografico ? 'Sí' : 'No';
+      return fila;
+    });
+
+    const sheet = XLSX.utils.json_to_sheet(filas, { header });
+    const rango = XLSX.utils.decode_range(sheet['!ref']);
+    for (let col = rango.s.c; col <= rango.e.c; col++) {
+      if (!camposFecha.has(header[col])) continue;
+      for (let row = rango.s.r + 1; row <= rango.e.r; row++) {
+        const celda = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (celda && celda.t === 'n') celda.z = 'd/m/yyyy';
+      }
+    }
+    sheet['!cols'] = header.map((h) => ({ wch: Math.min(Math.max(h.length + 2, 10), 34) }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Empleados');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `empleados-combuses-${fecha}.xlsx`);
   },
 
   _iniciales(nombre) {
@@ -291,6 +385,10 @@ Router.register('empleados', {
       if (!fb) return -1;
       return fb.localeCompare(fa);
     });
+
+    // Se guarda para que "Descargar Excel" exporte justo lo que se ve en
+    // pantalla (mismos filtros/orden), igual que ya hace el historial.
+    this._filtrados = filtrados;
 
     const total = this._employees.length;
     document.getElementById('empleados-contador').textContent =
