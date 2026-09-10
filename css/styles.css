@@ -366,10 +366,11 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .sidebar {
   width: var(--sidebar-w);
   flex: none;
-  /* Colores de la empresa: verde con degradado a blanco. El text-shadow se
-     hereda a todo el texto de adentro (y el filter de abajo a los svg) para
-     que siga siendo legible incluso sobre el tramo más claro del degradado. */
-  background: linear-gradient(165deg, #0a5c30 0%, #1f9153 40%, #6cc793 75%, #eafbf1 100%);
+  /* Colores de la empresa: verde esmeralda, oscuro arriba y más vivo abajo
+     -- sin degradar a blanco (se veía lavado). El text-shadow se hereda a
+     todo el texto de adentro (y el filter de abajo a los svg) como refuerzo
+     de contraste, aunque con este verde ya no hace tanta falta. */
+  background: linear-gradient(180deg, #063d24 0%, #0f8a4f 100%);
   color: #fff;
   text-shadow: 0 1px 2px rgba(4, 40, 20, 0.4);
   display: flex;
@@ -404,7 +405,7 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
    y queda legible sin importar en qué tramo del degradado caiga. */
 .sidebar-nav a.active {
   background: #fff;
-  color: #0a5c30;
+  color: #063d24;
   text-shadow: none;
   box-shadow: var(--shadow-sm);
 }
