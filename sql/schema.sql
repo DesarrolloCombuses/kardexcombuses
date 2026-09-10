@@ -713,35 +713,24 @@ $$;
 revoke all on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) from public;
 grant execute on function public.perfil_publico_guardar(uuid, text, jsonb, jsonb, jsonb, text) to anon, authenticated;
 
--- Deja que el link publico (rol anon, sin sesion) suba/reemplace SOLO la
--- foto de perfil del empleado del link, y unicamente bajo esta ruta fija
--- ("perfil-publico/<id-del-empleado>.jpg", una foto por empleado). No
--- depende de la cedula -- las policies de Storage no tienen forma de
--- validarla, solo pueden mirar la ruta del archivo -- pero exige que exista
--- un empleado con exactamente ese id, y aunque suban el archivo, no queda
--- como LA foto oficial del empleado (employees.foto_url) hasta que
--- perfil_publico_guardar() la registre, y esa función sí valida la cédula.
--- A propósito no se da permiso de lectura (select) a anon sobre este
--- bucket: así nadie puede listar ni ver la foto de otro empleado con solo
--- la anon key, aunque sepa o adivine su id.
-drop policy if exists "anon_insert_foto_perfil_publico" on storage.objects;
-create policy "anon_insert_foto_perfil_publico" on storage.objects
-  for insert
-  to anon
-  with check (
-    bucket_id = 'fotos-empleados'
-    and exists (select 1 from employees e where name = 'perfil-publico/' || e.id::text || '.jpg')
-  );
-
-drop policy if exists "anon_update_foto_perfil_publico" on storage.objects;
-create policy "anon_update_foto_perfil_publico" on storage.objects
-  for update
-  to anon
-  using (bucket_id = 'fotos-empleados' and name like 'perfil-publico/%')
-  with check (
-    bucket_id = 'fotos-empleados'
-    and exists (select 1 from employees e where name = 'perfil-publico/' || e.id::text || '.jpg')
-  );
+-- La foto de perfil del link público (rol anon, sin sesión) NO se sube por
+-- Storage directo. Se intentó con policies (ruta fija
+-- "perfil-publico/<id>.jpg", exige que exista un empleado con ese id) pero
+-- se confirmó contra producción, con requests HTTP directas, que Supabase
+-- Storage rechaza cualquier insert/update del rol anon en un bucket con
+-- public=false sin importar qué digan las policies -- se probó incluso con
+-- una policy "to public, with check (true)" (sin ninguna condición) y
+-- siguió fallando "row-level security policy", mientras que el mismo
+-- request contra un bucket public=true sí funcionó. Es una restricción de
+-- la plataforma, no de RLS. "fotos-empleados" tiene que seguir siendo
+-- privado (fotos de empleados, no para listar públicamente), así que la
+-- subida la hace la Edge Function subir-foto-perfil-publico
+-- (supabase/functions/), que usa el service role del lado del servidor
+-- para poder escribir en el bucket privado -- ver
+-- sql/foto_perfil_publico_via_edge_function_2026-09-10.sql. Igual que
+-- antes, subir el archivo no lo deja como LA foto oficial del empleado
+-- (employees.foto_url) hasta que perfil_publico_guardar() la registre, y
+-- esa función sí valida la cédula.
 
 -- Comparendos (infracciones de tránsito) y accidentes de los conductores,
 -- cruzados por cédula en el Paz y Salvo (junto a los siniestros del Google

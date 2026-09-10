@@ -436,17 +436,24 @@ const DB = {
     if (error) throw error;
   },
 
-  // Ruta fija por empleado ("perfil-publico/<id>.jpg"): permite que subir
-  // de nuevo la foto reemplace la anterior (upsert), y es lo que habilita
-  // la policy de Storage a validar el path sin depender de la cédula -- ver
-  // sql/perfil_publico.sql.
+  // Sube la foto vía Edge Function (subir-foto-perfil-publico) en vez de
+  // Storage directo -- Supabase rechaza cualquier insert/update del rol
+  // anon en un bucket privado sin importar qué digan las policies (se
+  // confirmó contra producción: incluso una policy "to public, with check
+  // (true)" fallaba iguial, mientras que el mismo request contra un bucket
+  // público sí funcionaba -- es una restricción de la plataforma). La
+  // función usa el service role del lado del servidor para poder escribir
+  // en el bucket privado, y valida que employeeId corresponda a un
+  // empleado real antes de guardar. Ruta fija ("perfil-publico/<id>.jpg")
+  // para que volver a subir reemplace la anterior.
   async uploadFotoPublico(employeeId, blob) {
-    const path = `perfil-publico/${employeeId}.jpg`;
-    const { error } = await window.supabaseClient.storage
-      .from('fotos-empleados')
-      .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    const { data, error } = await window.supabaseClient.functions.invoke('subir-foto-perfil-publico', {
+      body: blob,
+      headers: { 'Content-Type': 'image/jpeg', 'x-employee-id': employeeId },
+    });
     if (error) throw error;
-    return path;
+    if (!data?.ok) throw new Error(data?.message || 'No se pudo subir la foto.');
+    return data.path;
   },
 
   // ---- Perfil del usuario logueado ------------------------------------------

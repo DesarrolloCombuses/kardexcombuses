@@ -180,6 +180,7 @@ Router.register('empleados', {
       document.getElementById('empleados-nuevo-btn').addEventListener('click', () => this._abrirModal(null));
       document.getElementById('empleados-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       document.getElementById('empleados-export-btn').addEventListener('click', () => this._exportExcel());
+      document.getElementById('empleados-card-pendientes').addEventListener('click', () => this._filtrarPendientes());
       this._bound = true;
     }
     await this._load();
@@ -237,6 +238,22 @@ Router.register('empleados', {
     document.getElementById('empleados-filtro-perfil').value = '';
     document.getElementById('empleados-filtro-fecha-desde').value = '';
     document.getElementById('empleados-filtro-fecha-hasta').value = '';
+    this._render();
+  },
+
+  // Atajo desde la tarjeta "Perfiles pendientes": antes había que abrir
+  // Filtros avanzados a mano y elegir "Pendiente" ahí adentro. Estado se
+  // pone en "todos" (no solo activos) para no esconder un pendiente de
+  // alguien que ya salió sin completar su perfil.
+  _filtrarPendientes() {
+    document.getElementById('empleados-search').value = '';
+    document.getElementById('empleados-estado').value = 'todos';
+    document.getElementById('empleados-filtro-cargo').value = '';
+    document.getElementById('empleados-filtro-area').value = '';
+    document.getElementById('empleados-filtro-perfil').value = 'pendiente';
+    document.getElementById('empleados-filtro-fecha-desde').value = '';
+    document.getElementById('empleados-filtro-fecha-hasta').value = '';
+    document.getElementById('empleados-filtros-avanzados').open = true;
     this._render();
   },
 

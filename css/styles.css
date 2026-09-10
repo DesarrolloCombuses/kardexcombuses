@@ -542,6 +542,9 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 a.card-link { text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
 a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md); }
 
+.card-clickable { cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.card-clickable:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md); }
+
 /* Alerta de stock bajo en el Dashboard: reusa .callout, con la lista de
    prendas de Estadísticas (.low-stock-list) embebida adentro. */
 #dashboard-stock-alert { align-items: flex-start; }

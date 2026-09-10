@@ -423,3 +423,11 @@ entrypoint = "./functions/sonar-insert-driver/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/sonar-insert-driver/*.html" ]
+
+# verify_jwt = false porque la llama el link público de perfil (rol anon,
+# sin sesión) -- la función valida ella misma que el employee_id exista.
+[functions.subir-foto-perfil-publico]
+enabled = true
+verify_jwt = false
+import_map = "./functions/subir-foto-perfil-publico/deno.json"
+entrypoint = "./functions/subir-foto-perfil-publico/index.ts"
