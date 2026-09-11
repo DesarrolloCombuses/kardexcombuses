@@ -117,7 +117,6 @@ Router.register('historial', {
       return;
     }
     list.innerHTML = movements.map((m) => {
-      const nLineas = m.kardex_movement_items.length;
       const filas = [];
       if (m.tipo === 'entrada' && m.facturas) {
         filas.push(`
@@ -152,6 +151,12 @@ Router.register('historial', {
           </div>
         `);
       }
+      filas.push(...m.kardex_movement_items.map((li) => `
+        <div class="movement-card-row">
+          <span class="movement-card-label">Prenda</span>
+          <span class="movement-card-value">${li.item_variants.item_categories.nombre} · Talla ${li.item_variants.talla} <span class="muted">· ${li.cantidad} u.</span></span>
+        </div>
+      `));
       filas.push(`
         <div class="movement-card-row">
           <span class="movement-card-label">${m.tipo === 'salida' ? 'Entregado / registrado por' : 'Registrado por'}</span>
@@ -168,7 +173,6 @@ Router.register('historial', {
           <div class="movement-card-body">
             ${filas.join('')}
           </div>
-          <div class="movement-card-foot muted">${nLineas} línea(s) de prenda</div>
         </div>
       `;
     }).join('');
