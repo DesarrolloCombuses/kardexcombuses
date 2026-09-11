@@ -485,12 +485,22 @@ const DB = {
 
   // ---- Empleados ------------------------------------------------------------
 
+  // Mismo límite de 1000 filas por consulta que getEmployeesConPerfil -- ver
+  // el comentario ahí para el detalle.
   async getEmployees({ onlyActive = false } = {}) {
-    let query = window.supabaseClient.from('employees').select('*').order('nombre');
-    if (onlyActive) query = query.eq('activo', true);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    const PAGE_SIZE = 1000;
+    let empleados = [];
+    let desde = 0;
+    for (;;) {
+      let query = window.supabaseClient.from('employees').select('*').order('nombre').range(desde, desde + PAGE_SIZE - 1);
+      if (onlyActive) query = query.eq('activo', true);
+      const { data, error } = await query;
+      if (error) throw error;
+      empleados = empleados.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      desde += PAGE_SIZE;
+    }
+    return empleados;
   },
 
   async createEmployee(employee) {
@@ -575,15 +585,29 @@ const DB = {
   // trae contactos de emergencia e hijos (1 a muchos, PostgREST los
   // devuelve como arreglo) para no tener que pedirlos aparte al abrir cada
   // ficha o formulario de empleado.
+  // PostgREST solo devuelve hasta 1000 filas por consulta (límite del lado
+  // del servidor, no algo que se pueda subir desde el cliente) -- con más de
+  // 1000 empleados en la tabla, sin paginar se perdía en silencio todo lo
+  // que quedara después del corte alfabético (ej. apellidos con "V" en
+  // adelante), sin ningún error visible.
   async getEmployeesConPerfil({ onlyActive = true } = {}) {
-    let query = window.supabaseClient
-      .from('employees')
-      .select('*, perfil_sociodemografico ( * ), contactos_emergencia ( * ), hijos_empleado ( * )')
-      .order('nombre');
-    if (onlyActive) query = query.eq('activo', true);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    const PAGE_SIZE = 1000;
+    let empleados = [];
+    let desde = 0;
+    for (;;) {
+      let query = window.supabaseClient
+        .from('employees')
+        .select('*, perfil_sociodemografico ( * ), contactos_emergencia ( * ), hijos_empleado ( * )')
+        .order('nombre')
+        .range(desde, desde + PAGE_SIZE - 1);
+      if (onlyActive) query = query.eq('activo', true);
+      const { data, error } = await query;
+      if (error) throw error;
+      empleados = empleados.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      desde += PAGE_SIZE;
+    }
+    return empleados;
   },
 
   // ---- Contactos de emergencia e hijos ---------------------------------------
