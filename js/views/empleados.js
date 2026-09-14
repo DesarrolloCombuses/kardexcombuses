@@ -690,6 +690,12 @@ Router.register('empleados', {
         ` : ''}
       </div>
 
+      <div class="modal-section" id="empleado-vinculacion-section" hidden>
+        <h3 class="modal-section-title">Historial de vinculación</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Esta cédula tiene más de un registro en Empleados -- es un reingreso.</p>
+        <div id="empleado-vinculacion-lista" class="detalle-list"></div>
+      </div>
+
       ${this._estadoBloqueHtml(empleado)}
 
       ${empleado.perfil_aprobado_at ? `
@@ -766,6 +772,7 @@ Router.register('empleados', {
 
     this._cargarAuditoria(empleado.id);
     this._cargarDotacion(empleado.id);
+    this._cargarHistorialVinculacion(empleado);
 
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
@@ -859,6 +866,36 @@ Router.register('empleados', {
       }).join('');
     } catch {
       el.innerHTML = '<p class="empty-note">No se pudo cargar la dotación entregada.</p>';
+    }
+  },
+
+  // Reingreso = misma cédula con más de un registro en "employees" (ver
+  // employees_cedula_activo_unique en schema.sql: solo se exige única
+  // ENTRE ACTIVOS, así que puede haber varios inactivos repetidos, uno por
+  // cada paso de esa persona por la empresa). Si esta cédula solo tiene un
+  // registro, la sección se deja oculta -- no hay nada que contar.
+  async _cargarHistorialVinculacion(empleado) {
+    const section = document.getElementById('empleado-vinculacion-section');
+    const el = document.getElementById('empleado-vinculacion-lista');
+    if (!section || !el) return;
+    try {
+      const historial = await DB.getHistorialVinculacion(empleado.cedula);
+      if (historial.length <= 1) return;
+      section.hidden = false;
+      el.innerHTML = historial.map((h) => {
+        const desde = formatFecha(h.perfil_sociodemografico?.fecha_ingreso);
+        const hasta = h.activo ? 'Actualmente' : formatFecha(h.fecha_salida);
+        const detalle = [h.cargo || 'Sin cargo', h.area, !h.activo ? h.motivo_renuncia : null].filter(Boolean).join(' · ');
+        return `
+          <div class="detalle-list-item">
+            <span class="detalle-list-item-main">${desde} → ${hasta}</span>
+            <span class="detalle-list-item-sub">${detalle}${h.id === empleado.id ? ' · Este registro' : ''}</span>
+          </div>
+        `;
+      }).join('');
+    } catch {
+      section.hidden = false;
+      el.innerHTML = '<p class="empty-note">No se pudo cargar el historial de vinculación.</p>';
     }
   },
 
@@ -1591,6 +1628,47 @@ Router.register('empleados', {
       msg.className = 'form-msg error';
       return;
     }
+
+    // Solo al CREAR (no al editar): avisa si esta cédula ya tiene
+    // historial en Empleados antes de intentar guardar. employees.cedula
+    // solo es única ENTRE ACTIVOS (ver employees_cedula_activo_unique en
+    // schema.sql), así que un reingreso es válido -- esto es nada más para
+    // confirmar que no sea un error de digitación. Mismo patrón que
+    // aspirantes.js _seleccionar.
+    if (!employeeId) {
+      msg.textContent = 'Verificando cédula…';
+      let coincidencias;
+      try {
+        coincidencias = await DB.buscarEmpleadosPorCedula(cedula);
+      } catch (err) {
+        msg.textContent = 'No se pudo verificar la cédula: ' + err.message;
+        msg.className = 'form-msg error';
+        return;
+      }
+      const activoExistente = coincidencias.find((emp) => emp.activo);
+      if (activoExistente) {
+        msg.textContent = `Ya existe un empleado ACTIVO con esta cédula (${activoExistente.nombre}).`;
+        msg.className = 'form-msg error';
+        alert(`Ya existe un empleado ACTIVO con la cédula ${cedula} (${activoExistente.nombre}). Revisa si está bien digitada -- no se puede crear otro mientras ese registro siga activo.`);
+        return;
+      }
+      if (coincidencias.length) {
+        const masReciente = coincidencias[0];
+        const continuar = confirm(
+          `Ya existe un registro de "${masReciente.nombre}" con la cédula ${cedula}, marcado como inactivo` +
+          (masReciente.fecha_salida ? ` (salió el ${formatFecha(masReciente.fecha_salida)}${masReciente.motivo_renuncia ? ', motivo: ' + masReciente.motivo_renuncia : ''})` : '') +
+          `.\n\n¿Es esta misma persona que vuelve a la empresa (reingreso)? Si confirmas, se crea un registro NUEVO de empleado -- el historial anterior se queda intacto, sin modificarlo.`
+        );
+        if (!continuar) {
+          msg.textContent = 'Creación cancelada.';
+          msg.className = 'form-msg';
+          return;
+        }
+      }
+      msg.textContent = 'Guardando…';
+      msg.className = 'form-msg';
+    }
+
     const basico = {
       nombre,
       cedula,

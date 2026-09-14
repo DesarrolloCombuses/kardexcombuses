@@ -100,6 +100,15 @@ Router.register('personal-alertas', {
       .filter((e) => !this._dotacionIds.has(e.id))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     this._renderSinDotacion(sinDotacion);
+
+    // Solo activos (ya viene filtrado desde onEnter) -- a un conductor
+    // inactivo no tiene sentido pedirle que se le complete la base, esta
+    // alerta es para que a alguien que sigue trabajando no le falte ese
+    // dato en su ficha.
+    const conductoresSinBase = empleados
+      .filter((e) => /conductor/i.test(e.cargo || '') && !e.base)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    this._renderConductoresSinBase(conductoresSinBase);
   },
 
   // Lista de próximos cumpleaños (nombre, cargo, fecha y cuántos días
@@ -157,6 +166,25 @@ Router.register('personal-alertas', {
         </div>
       `).join('');
     this._renderRankedBars('pa-bars-sindotacion-cargo', distribucion(items, (e) => e.cargo));
+  },
+
+  // Cruce Empleados + vehículo asignado: conductores activos a los que
+  // todavía no se les ha diligenciado la base (dato clave para bodega y
+  // para el envío a Sonar, ver sonar-insert-driver). Desglose por ruta en
+  // vez de por cargo -- acá prácticamente todos son "Conductor", así que
+  // ese desglose no aportaría nada.
+  _renderConductoresSinBase(items) {
+    document.getElementById('pa-sinbase-subtitulo').textContent = `${items.length} conductor(es)`;
+    const lista = document.getElementById('pa-sinbase-lista');
+    lista.innerHTML = items.length === 0
+      ? '<p class="empty-note">Todos los conductores activos tienen base asignada.</p>'
+      : items.map((e) => `
+        <div class="detalle-list-item">
+          <span class="detalle-list-item-main">${e.nombre}</span>
+          <span class="detalle-list-item-sub">${e.ruta ? 'Ruta ' + e.ruta : 'Sin ruta'}${e.numero_interno ? ' · Vehículo ' + e.numero_interno : ''} · CC ${e.cedula}</span>
+        </div>
+      `).join('');
+    this._renderRankedBars('pa-bars-sinbase-ruta', distribucion(items, (e) => e.ruta));
   },
 
   // Ranking tipo "leaderboard" (rango + barra a color + %) -- más visual

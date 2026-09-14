@@ -272,6 +272,22 @@ const DB = {
     return data;
   },
 
+  // Todos los registros (activo + inactivos) de una cédula, del más
+  // antiguo al más reciente -- para pintar "Historial de vinculación" en
+  // la ficha del empleado (ver _cargarHistorialVinculacion en empleados.js).
+  // Más de una fila significa reingreso: alguien que ya trabajó acá, se
+  // fue, y volvió a ser contratado (ver employees_cedula_activo_unique en
+  // schema.sql, que permite varios inactivos con la misma cédula).
+  async getHistorialVinculacion(cedula) {
+    const { data, error } = await window.supabaseClient
+      .from('employees')
+      .select('id, nombre, cargo, area, activo, fecha_salida, motivo_renuncia, perfil_sociodemografico ( fecha_ingreso )')
+      .eq('cedula', cedula)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data;
+  },
+
   // Base/afiliado al que está asignado un vehículo, para autocompletar el
   // campo "Base" en vivo apenas se digita el número interno (en vez de
   // esperar a guardar y que lo corrija el trigger sync_employee_base_from_vehiculo).
