@@ -117,6 +117,16 @@ function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
 
+// Mismo criterio de períodos que Historial (ver js/views/historial.js):
+// Combuses entrega dotación 3 veces al año, el período se calcula solo a
+// partir de la fecha de entrega, sin depender de que alguien lo anote.
+function periodoDeFecha(fechaEntregaISO) {
+  if (!fechaEntregaISO) return null;
+  const [year, month] = fechaEntregaISO.split('-').map(Number);
+  const nombre = month <= 4 ? 'Abril' : month <= 8 ? 'Agosto' : 'Diciembre';
+  return `${nombre} ${year}`;
+}
+
 // Para Excel: number de serie de fecha (días desde 1899-12-30, la misma
 // cuenta que usa Excel), calculado a mano con Date.UTC en vez de entregarle
 // un objeto Date de JS a SheetJS. Se probó con un objeto Date normal
@@ -683,6 +693,12 @@ Router.register('empleados', {
       ${sonarHtml}
 
       <div class="modal-section">
+        <h3 class="modal-section-title">Dotación entregada</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Entregas registradas en el Kardex para ${empleado.nombre}.</p>
+        <div id="empleado-dotacion-lista" class="detalle-list detalle-list-scroll"><p class="empty-note">Cargando…</p></div>
+      </div>
+
+      <div class="modal-section">
         <h3 class="modal-section-title">Perfil sociodemográfico</h3>
         <div class="detalle-cards">${seccionesHtml}</div>
         ${observacionesHtml ? `<div class="detalle-grid" style="margin-top:0.9rem">${observacionesHtml}</div>` : ''}
@@ -742,6 +758,7 @@ Router.register('empleados', {
     if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
     this._cargarAuditoria(empleado.id);
+    this._cargarDotacion(empleado.id);
 
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
@@ -786,6 +803,55 @@ Router.register('empleados', {
       }).join('');
     } catch {
       el.innerHTML = '<p class="empty-note">No se pudo cargar el historial de cambios.</p>';
+    }
+  },
+
+  // Junta el Kardex con Empleados: trae las salidas (entregas) registradas
+  // para este empleado, para saber de un vistazo si y cuándo se le ha dado
+  // dotación -- sin esto había que ir a Historial y filtrar a mano por
+  // nombre. Las entradas no aplican (no tienen employee_id, son ingreso a
+  // bodega). Categoría/talla vienen del catálogo de prendas (no las escribe
+  // un tercero sin autenticar), así que no necesitan escapeHtml como sí lo
+  // necesita _cargarAuditoria.
+  async _cargarDotacion(employeeId) {
+    const el = document.getElementById('empleado-dotacion-lista');
+    if (!el) return;
+    try {
+      const { movements } = await DB.getMovements({ employeeId, tipo: 'salida' });
+      if (movements.length === 0) {
+        el.innerHTML = '<p class="empty-note">Sin entregas de dotación registradas todavía.</p>';
+        return;
+      }
+      el.innerHTML = movements.map((m) => {
+        const prendas = m.kardex_movement_items
+          .map((li) => `${li.item_variants.item_categories.nombre} · Talla ${li.item_variants.talla} · ${li.cantidad} u.`)
+          .join(', ');
+        const periodo = periodoDeFecha(m.fecha_entrega);
+        const fecha = m.fecha_entrega
+          ? new Date(`${m.fecha_entrega}T00:00:00`).toLocaleDateString('es-CO')
+          : new Date(m.fecha).toLocaleDateString('es-CO');
+        return `
+          <div class="movement-card ${m.anulado ? 'anulado' : ''}" style="cursor:default">
+            <div class="movement-card-top">
+              <span class="tag salida">salida</span>
+              ${m.anulado ? '<span class="tag anulado-tag">Anulado</span>' : ''}
+              <span class="movement-card-fecha">${fecha}${periodo ? ' · ' + periodo : ''}</span>
+            </div>
+            <div class="movement-card-body">
+              <div class="movement-card-row">
+                <span class="movement-card-label">Prendas</span>
+                <span class="movement-card-value">${prendas}</span>
+              </div>
+              <div class="movement-card-row">
+                <span class="movement-card-label">Entregado por</span>
+                <span class="movement-card-value">${m.entregado_por_nombre || m.creado_por_nombre || '—'}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch {
+      el.innerHTML = '<p class="empty-note">No se pudo cargar la dotación entregada.</p>';
     }
   },
 
