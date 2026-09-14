@@ -1101,6 +1101,11 @@ tbody tr:hover { background: var(--slate-50); }
 .detalle-list-item-main { font-weight: 700; color: var(--slate-900); font-size: 0.85rem; }
 .detalle-list-item-sub { font-size: 0.78rem; color: var(--slate-500); }
 
+/* Listas de indicadores (cumpleaños próximos, mayores de 50) -- pueden
+   crecer bastante más que una ficha de contactos/hijos, así que se limita
+   la altura y se deja scroll propio en vez de estirar toda la tarjeta. */
+.detalle-list-scroll { max-height: 340px; overflow-y: auto; padding-right: 0.25rem; }
+
 @media (max-width: 640px) {
   .person-row { flex-wrap: wrap; }
   .person-info { flex: 1 1 100%; order: 1; }

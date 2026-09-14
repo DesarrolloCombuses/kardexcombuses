@@ -18,6 +18,19 @@ function rangoEdad(edad) {
   return '55 o más';
 }
 
+// Cuántos días faltan para el próximo cumpleaños (0 = hoy) contando desde
+// la fecha de nacimiento, sin importar el año de nacimiento -- si el
+// cumpleaños de este año ya pasó, se calcula contra el del año siguiente.
+const DIAS_CUMPLE_PROXIMO = 30;
+
+function diasParaCumplir(fechaNacimientoISO, hoy) {
+  if (!fechaNacimientoISO) return null;
+  const nacimiento = new Date(`${fechaNacimientoISO}T00:00:00`);
+  let proximo = new Date(hoy.getFullYear(), nacimiento.getMonth(), nacimiento.getDate());
+  if (proximo < hoy) proximo = new Date(hoy.getFullYear() + 1, nacimiento.getMonth(), nacimiento.getDate());
+  return Math.round((proximo - hoy) / 86400000);
+}
+
 const ORDEN_RANGO_EDAD = ['Menos de 25', '25 a 34', '35 a 44', '45 a 54', '55 o más', 'Sin dato'];
 const ORDEN_ESCOLARIDAD = ['Primaria', 'Secundaria incompleta', 'Secundaria completa', 'Técnico', 'Tecnólogo', 'Universitario', 'Posgrado', 'Sin dato'];
 const ORDEN_ESTRATO = ['1', '2', '3', '4', '5', '6', 'Sin dato'];
@@ -120,6 +133,19 @@ Router.register('estadisticas-personal', {
       ? `${Math.round((conducen / empleados.length) * 100)}%`
       : '0%';
 
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const proximosCumple = conPerfil
+      .map((e) => ({ e, dias: diasParaCumplir(e.perfil_sociodemografico.fecha_nacimiento, hoy) }))
+      .filter((x) => x.dias != null && x.dias <= DIAS_CUMPLE_PROXIMO)
+      .sort((a, b) => a.dias - b.dias);
+    this._renderCumpleanos(proximosCumple);
+
+    const mayores50 = conPerfil
+      .filter((e) => (edadDeFecha(e.perfil_sociodemografico.fecha_nacimiento) ?? 0) >= 50)
+      .sort((a, b) => edadDeFecha(b.perfil_sociodemografico.fecha_nacimiento) - edadDeFecha(a.perfil_sociodemografico.fecha_nacimiento));
+    this._renderMayores50(mayores50);
+
     this._renderDonut('sp-donut-sexo', 'sp-legend-sexo', 'sp-donut-sexo-total', distribucion(perfiles, (p) => p.sexo));
     renderBarChart('sp-bars-edad', distribucion(perfiles, (p) => rangoEdad(edadDeFecha(p.fecha_nacimiento)), ORDEN_RANGO_EDAD));
     renderBarChart('sp-bars-estado-civil', distribucion(perfiles, (p) => p.estado_civil));
@@ -144,13 +170,54 @@ Router.register('estadisticas-personal', {
     document.getElementById('sp-ruta-kpi-rutas').textContent = rutasConConductores.length;
     document.getElementById('sp-ruta-kpi-sinruta').textContent = sinRuta ? sinRuta.count : 0;
     document.getElementById('sp-ruta-kpi-lider').textContent = lider ? `Ruta ${lider.label} (${lider.count})` : '—';
-    this._renderRankedBars('sp-bars-ruta', distRuta);
+    this._renderRankedBars('sp-bars-ruta', distRuta, (l) => 'Ruta ' + l);
   },
 
-  // Ranking tipo "leaderboard" (rango + barra a color + %) para Conductores
-  // por ruta -- más visual que una barra plana, para que se lea de un
-  // vistazo cuál ruta concentra más conductores.
-  _renderRankedBars(elId, dist) {
+  // Lista de próximos cumpleaños (nombre, cargo, fecha y cuántos días
+  // faltan) más un ranking por cargo, para saber tanto a quién felicitar
+  // como qué cargo concentra más cumpleaños en el rango.
+  _renderCumpleanos(items) {
+    document.getElementById('sp-cumple-subtitulo').textContent =
+      `${items.length} en los próximos ${DIAS_CUMPLE_PROXIMO} días`;
+    const lista = document.getElementById('sp-cumple-lista');
+    lista.innerHTML = items.length === 0
+      ? `<p class="empty-note">Sin cumpleaños en los próximos ${DIAS_CUMPLE_PROXIMO} días.</p>`
+      : items.map(({ e, dias }) => {
+        const fechaTexto = new Date(`${e.perfil_sociodemografico.fecha_nacimiento}T00:00:00`)
+          .toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+        const cuando = dias === 0 ? 'Hoy' : dias === 1 ? 'Mañana' : `En ${dias} días`;
+        return `
+          <div class="detalle-list-item">
+            <span class="detalle-list-item-main">${e.nombre}</span>
+            <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · ${fechaTexto} · ${cuando}</span>
+          </div>
+        `;
+      }).join('');
+    this._renderRankedBars('sp-bars-cumple-cargo', distribucion(items.map((x) => x.e), (e) => e.cargo));
+  },
+
+  // Mismo patrón que _renderCumpleanos: lista de personas (para saber
+  // quiénes son, ej. para exámenes médicos periódicos) más el desglose por
+  // cargo.
+  _renderMayores50(items) {
+    document.getElementById('sp-mayores50-subtitulo').textContent = `${items.length} persona(s)`;
+    const lista = document.getElementById('sp-mayores50-lista');
+    lista.innerHTML = items.length === 0
+      ? '<p class="empty-note">Sin personas mayores de 50 años.</p>'
+      : items.map((e) => `
+        <div class="detalle-list-item">
+          <span class="detalle-list-item-main">${e.nombre}</span>
+          <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · ${edadDeFecha(e.perfil_sociodemografico.fecha_nacimiento)} años</span>
+        </div>
+      `).join('');
+    this._renderRankedBars('sp-bars-mayores50-cargo', distribucion(items, (e) => e.cargo));
+  },
+
+  // Ranking tipo "leaderboard" (rango + barra a color + %) -- más visual
+  // que una barra plana, para que se lea de un vistazo qué valor concentra
+  // más personas (rutas, cargos, etc.). formatLabel deja personalizar cómo
+  // se ve cada etiqueta (ej. "Ruta 700" en vez de solo "700").
+  _renderRankedBars(elId, dist, formatLabel = (l) => l) {
     const el = document.getElementById(elId);
     const total = dist.reduce((s, d) => s + d.count, 0);
     if (total === 0) {
@@ -163,12 +230,13 @@ Router.register('estadisticas-personal', {
       const esSinDato = d.label === 'Sin dato';
       const color = esSinDato ? '#c9d0db' : this._palette[colorIdx++ % this._palette.length];
       const pct = (d.count / total) * 100;
+      const etiqueta = esSinDato ? 'Sin dato' : formatLabel(d.label);
       return `
         <div class="ranked-row ${i === 0 && !esSinDato ? 'top-rank' : ''}">
           <span class="ranked-rank">${i + 1}</span>
           <div class="ranked-body">
             <div class="ranked-top-row">
-              <span class="ranked-label" title="${esSinDato ? 'Sin dato' : 'Ruta ' + d.label}">${esSinDato ? 'Sin dato' : 'Ruta ' + d.label}</span>
+              <span class="ranked-label" title="${etiqueta}">${etiqueta}</span>
               <span class="ranked-value">${d.count}<span class="ranked-pct">(${pct.toFixed(0)}%)</span></span>
             </div>
             <span class="ranked-track"><span class="ranked-fill" data-pct="${(d.count / max) * 100}" style="background:${color}"></span></span>
