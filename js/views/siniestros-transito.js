@@ -11,9 +11,9 @@
 
 const ORDEN_GRAVEDAD_ACCIDENTE = ['SOLO DAÑOS', 'HERIDO', 'MUERTO', 'Sin dato'];
 
-// Copia local (no compartida con estadisticas-personal.js) a propósito: cada
-// vista de este proyecto se mantiene autocontenida en vez de depender de que
-// otro archivo se haya cargado antes en app.html.
+// Copia local (no compartida con las vistas de personal-*.js) a propósito:
+// cada vista de este proyecto se mantiene autocontenida en vez de depender
+// de que otro archivo se haya cargado antes en app.html.
 function stDistribucion(items, getValor, ordenFijo) {
   const counts = new Map();
   items.forEach((item) => {
