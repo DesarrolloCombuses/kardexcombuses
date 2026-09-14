@@ -222,7 +222,7 @@ export default {
 
     const { data: empleado, error: empErr } = await ctx.supabase
       .from("employees")
-      .select("id, cedula, nombre, cargo, ruta, telefono, email_personal")
+      .select("id, cedula, nombre, cargo, ruta, base, telefono, email_personal")
       .eq("id", employeeId)
       .single();
     if (empErr || !empleado) {
@@ -257,6 +257,13 @@ export default {
       .maybeSingle();
     const direccion = [perfil?.lugar_residencia, perfil?.barrio].filter(Boolean).join(", ");
 
+    // Combuses no usa este campo para un correo real: lo usan para
+    // identificar rápido, dentro del visor de Sonar, a qué base pertenece
+    // el conductor (ej. "BASE 3"), tomando el valor ya calculado en
+    // employees.base a partir de su vehículo (ver _autocompletarBaseVehiculo
+    // en js/views/empleados.js y el trigger que lo recalcula al guardar).
+    const dr_email = empleado.base ? `BASE ${String(empleado.base).trim().toUpperCase()}` : "";
+
     const driver: SonarDriver = {
       dr_Id: 0,
       dr_cedula: empleado.cedula || "",
@@ -265,7 +272,7 @@ export default {
       dr_address: direccion,
       dr_phone: empleado.telefono || "",
       dr_cellphone: empleado.telefono || "",
-      dr_email: empleado.email_personal || "",
+      dr_email,
       dr_mId: "",
       dr_mIdValids: [],
     };
