@@ -683,7 +683,7 @@
 
         <!-- ================= PERSONAL: CUMPLEAÑOS Y ALERTAS ================= -->
         <section data-view="personal-alertas" class="view">
-          <p class="view-intro">Próximos cumpleaños y personas mayores de 50 años en la planta activa -- seguimiento para gestión humana y SG-SST.</p>
+          <p class="view-intro">Próximos cumpleaños, personas mayores de 50 años y personas sin dotación entregada en la planta activa -- seguimiento para gestión humana, SG-SST y bodega.</p>
 
           <div class="toolbar">
             <label class="filtro-inline">
@@ -718,6 +718,20 @@
             <div class="panel-card chart-card">
               <div class="section-heading"><h2>Mayores de 50 años por cargo</h2></div>
               <div id="pa-bars-mayores50-cargo" class="ranked-bars"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Sin dotación entregada</h2>
+                <p class="view-intro" id="pa-sindotacion-subtitulo" style="margin:0.2rem 0 0">0 persona(s)</p>
+              </div>
+              <div id="pa-sindotacion-lista" class="detalle-list detalle-list-scroll"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Sin dotación entregada por cargo</h2></div>
+              <div id="pa-bars-sindotacion-cargo" class="ranked-bars"></div>
             </div>
           </div>
         </section>
@@ -1191,8 +1205,9 @@
 
           <div class="help-block" id="ayuda-personal-alertas">
             <h2>Cumpleaños y alertas</h2>
-            <p class="prose-p">Quiénes cumplen años en los próximos 30 días y quiénes son mayores de 50, cada uno con su desglose por cargo — para gestión humana y seguimiento del SG-SST. Solo cuenta a quienes tienen perfil sociodemográfico <span class="tag completo">Completo</span> (ahí vive la fecha de nacimiento).</p>
-            <p class="prose-p">"Ver por cargo" filtra las dos listas y sus desgloses a un solo cargo — por ejemplo, elige "Conductor" para ver únicamente sus cumpleaños y mayores de 50. "Todos los cargos" vuelve a la vista completa.</p>
+            <p class="prose-p">Quiénes cumplen años en los próximos 30 días y quiénes son mayores de 50, cada uno con su desglose por cargo — para gestión humana y seguimiento del SG-SST. Estas dos solo cuentan a quienes tienen perfil sociodemográfico <span class="tag completo">Completo</span> (ahí vive la fecha de nacimiento).</p>
+            <p class="prose-p">"Sin dotación entregada" cruza Empleados con el Kardex: lista a quienes no tienen ninguna salida (entrega) registrada a su nombre, sin importar el perfil sociodemográfico — para que bodega sepa a quién le falta entregarle.</p>
+            <p class="prose-p">"Ver por cargo" filtra las tres listas y sus desgloses a un solo cargo — por ejemplo, elige "Conductor" para ver únicamente sus cumpleaños, mayores de 50 y pendientes de dotación. "Todos los cargos" vuelve a la vista completa.</p>
           </div>
 
           <div class="help-block" id="ayuda-personal-conductores">

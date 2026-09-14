@@ -727,6 +727,31 @@ const DB = {
     return { movements, total: pageSize ? count : movements.length };
   },
 
+  // Solo el employee_id de cada salida NO anulada -- para el indicador
+  // "Sin dotación entregada" (Personal > Cumpleaños y alertas), sin traer
+  // el detalle completo de cada movimiento. Igual que getEmployees, pagina
+  // de a 1000: el número de movimientos crece mucho más rápido que el de
+  // empleados.
+  async getEmployeeIdsConDotacion() {
+    const PAGE_SIZE = 1000;
+    const ids = new Set();
+    let desde = 0;
+    for (;;) {
+      const { data, error } = await window.supabaseClient
+        .from('kardex_movements')
+        .select('employee_id')
+        .eq('tipo', 'salida')
+        .eq('anulado', false)
+        .not('employee_id', 'is', null)
+        .range(desde, desde + PAGE_SIZE - 1);
+      if (error) throw error;
+      data.forEach((r) => ids.add(r.employee_id));
+      if (data.length < PAGE_SIZE) break;
+      desde += PAGE_SIZE;
+    }
+    return ids;
+  },
+
   // Inserta el encabezado del movimiento y sus líneas. El trigger de la BD
   // actualiza stock_actual y valida que no quede negativo en salidas.
   async createMovement({ header, lines }) {

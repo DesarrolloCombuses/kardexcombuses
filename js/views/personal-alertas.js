@@ -47,7 +47,12 @@ Router.register('personal-alertas', {
       document.getElementById('pa-filtro-cargo').addEventListener('change', () => this._aplicarFiltro());
       this._bound = true;
     }
-    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: true });
+    const [empleados, dotacionIds] = await Promise.all([
+      DB.getEmployeesConPerfil({ onlyActive: true }),
+      DB.getEmployeeIdsConDotacion(),
+    ]);
+    this._empleadosAll = empleados;
+    this._dotacionIds = dotacionIds;
     this._llenarFiltroCargo(this._empleadosAll);
     this._aplicarFiltro();
   },
@@ -86,6 +91,15 @@ Router.register('personal-alertas', {
       .filter((e) => (edadDeFecha(e.perfil_sociodemografico.fecha_nacimiento) ?? 0) >= 50)
       .sort((a, b) => edadDeFecha(b.perfil_sociodemografico.fecha_nacimiento) - edadDeFecha(a.perfil_sociodemografico.fecha_nacimiento));
     this._renderMayores50(mayores50);
+
+    // No depende de perfil_sociodemografico (a diferencia de las otras dos):
+    // basta con el Kardex de salidas para saber si a alguien ya se le
+    // entregó dotación, sin importar si su perfil sociodemográfico está
+    // completo o no.
+    const sinDotacion = empleados
+      .filter((e) => !this._dotacionIds.has(e.id))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    this._renderSinDotacion(sinDotacion);
   },
 
   // Lista de próximos cumpleaños (nombre, cargo, fecha y cuántos días
@@ -126,6 +140,23 @@ Router.register('personal-alertas', {
         </div>
       `).join('');
     this._renderRankedBars('pa-bars-mayores50-cargo', distribucion(items, (e) => e.cargo));
+  },
+
+  // Cruce Kardex + Empleados: quiénes no tienen ni una sola salida
+  // registrada a su nombre -- para que bodega sepa a quién le falta
+  // entregarle dotación, sin tener que ir a Historial a buscar uno por uno.
+  _renderSinDotacion(items) {
+    document.getElementById('pa-sindotacion-subtitulo').textContent = `${items.length} persona(s)`;
+    const lista = document.getElementById('pa-sindotacion-lista');
+    lista.innerHTML = items.length === 0
+      ? '<p class="empty-note">Todos tienen al menos una entrega de dotación registrada.</p>'
+      : items.map((e) => `
+        <div class="detalle-list-item">
+          <span class="detalle-list-item-main">${e.nombre}</span>
+          <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · CC ${e.cedula}</span>
+        </div>
+      `).join('');
+    this._renderRankedBars('pa-bars-sindotacion-cargo', distribucion(items, (e) => e.cargo));
   },
 
   // Ranking tipo "leaderboard" (rango + barra a color + %) -- más visual
