@@ -9,19 +9,6 @@ function edadDeFecha(fechaISO) {
   return edad;
 }
 
-// Cuántos días faltan para el próximo cumpleaños (0 = hoy) contando desde
-// la fecha de nacimiento, sin importar el año de nacimiento -- si el
-// cumpleaños de este año ya pasó, se calcula contra el del año siguiente.
-const DIAS_CUMPLE_PROXIMO = 30;
-
-function diasParaCumplir(fechaNacimientoISO, hoy) {
-  if (!fechaNacimientoISO) return null;
-  const nacimiento = new Date(`${fechaNacimientoISO}T00:00:00`);
-  let proximo = new Date(hoy.getFullYear(), nacimiento.getMonth(), nacimiento.getDate());
-  if (proximo < hoy) proximo = new Date(hoy.getFullYear() + 1, nacimiento.getMonth(), nacimiento.getDate());
-  return Math.round((proximo - hoy) / 86400000);
-}
-
 // Cuenta cuántas personas caen en cada valor de un campo (o "Sin dato" si
 // viene vacío), ordenado de mayor a menor cantidad (Sin dato siempre al
 // final).
@@ -38,7 +25,7 @@ function distribucion(items, getValor) {
 }
 
 Router.register('personal-alertas', {
-  title: 'Cumpleaños y alertas',
+  title: 'Alertas',
 
   _palette: ['#2f6fed', '#20b2aa', '#a970ff', '#ff9f43', '#26c6da', '#ef5da8', '#5ec26a', '#7b8cff'],
 
@@ -79,20 +66,12 @@ Router.register('personal-alertas', {
   _render(empleados) {
     const conPerfil = empleados.filter((e) => e.perfil_sociodemografico);
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const proximosCumple = conPerfil
-      .map((e) => ({ e, dias: diasParaCumplir(e.perfil_sociodemografico.fecha_nacimiento, hoy) }))
-      .filter((x) => x.dias != null && x.dias <= DIAS_CUMPLE_PROXIMO)
-      .sort((a, b) => a.dias - b.dias);
-    this._renderCumpleanos(proximosCumple);
-
     const mayores50 = conPerfil
       .filter((e) => (edadDeFecha(e.perfil_sociodemografico.fecha_nacimiento) ?? 0) >= 50)
       .sort((a, b) => edadDeFecha(b.perfil_sociodemografico.fecha_nacimiento) - edadDeFecha(a.perfil_sociodemografico.fecha_nacimiento));
     this._renderMayores50(mayores50);
 
-    // No depende de perfil_sociodemografico (a diferencia de las otras dos):
+    // No depende de perfil_sociodemografico (a diferencia de mayores50):
     // basta con el Kardex de salidas para saber si a alguien ya se le
     // entregó dotación, sin importar si su perfil sociodemográfico está
     // completo o no.
@@ -111,32 +90,8 @@ Router.register('personal-alertas', {
     this._renderConductoresSinBase(conductoresSinBase);
   },
 
-  // Lista de próximos cumpleaños (nombre, cargo, fecha y cuántos días
-  // faltan) más un ranking por cargo, para saber tanto a quién felicitar
-  // como qué cargo concentra más cumpleaños en el rango.
-  _renderCumpleanos(items) {
-    document.getElementById('pa-cumple-subtitulo').textContent =
-      `${items.length} en los próximos ${DIAS_CUMPLE_PROXIMO} días`;
-    const lista = document.getElementById('pa-cumple-lista');
-    lista.innerHTML = items.length === 0
-      ? `<p class="empty-note">Sin cumpleaños en los próximos ${DIAS_CUMPLE_PROXIMO} días.</p>`
-      : items.map(({ e, dias }) => {
-        const fechaTexto = new Date(`${e.perfil_sociodemografico.fecha_nacimiento}T00:00:00`)
-          .toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
-        const cuando = dias === 0 ? 'Hoy' : dias === 1 ? 'Mañana' : `En ${dias} días`;
-        return `
-          <div class="detalle-list-item">
-            <span class="detalle-list-item-main">${e.nombre}</span>
-            <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · ${fechaTexto} · ${cuando}</span>
-          </div>
-        `;
-      }).join('');
-    this._renderRankedBars('pa-bars-cumple-cargo', distribucion(items.map((x) => x.e), (e) => e.cargo));
-  },
-
-  // Mismo patrón que _renderCumpleanos: lista de personas (para saber
-  // quiénes son, ej. para exámenes médicos periódicos) más el desglose por
-  // cargo.
+  // Lista de personas (para saber quiénes son, ej. para exámenes médicos
+  // periódicos) más el desglose por cargo.
   _renderMayores50(items) {
     document.getElementById('pa-mayores50-subtitulo').textContent = `${items.length} persona(s)`;
     const lista = document.getElementById('pa-mayores50-lista');
