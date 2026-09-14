@@ -454,7 +454,14 @@ Router.register('empleados', {
         ? `<span>Ingreso: ${formatFecha(fechaIngreso)}${fechaIngreso ? ` · ${antiguedadTexto(fechaIngreso)}` : ''}</span>`
         : `<span class="persona-salida">Salida: ${formatFecha(e.fecha_salida)}</span>${e.motivo_renuncia ? `<span>${e.motivo_renuncia}</span>` : ''}`;
 
-      const vehiculoPartes = [e.numero_interno ? `Vehículo ${e.numero_interno}` : '', e.ruta ? `Ruta ${e.ruta}` : ''].filter(Boolean);
+      // Base se agrega acá para poder identificar conductores de una misma
+      // ruta que operan desde bases distintas (ej. Ruta 700 con carros en
+      // Base 0, 3 y 4) -- antes solo se veía Vehículo/Ruta en la tarjeta.
+      const vehiculoPartes = [
+        e.numero_interno ? `Vehículo ${e.numero_interno}` : '',
+        e.ruta ? `Ruta ${e.ruta}` : '',
+        e.base ? `Base ${e.base}` : '',
+      ].filter(Boolean);
       const vehiculoHtml = vehiculoPartes.length ? `<span class="person-meta-vehiculo">${vehiculoPartes.join(' · ')}</span>` : '';
 
       return `
