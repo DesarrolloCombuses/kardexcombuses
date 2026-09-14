@@ -7,6 +7,10 @@
   document.getElementById('user-email').textContent = session.user.email;
   document.getElementById('user-avatar').textContent = session.user.email.slice(0, 2).toUpperCase();
   document.getElementById('logout-btn').addEventListener('click', () => Auth.signOut());
+  // Visible a propósito (no solo en DevTools) para poder confirmar de un
+  // vistazo si el navegador ya sirvió la versión nueva después de un
+  // despliegue, sin depender de que aparezca el banner de actualización.
+  document.getElementById('sidebar-version').textContent = `v${window.APP_CONFIG.APP_VERSION}`;
 
   // Cuentas de solo consulta: se quitan del menú las secciones que no
   // pueden ver (Router también las bloquea si alguien escribe el hash a

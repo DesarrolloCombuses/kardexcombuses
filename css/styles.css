@@ -445,6 +445,7 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .sidebar-user-email { font-size: 0.78rem; color: rgba(255, 255, 255, 0.75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-footer button { width: 100%; justify-content: center; display: flex; align-items: center; gap: 0.5rem; }
 .sidebar-footer button svg { width: 16px; height: 16px; }
+.sidebar-version { text-align: center; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45); }
 
 .sidebar-toggle {
   display: none;
