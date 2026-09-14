@@ -180,6 +180,7 @@ Router.register('empleados', {
       document.getElementById('empleados-nuevo-btn').addEventListener('click', () => this._abrirModal(null));
       document.getElementById('empleados-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       document.getElementById('empleados-export-btn').addEventListener('click', () => this._exportExcel());
+      document.getElementById('empleados-links-btn').addEventListener('click', () => this._exportLinks());
       document.getElementById('empleados-card-pendientes').addEventListener('click', () => this._filtrarPendientes());
       this._bound = true;
     }
@@ -716,6 +717,9 @@ Router.register('empleados', {
     const pazYSalvoBtn = document.getElementById('empleado-pazysalvo-btn');
     if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
+    const linkActualizarBtn = document.getElementById('empleado-link-actualizar-btn');
+    if (linkActualizarBtn) linkActualizarBtn.addEventListener('click', () => this._mostrarLinkModal(empleado.nombre, this._linkPerfil(empleado.id)));
+
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
         this._pintarFoto(document.getElementById('empleado-detalle-avatar'), url);
@@ -738,11 +742,15 @@ Router.register('empleados', {
   // depender de que alguien la agregue después a mano.
   _estadoBloqueHtml(empleado) {
     const hoy = new Date().toISOString().slice(0, 10);
+    // El link de actualización solo tiene sentido para alguien activo (a un
+    // retirado no se le pide que mantenga al día datos como EPS o
+    // dirección) -- por eso solo aparece en la rama de "activo".
     if (empleado.activo) {
       return `
         <div style="margin-bottom:1.2rem">
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
+          <button type="button" id="empleado-link-actualizar-btn" class="btn-secondary">Enviar link para actualizar datos</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
             <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
@@ -762,6 +770,95 @@ Router.register('empleados', {
         <p id="empleado-estado-msg" class="form-msg"></p>
       </div>
     `;
+  },
+
+  // Mismo mecanismo de "perfil-publico.html" que ya usa Selección de
+  // personal para que un aspirante autodiligencie sus datos: acá se
+  // reutiliza tal cual para que cualquier empleado activo pueda actualizar
+  // los suyos (EPS, dirección, teléfono, etc.) por su cuenta, sin login.
+  _linkPerfil(employeeId) {
+    const url = new URL('perfil-publico.html', window.location.href);
+    url.searchParams.set('id', employeeId);
+    return url.toString();
+  },
+
+  async _copiarTexto(texto) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  _mostrarLinkModal(nombre, url) {
+    const puedeCompartir = typeof navigator.share === 'function';
+    document.getElementById('modal-body').innerHTML = `
+      <div class="modal-header">
+        <span class="modal-header-fecha">Link para actualizar datos — ${nombre}</span>
+      </div>
+      <div class="modal-section">
+        <p class="prose-p">Envíale este link a ${nombre} (WhatsApp, correo, etc.). Con su cédula podrá actualizar sus datos, sin usuario ni contraseña.</p>
+        <input type="text" id="pp-link-input" value="${url}" readonly />
+        <div style="display:flex; gap:0.6rem; margin-top:0.75rem; flex-wrap:wrap">
+          <button type="button" class="btn-secondary" id="pp-link-copiar">Copiar link</button>
+          ${puedeCompartir ? '<button type="button" class="btn-secondary" id="pp-link-compartir">Compartir…</button>' : ''}
+        </div>
+        <p id="pp-link-msg" class="form-msg"></p>
+      </div>
+    `;
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+
+    const input = document.getElementById('pp-link-input');
+    input.addEventListener('click', () => input.select());
+    input.focus();
+    input.select();
+
+    document.getElementById('pp-link-copiar').addEventListener('click', async () => {
+      const ok = await this._copiarTexto(url);
+      const msg = document.getElementById('pp-link-msg');
+      msg.textContent = ok
+        ? 'Copiado al portapapeles.'
+        : 'No se pudo copiar automáticamente. El texto ya quedó seleccionado: cópialo con el teclado o el menú de tu navegador.';
+      msg.className = ok ? 'form-msg success' : 'form-msg error';
+      if (!ok) { input.focus(); input.select(); }
+    });
+
+    const shareBtn = document.getElementById('pp-link-compartir');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        navigator.share({ title: 'Actualiza tus datos — ERP Combuses', text: `Hola ${nombre}, actualiza tus datos aquí:`, url }).catch(() => {});
+      });
+    }
+  },
+
+  // Excel con un link por empleado (respeta los filtros activos de la
+  // lista, ej. buscar/filtrar por área antes de generar) para poder
+  // organizar un envío masivo -- por WhatsApp Business, correo, etc. --
+  // en vez de tener que entrar persona por persona a copiar el link.
+  // Siempre se excluyen los inactivos así el filtro de Estado esté en
+  // "Todos": a alguien que ya se fue no tiene sentido pedirle que
+  // actualice datos.
+  _exportLinks() {
+    const empleados = (this._filtrados || []).filter((e) => e.activo);
+    if (empleados.length === 0) {
+      alert('No hay empleados activos para exportar con los filtros actuales.');
+      return;
+    }
+    const header = ['Cédula', 'Nombre', 'Cargo', 'Área', 'Link para actualizar datos'];
+    const filas = empleados.map((e) => ({
+      'Cédula': e.cedula,
+      'Nombre': e.nombre,
+      'Cargo': e.cargo || '',
+      'Área': e.area || '',
+      'Link para actualizar datos': this._linkPerfil(e.id),
+    }));
+    const sheet = XLSX.utils.json_to_sheet(filas, { header });
+    sheet['!cols'] = [{ wch: 16 }, { wch: 32 }, { wch: 22 }, { wch: 20 }, { wch: 62 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Links');
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `links-actualizacion-datos-${fecha}.xlsx`);
   },
 
   // Paz y salvo (formato FO-SV-002): documento que se entrega a un

@@ -206,11 +206,16 @@ function validarFechaNacimiento(iso) {
     wrap.querySelector('.linea-remove').addEventListener('click', () => wrap.remove());
   }
 
-  const MSG_EN_REVISION = 'Tu información quedó guardada. El auxiliar de vinculaciones la va a revisar y va a continuar con tu proceso de ingreso. Puedes volver a entrar por este mismo link para ver cuándo quede aprobada.';
+  // Mismo link y mismo formulario sirven tanto para que un aspirante recién
+  // seleccionado complete su perfil por primera vez como para que cualquier
+  // colaborador ya activo actualice sus datos más adelante -- el texto se
+  // deja neutral a propósito (nada de "bienvenido" ni "tu proceso de
+  // ingreso") para que tenga sentido en los dos casos.
+  const MSG_EN_REVISION = 'Tu información quedó guardada. El equipo de Gestión Humana la va a revisar. Puedes volver a entrar por este mismo link cuando quieras para actualizar tus datos.';
 
   function bannerAprobacionHtml(perfil) {
     return perfil.perfil_aprobado_at
-      ? '<div class="pp-banner aprobado" id="pp-estado-banner">✓ Tu perfil fue aprobado. ¡Bienvenido(a) a Combuses!</div>'
+      ? '<div class="pp-banner aprobado" id="pp-estado-banner">✓ Tus datos ya fueron revisados y aprobados por Gestión Humana.</div>'
       : `<div class="pp-banner pendiente" id="pp-estado-banner">${MSG_EN_REVISION}</div>`;
   }
 
@@ -365,7 +370,7 @@ function validarFechaNacimiento(iso) {
         .filter((h) => h.nombre);
 
       await DB.guardarPerfilPublico(employeeId, cedulaVerificada, perfil, contactos, hijos, fotoUrl);
-      msg.textContent = '¡Datos guardados! El auxiliar de vinculaciones va a continuar con tu proceso.';
+      msg.textContent = '¡Datos guardados! El equipo de Gestión Humana los va a revisar.';
       msg.className = 'form-msg success';
 
       // guardarPerfilPublico() siempre deja el perfil pendiente de nuevo
