@@ -142,19 +142,18 @@ function validarFechaNacimiento(iso) {
   document.getElementById('pp-year').textContent = new Date().getFullYear();
 
   const params = new URLSearchParams(window.location.search);
-  const employeeId = params.get('id');
+  // "id" es opcional: solo lo trae el link personalizado que genera
+  // Selección de personal para un aspirante recién convertido (exige que
+  // coincida con la cédula). El link genérico que se comparte a toda la
+  // planta no trae nada -- ahí el empleado se resuelve solo con la cédula
+  // (ver perfil_publico_obtener/guardar en sql/perfil_publico.sql).
+  const employeeIdUrl = params.get('id');
 
   const gateCard = document.getElementById('pp-gate-card');
   const formCard = document.getElementById('pp-form-card');
-  const errorCard = document.getElementById('pp-error-card');
-
-  if (!employeeId) {
-    gateCard.classList.add('hidden');
-    errorCard.classList.remove('hidden');
-    return;
-  }
 
   let cedulaVerificada = null;
+  let employeeIdResuelto = null;
   let fotoCamera = null;
   let cargoActual = null;
 
@@ -339,7 +338,7 @@ function validarFechaNacimiento(iso) {
       let fotoUrl = null;
       if (fotoCamera && fotoCamera.hasPhoto()) {
         Loading.setMessage('Subiendo foto…');
-        fotoUrl = await DB.uploadFotoPublico(employeeId, fotoCamera.getFile());
+        fotoUrl = await DB.uploadFotoPublico(employeeIdResuelto, fotoCamera.getFile());
         Loading.setMessage('Guardando…');
       }
 
@@ -369,7 +368,7 @@ function validarFechaNacimiento(iso) {
         }))
         .filter((h) => h.nombre);
 
-      await DB.guardarPerfilPublico(employeeId, cedulaVerificada, perfil, contactos, hijos, fotoUrl);
+      await DB.guardarPerfilPublico(employeeIdResuelto, cedulaVerificada, perfil, contactos, hijos, fotoUrl);
       msg.textContent = '¡Datos guardados! El equipo de Gestión Humana los va a revisar.';
       msg.className = 'form-msg success';
 
@@ -402,8 +401,9 @@ function validarFechaNacimiento(iso) {
     submitBtn.disabled = true;
     Loading.show('Verificando…');
     try {
-      const perfil = await DB.obtenerPerfilPublico(employeeId, cedula);
+      const perfil = await DB.obtenerPerfilPublico(employeeIdUrl, cedula);
       cedulaVerificada = cedula;
+      employeeIdResuelto = perfil.employee_id;
       renderFormulario(perfil);
       gateCard.classList.add('hidden');
       formCard.classList.remove('hidden');

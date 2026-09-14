@@ -436,6 +436,20 @@ const DB = {
     if (error) throw error;
   },
 
+  // Historial de perfil_publico_guardar() para un empleado: qué campo
+  // cambió, con qué valor antes y después, cada vez que alguien guarda
+  // desde el link público. Solo lectura (RLS: authenticated), las filas las
+  // crea únicamente esa función (security definer).
+  async getAuditoriaPerfilPublico(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('perfil_publico_auditoria')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
   // Sube la foto vía Edge Function (subir-foto-perfil-publico) en vez de
   // Storage directo -- Supabase rechaza cualquier insert/update del rol
   // anon en un bucket privado sin importar qué digan las policies (se

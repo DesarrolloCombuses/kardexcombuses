@@ -49,6 +49,16 @@ const SECCIONES_DETALLE = [
   { titulo: 'Afiliaciones', campos: ['eps', 'arl', 'fondo_pension', 'caja_compensacion'] },
 ];
 
+// Etiquetas legibles para el historial de cambios (empleado-auditoria-lista)
+// -- telefono/email_personal no están en CAMPOS_SOCIODEMOGRAFICOS porque
+// viven en "employees", no en el perfil, pero sí se auditan igual (ver
+// perfil_publico_guardar en sql/perfil_publico.sql).
+const CAMPOS_AUDITORIA_LABELS = {
+  telefono: 'Teléfono',
+  email_personal: 'Correo personal',
+  ...Object.fromEntries(CAMPOS_SOCIODEMOGRAFICOS.map((c) => [c.id, c.label])),
+};
+
 function campoVacio(valor) {
   return valor === null || valor === undefined || valor === '';
 }
@@ -57,7 +67,12 @@ function valorCampoDetalle(campo, valor) {
   if (campoVacio(valor)) return '—';
   if (campo.type === 'checkbox') return valor ? 'Sí' : 'No';
   if (campo.type === 'date') return formatFecha(valor);
-  return valor;
+  // Estos campos los autodiligencia la propia persona desde el link
+  // público (perfil-publico.html), sin ningún login -- se escapan antes de
+  // insertarlos como HTML por la misma razón que ya se hace con los
+  // siniestros (ver escapeHtml más abajo): cualquiera podría escribir
+  // <script> en, por ejemplo, "Dirección de residencia".
+  return escapeHtml(valor);
 }
 
 // Rutas cuyos conductores también deben quedar registrados en Sonar
@@ -180,7 +195,7 @@ Router.register('empleados', {
       document.getElementById('empleados-nuevo-btn').addEventListener('click', () => this._abrirModal(null));
       document.getElementById('empleados-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       document.getElementById('empleados-export-btn').addEventListener('click', () => this._exportExcel());
-      document.getElementById('empleados-links-btn').addEventListener('click', () => this._exportLinks());
+      document.getElementById('empleados-links-btn').addEventListener('click', () => this._mostrarLinkActualizacionModal());
       document.getElementById('empleados-card-pendientes').addEventListener('click', () => this._filtrarPendientes());
       this._bound = true;
     }
@@ -510,16 +525,19 @@ Router.register('empleados', {
     `;
   },
 
+  // nombre/parentesco/teléfono/sexo también vienen del autodiligenciamiento
+  // público (contactos de emergencia e hijos) -- mismo motivo de escapeHtml
+  // que valorCampoDetalle.
   _contactoDetalleHtml(c) {
-    const sub = [c.parentesco, c.telefono].filter(Boolean).join(' · ') || '—';
-    return `<div class="detalle-list-item"><span class="detalle-list-item-main">${c.nombre}</span><span class="detalle-list-item-sub">${sub}</span></div>`;
+    const sub = [c.parentesco, c.telefono].filter(Boolean).map(escapeHtml).join(' · ') || '—';
+    return `<div class="detalle-list-item"><span class="detalle-list-item-main">${escapeHtml(c.nombre)}</span><span class="detalle-list-item-sub">${sub}</span></div>`;
   },
 
   _hijoDetalleHtml(h) {
     const partes = [];
     if (h.fecha_nacimiento) partes.push(`${formatFecha(h.fecha_nacimiento)} (${edadTexto(h.fecha_nacimiento)})`);
-    if (h.sexo) partes.push(h.sexo);
-    return `<div class="detalle-list-item"><span class="detalle-list-item-main">${h.nombre}</span><span class="detalle-list-item-sub">${partes.join(' · ') || '—'}</span></div>`;
+    if (h.sexo) partes.push(escapeHtml(h.sexo));
+    return `<div class="detalle-list-item"><span class="detalle-list-item-main">${escapeHtml(h.nombre)}</span><span class="detalle-list-item-sub">${partes.join(' · ') || '—'}</span></div>`;
   },
 
   _verDetalle(empleado) {
@@ -614,11 +632,11 @@ Router.register('empleados', {
           <div class="detalle-fact-label">Área</div>
         </div>
         <div class="detalle-fact">
-          <div class="detalle-fact-value">${empleado.telefono || '—'}</div>
+          <div class="detalle-fact-value">${escapeHtml(empleado.telefono) || '—'}</div>
           <div class="detalle-fact-label">Teléfono</div>
         </div>
         <div class="detalle-fact">
-          <div class="detalle-fact-value">${empleado.email_personal || '—'}</div>
+          <div class="detalle-fact-value">${escapeHtml(empleado.email_personal) || '—'}</div>
           <div class="detalle-fact-label">Correo personal</div>
         </div>
         <div class="detalle-fact">
@@ -673,6 +691,12 @@ Router.register('empleados', {
       ${contactosHtml}
       ${hijosHtml}
 
+      <div class="modal-section">
+        <h3 class="modal-section-title">Historial de cambios (autodiligenciamiento)</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Cada vez que ${empleado.nombre} guarda algo desde el link público de actualizar datos, queda registrado acá qué campo cambió.</p>
+        <div id="empleado-auditoria-lista" class="detalle-list detalle-list-scroll"><p class="empty-note">Cargando…</p></div>
+      </div>
+
       <button type="button" id="empleado-detalle-editar" style="margin-top:1.2rem">Editar</button>
     `;
     document.getElementById('modal-box').classList.add('modal-wide');
@@ -717,8 +741,7 @@ Router.register('empleados', {
     const pazYSalvoBtn = document.getElementById('empleado-pazysalvo-btn');
     if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
-    const linkActualizarBtn = document.getElementById('empleado-link-actualizar-btn');
-    if (linkActualizarBtn) linkActualizarBtn.addEventListener('click', () => this._mostrarLinkModal(empleado.nombre, this._linkPerfil(empleado.id)));
+    this._cargarAuditoria(empleado.id);
 
     if (empleado.foto_url) {
       this._resolverFoto(empleado.foto_url).then((url) => {
@@ -735,6 +758,37 @@ Router.register('empleados', {
     }
   },
 
+  // Trae y pinta el historial de auditoría (perfil_publico_auditoria) del
+  // empleado -- aparte del renderizado principal del modal (que es
+  // síncrono) porque implica un viaje a la red, igual que _resolverFoto.
+  // Los valores vienen tal cual los escribió la persona en el link público,
+  // así que se escapan (mismo motivo que valorCampoDetalle).
+  async _cargarAuditoria(employeeId) {
+    const el = document.getElementById('empleado-auditoria-lista');
+    if (!el) return;
+    try {
+      const filas = await DB.getAuditoriaPerfilPublico(employeeId);
+      if (filas.length === 0) {
+        el.innerHTML = '<p class="empty-note">Sin cambios registrados todavía.</p>';
+        return;
+      }
+      el.innerHTML = filas.map((f) => {
+        const campo = escapeHtml(CAMPOS_AUDITORIA_LABELS[f.campo] || f.campo);
+        const antes = campoVacio(f.valor_anterior) ? '(vacío)' : escapeHtml(f.valor_anterior);
+        const ahora = campoVacio(f.valor_nuevo) ? '(vacío)' : escapeHtml(f.valor_nuevo);
+        const fecha = new Date(f.created_at).toLocaleString('es-CO');
+        return `
+          <div class="detalle-list-item">
+            <span class="detalle-list-item-main">${campo}</span>
+            <span class="detalle-list-item-sub">${fecha} · "${antes}" → "${ahora}"</span>
+          </div>
+        `;
+      }).join('');
+    } catch {
+      el.innerHTML = '<p class="empty-note">No se pudo cargar el historial de cambios.</p>';
+    }
+  },
+
   // Cambiar activo/inactivo directo desde el detalle -- antes solo se podía
   // tocando "Editar" y guardando todo el formulario. Al inactivar se pide la
   // fecha de salida ahí mismo (con el día de hoy como valor por defecto,
@@ -742,15 +796,11 @@ Router.register('empleados', {
   // depender de que alguien la agregue después a mano.
   _estadoBloqueHtml(empleado) {
     const hoy = new Date().toISOString().slice(0, 10);
-    // El link de actualización solo tiene sentido para alguien activo (a un
-    // retirado no se le pide que mantenga al día datos como EPS o
-    // dirección) -- por eso solo aparece en la rama de "activo".
     if (empleado.activo) {
       return `
         <div style="margin-bottom:1.2rem">
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
-          <button type="button" id="empleado-link-actualizar-btn" class="btn-secondary">Enviar link para actualizar datos</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
             <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
@@ -772,14 +822,14 @@ Router.register('empleados', {
     `;
   },
 
-  // Mismo mecanismo de "perfil-publico.html" que ya usa Selección de
-  // personal para que un aspirante autodiligencie sus datos: acá se
-  // reutiliza tal cual para que cualquier empleado activo pueda actualizar
-  // los suyos (EPS, dirección, teléfono, etc.) por su cuenta, sin login.
-  _linkPerfil(employeeId) {
-    const url = new URL('perfil-publico.html', window.location.href);
-    url.searchParams.set('id', employeeId);
-    return url.toString();
+  // Un solo link genérico (sin "?id="), igual para todos: quien lo abre
+  // escribe su propia cédula y el servidor resuelve solo con eso a qué
+  // empleado corresponde (ver perfil_publico_obtener/guardar en
+  // sql/perfil_publico.sql) -- por eso no hace falta generar/exportar un
+  // link por persona, con uno solo alcanza para compartir a toda la planta
+  // (WhatsApp, correo, cartelera, etc.).
+  _linkActualizacionDatos() {
+    return new URL('perfil-publico.html', window.location.href).toString();
   },
 
   async _copiarTexto(texto) {
@@ -791,14 +841,15 @@ Router.register('empleados', {
     }
   },
 
-  _mostrarLinkModal(nombre, url) {
+  _mostrarLinkActualizacionModal() {
+    const url = this._linkActualizacionDatos();
     const puedeCompartir = typeof navigator.share === 'function';
     document.getElementById('modal-body').innerHTML = `
       <div class="modal-header">
-        <span class="modal-header-fecha">Link para actualizar datos — ${nombre}</span>
+        <span class="modal-header-fecha">Link para actualizar datos</span>
       </div>
       <div class="modal-section">
-        <p class="prose-p">Envíale este link a ${nombre} (WhatsApp, correo, etc.). Con su cédula podrá actualizar sus datos, sin usuario ni contraseña.</p>
+        <p class="prose-p">Es el mismo link para todos: cada colaborador activo entra con su propia cédula y solo ve/edita su propia información. Compártelo por WhatsApp, correo o cartelera.</p>
         <input type="text" id="pp-link-input" value="${url}" readonly />
         <div style="display:flex; gap:0.6rem; margin-top:0.75rem; flex-wrap:wrap">
           <button type="button" class="btn-secondary" id="pp-link-copiar">Copiar link</button>
@@ -827,38 +878,9 @@ Router.register('empleados', {
     const shareBtn = document.getElementById('pp-link-compartir');
     if (shareBtn) {
       shareBtn.addEventListener('click', () => {
-        navigator.share({ title: 'Actualiza tus datos — ERP Combuses', text: `Hola ${nombre}, actualiza tus datos aquí:`, url }).catch(() => {});
+        navigator.share({ title: 'Actualiza tus datos — ERP Combuses', text: 'Actualiza tus datos con Combuses aquí:', url }).catch(() => {});
       });
     }
-  },
-
-  // Excel con un link por empleado (respeta los filtros activos de la
-  // lista, ej. buscar/filtrar por área antes de generar) para poder
-  // organizar un envío masivo -- por WhatsApp Business, correo, etc. --
-  // en vez de tener que entrar persona por persona a copiar el link.
-  // Siempre se excluyen los inactivos así el filtro de Estado esté en
-  // "Todos": a alguien que ya se fue no tiene sentido pedirle que
-  // actualice datos.
-  _exportLinks() {
-    const empleados = (this._filtrados || []).filter((e) => e.activo);
-    if (empleados.length === 0) {
-      alert('No hay empleados activos para exportar con los filtros actuales.');
-      return;
-    }
-    const header = ['Cédula', 'Nombre', 'Cargo', 'Área', 'Link para actualizar datos'];
-    const filas = empleados.map((e) => ({
-      'Cédula': e.cedula,
-      'Nombre': e.nombre,
-      'Cargo': e.cargo || '',
-      'Área': e.area || '',
-      'Link para actualizar datos': this._linkPerfil(e.id),
-    }));
-    const sheet = XLSX.utils.json_to_sheet(filas, { header });
-    sheet['!cols'] = [{ wch: 16 }, { wch: 32 }, { wch: 22 }, { wch: 20 }, { wch: 62 }];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, 'Links');
-    const fecha = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `links-actualizacion-datos-${fecha}.xlsx`);
   },
 
   // Paz y salvo (formato FO-SV-002): documento que se entrega a un
