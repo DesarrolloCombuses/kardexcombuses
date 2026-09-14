@@ -622,8 +622,6 @@ a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md);
    Conductores por ruta -- mini dashboard tipo BI (KPIs + ranking)
    ===================================================================== */
 
-.ruta-dashboard { background: linear-gradient(180deg, var(--slate-50), var(--panel-bg, #fff)); }
-
 .ruta-kpis { display: flex; gap: 0.85rem; flex-wrap: wrap; margin: 0.9rem 0 1.3rem; }
 .ruta-kpi {
   flex: 1; min-width: 150px; background: var(--slate-50); border: 1px solid var(--slate-200);
