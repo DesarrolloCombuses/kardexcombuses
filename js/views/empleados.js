@@ -145,6 +145,55 @@ function formatSalario(valor) {
   return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 }
 
+// Convierte un valor en pesos a su escritura en letras (mayúsculas, sin
+// acentuar "MIL"/"MILLÓN" con "UNO" -- ver apócope más abajo), para el
+// certificado laboral ("la suma de UN MILLÓN... PESOS ($1.000.000)").
+// Solo para empleados.salario, que siempre es un entero en pesos (sin
+// centavos), así que no hay parte decimal que manejar.
+function numeroALetras(valor) {
+  const numero = Math.round(Number(valor) || 0);
+  if (numero === 0) return 'CERO';
+
+  const UNIDADES = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+  const DIEZ_A_DIECINUEVE = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+  const VEINTIS = ['VEINTE', 'VEINTIÚN', 'VEINTIDÓS', 'VEINTITRÉS', 'VEINTICUATRO', 'VEINTICINCO', 'VEINTISÉIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+  const DECENAS = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  const CENTENAS = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+  // n entre 0 y 999. "UN" (no "UNO") a propósito: en este documento el
+  // número siempre queda pegado a un sustantivo después (MIL, MILLÓN(ES) o
+  // PESOS), y ahí es donde aplica la apócope de "uno" -> "un" en español.
+  function tresDigitos(n) {
+    if (n === 0) return '';
+    if (n === 100) return 'CIEN';
+    const centena = Math.floor(n / 100);
+    const resto = n % 100;
+    const partes = [];
+    if (centena > 0) partes.push(CENTENAS[centena]);
+    if (resto > 0) {
+      if (resto < 10) partes.push(UNIDADES[resto]);
+      else if (resto < 20) partes.push(DIEZ_A_DIECINUEVE[resto - 10]);
+      else if (resto < 30) partes.push(VEINTIS[resto - 20]);
+      else {
+        const decena = Math.floor(resto / 10);
+        const unidad = resto % 10;
+        partes.push(unidad === 0 ? DECENAS[decena] : `${DECENAS[decena]} Y ${UNIDADES[unidad]}`);
+      }
+    }
+    return partes.join(' ');
+  }
+
+  const millones = Math.floor(numero / 1000000);
+  const miles = Math.floor((numero % 1000000) / 1000);
+  const resto = numero % 1000;
+
+  const partes = [];
+  if (millones > 0) partes.push(millones === 1 ? 'UN MILLÓN' : `${tresDigitos(millones)} MILLONES`);
+  if (miles > 0) partes.push(miles === 1 ? 'MIL' : `${tresDigitos(miles)} MIL`);
+  if (resto > 0) partes.push(tresDigitos(resto));
+  return partes.join(' ');
+}
+
 // Antigüedad y edad son datos que se leen de un vistazo (no hay que ir
 // campo por campo a calcularlos a mano), por eso se destacan aparte en el
 // detalle en vez de quedar mezclados en la grilla con todo lo demás.
@@ -770,6 +819,9 @@ Router.register('empleados', {
     const pazYSalvoBtn = document.getElementById('empleado-pazysalvo-btn');
     if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
+    const certificadoBtn = document.getElementById('empleado-certificado-btn');
+    if (certificadoBtn) certificadoBtn.addEventListener('click', () => this._generarCertificadoLaboral(empleado));
+
     this._cargarAuditoria(empleado.id);
     this._cargarDotacion(empleado.id);
     this._cargarHistorialVinculacion(empleado);
@@ -911,6 +963,7 @@ Router.register('empleados', {
         <div style="margin-bottom:1.2rem">
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
+          <button type="button" id="empleado-certificado-btn" class="btn-secondary">Certificado laboral</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
             <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
@@ -927,6 +980,7 @@ Router.register('empleados', {
       <div style="margin-bottom:1.2rem">
         <button type="button" id="empleado-activar-btn" class="btn-secondary">Marcar como activo</button>
         <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
+        <button type="button" id="empleado-certificado-btn" class="btn-secondary">Certificado laboral</button>
         <p id="empleado-estado-msg" class="form-msg"></p>
       </div>
     `;
@@ -1324,6 +1378,128 @@ Router.register('empleados', {
       const msg = document.getElementById('pazysalvo-msg');
       msg.textContent = 'El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.';
       msg.className = 'form-msg error';
+      return;
+    }
+    ventana.document.open();
+    ventana.document.write(html);
+    ventana.document.close();
+  },
+
+  // Un solo clic: a diferencia del paz y salvo, acá no hace falta ningún
+  // dato adicional -- todo lo que necesita el formato (nombre, cédula,
+  // cargo, fechas, salario) ya vive en el empleado/perfil. Mismo patrón de
+  // ventana nueva + Imprimir/Guardar PDF que _generarDocumentoPazYSalvo.
+  _generarCertificadoLaboral(empleado) {
+    const perfil = empleado.perfil_sociodemografico || {};
+    const sexo = perfil.sexo;
+    const esFemenino = sexo === 'Femenino';
+    const esMasculino = sexo === 'Masculino';
+    const articulo = esFemenino ? 'La señora' : esMasculino ? 'El señor' : 'El/la señor/a';
+    const identificado = esFemenino ? 'identificada' : esMasculino ? 'identificado' : 'identificado/a';
+    const vinculado = esFemenino ? 'vinculada' : esMasculino ? 'vinculado' : 'vinculado/a';
+    const verboVinculacion = empleado.activo ? 'está' : 'estuvo';
+    const desdeTexto = perfil.fecha_ingreso ? formatFecha(perfil.fecha_ingreso) : 'N/N';
+    const hastaTexto = empleado.activo ? 'hasta la fecha' : `hasta el ${formatFecha(empleado.fecha_salida)}`;
+    const salarioTexto = empleado.salario
+      ? `${numeroALetras(empleado.salario)} PESOS ($${Number(empleado.salario).toLocaleString('es-CO')})`
+      : '(NO REGISTRA SALARIO EN EL SISTEMA -- completar a mano antes de entregar)';
+    const fechaExpedicion = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Certificación laboral — ${empleado.nombre}</title>
+<style>
+  @page { size: letter; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 24px; font-size: 13px; line-height: 1.6; }
+  table { width: 100%; border-collapse: collapse; }
+  .doc-header td { border: 1.5px solid #000; padding: 8px 10px; vertical-align: middle; }
+  .doc-header .brand-cell { width: 26%; }
+  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: #0a1930; }
+  .doc-header .brand svg { flex: none; }
+  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 15px; letter-spacing: 0.02em; }
+  .doc-header .meta-cell { width: 22%; font-size: 11.5px; line-height: 1.55; }
+  .doc-header .meta-cell b { font-weight: 700; }
+  .empresa { text-align: center; font-weight: 700; margin: 18px 0 4px; }
+  .nit { text-align: center; margin: 0 0 22px; }
+  .expedicion { margin: 0 0 22px; }
+  .parrafo { margin: 0 0 16px; text-align: justify; }
+  .firma { margin-top: 55px; }
+  .firma .nombre { font-weight: 700; border-top: 1px solid #000; display: inline-block; padding-top: 4px; }
+  .footer-dir { margin-top: 30px; font-size: 11.5px; }
+  .aprobacion { margin-top: 24px; }
+  .aprobacion td, .aprobacion th { border: 1px solid #000; padding: 6px 8px; font-size: 10.5px; }
+  .aprobacion th { background: #f3f4f6; font-weight: 700; text-align: left; }
+  .print-actions { margin-bottom: 16px; }
+  .print-actions button { font: inherit; padding: 8px 16px; border-radius: 6px; border: none; background: #2f6fed; color: #fff; font-weight: 600; cursor: pointer; }
+  @media print { .print-actions { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+  <div class="print-actions"><button type="button" onclick="window.print()">Imprimir / Guardar PDF</button></div>
+  <table>
+    <tr class="doc-header">
+      <td class="brand-cell">
+        <div class="brand">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          COMBUSES
+        </div>
+      </td>
+      <td class="title-cell">CERTIFICACIÓN LABORAL</td>
+      <td class="meta-cell">
+        <b>Código:</b> DO-GH-02<br>
+        <b>Versión:</b> 001<br>
+        <b>Fecha:</b> 14/06/2026
+      </td>
+    </tr>
+  </table>
+
+  <p class="empresa">COMPAÑÍA METROPOLITANA DE BUSES S.A.<br>COMBUSES S.A.</p>
+  <p class="nit">NIT: 890920397</p>
+
+  <p class="expedicion"><strong>Fecha de expedición:</strong> ${fechaExpedicion}.</p>
+
+  <p style="text-align:center;font-weight:700;margin:0 0 16px">A QUIEN INTERESE.</p>
+
+  <p class="parrafo">El suscrito Coordinador Administrativo y de Gestión del Talento Humano de la <strong>COMPAÑÍA METROPOLITANA DE BUSES S.A. (COMBUSES S.A.)</strong>, certifica que:</p>
+
+  <p class="parrafo">${articulo} <strong>${empleado.nombre}</strong>, ${identificado} con cédula de ciudadanía No. <strong>${empleado.cedula}</strong>, ${verboVinculacion} ${vinculado} laboralmente con esta organización desde el <strong>${desdeTexto}</strong> ${hastaTexto}, desempeñando el cargo de <strong>${empleado.cargo || 'N/N'}</strong>, y devengando como último salario mensual, la suma de ${salarioTexto} M/CTE.</p>
+
+  <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
+
+  <div class="firma">
+    <span class="nombre">SARA MEDINA MONTOYA</span><br>
+    Coordinadora Gestión Humana<br>
+    COMPAÑÍA METROPOLITANA DE BUSES S.A.
+  </div>
+
+  <p class="footer-dir"><strong>Dirección:</strong> Calle 55 No 46-14 Edificio Perú Oriental, La Candelaria – Medellín | <strong>Tel:</strong> 604 448 44 08 Ext. 111</p>
+
+  <table class="aprobacion">
+    <tr>
+      <th>Elaborado por:</th>
+      <th>Revisado por:</th>
+      <th>Aprobado por:</th>
+    </tr>
+    <tr>
+      <td>Andrés A. Tuberquia Sánchez<br>Coord. Administrativo y de GTH</td>
+      <td>Bravo Restrepo Abogados<br>Asesoría legal y jurídica</td>
+      <td>Rosemberg Dueñas Uribe<br>Gerente General</td>
+    </tr>
+    <tr>
+      <td>Fecha: 13/04/2026</td>
+      <td>Fecha: 13/04/2026</td>
+      <td>Fecha: 14/04/2026</td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const ventana = window.open('', '_blank');
+    if (!ventana) {
+      alert('El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.');
       return;
     }
     ventana.document.open();
