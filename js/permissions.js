@@ -1,9 +1,13 @@
-// Control de acceso por cuenta. A propósito vive acá (no en SQL/RLS) para
-// poder cambiar quién entra y qué ve sin tocar la base de datos. OJO: esto
-// solo oculta/bloquea cosas del lado de la app -- alguien que abriera la
-// consola del navegador con una sesión "viewer" técnicamente podría seguir
-// llamando a Supabase directo. Si eso llega a importar, la restricción real
-// tiene que moverse a políticas RLS en el momento en que se necesite.
+// Control de acceso por cuenta. Esta lista decide qué ve cada quien dentro
+// de la app (rol admin/viewer) y se puede cambiar sin tocar la base de
+// datos. La restricción real -- que un correo fuera de esta lista no pueda
+// leer ni escribir nada de Kardex aunque tenga sesión válida en el proyecto
+// de Supabase compartido -- vive además en la base de datos: la tabla
+// kardex_authorized_users y la función kardex_is_authorized() (ver
+// sql/rls_solo_autorizados_2026-09-15.sql), usadas en las policies RLS de
+// las tablas propias de Kardex. IMPORTANTE: cuando se agregue o quite a
+// alguien acá, hay que repetir el cambio en esa tabla, o quedará
+// autorizado/bloqueado distinto en la app que en la base de datos.
 const AUTHORIZED_USERS = {
   'kardex@combuses.com.co': 'admin',
   'vinculaciones@combuses.com.co': 'admin',
