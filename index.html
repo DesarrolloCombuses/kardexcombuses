@@ -85,6 +85,7 @@
   <script src="js/supabase-client.js"></script>
   <script src="js/connectivity.js"></script>
   <script src="js/loading-overlay.js"></script>
+  <script src="js/db.js"></script>
   <script src="js/permissions.js"></script>
   <script src="js/auth.js"></script>
   <script>
@@ -111,7 +112,7 @@
       submitBtn.disabled = true;
       try {
         const { session } = await Auth.signIn(email, password);
-        if (!Permissions.getRole(session.user.email)) {
+        if (!(await Permissions.resolveRole(session.user.email))) {
           await Auth.signOutSilently();
           msg.textContent = 'No está permitido el ingreso con una cuenta distinta a las autorizadas.';
           msg.className = 'form-msg error';

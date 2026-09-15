@@ -2,7 +2,7 @@
   const session = await Auth.requireAuth();
   if (!session) return;
 
-  window.APP_ROLE = Permissions.getRole(session.user.email);
+  window.APP_ROLE = await Permissions.resolveRole(session.user.email);
 
   document.getElementById('user-email').textContent = session.user.email;
   document.getElementById('user-avatar').textContent = session.user.email.slice(0, 2).toUpperCase();
@@ -12,19 +12,36 @@
   // despliegue, sin depender de que aparezca el banner de actualización.
   document.getElementById('sidebar-version').textContent = `v${window.APP_CONFIG.APP_VERSION}`;
 
-  // Cuentas de solo consulta: se quitan del menú las secciones que no
-  // pueden ver (Router también las bloquea si alguien escribe el hash a
-  // mano, esto es solo para que ni aparezcan como opción).
-  if (window.APP_ROLE === 'viewer') {
-    ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil'].forEach((name) => {
-      document.querySelector(`[data-nav="${name}"]`)?.remove();
+  if (window.APP_ROLE === 'empleado') {
+    // Autoservicio de un colaborador: no es una cuenta administrativa, así
+    // que se le quita TODO el menú salvo "Mis permisos" -- lista blanca en
+    // vez de negra, para que un ítem nuevo que se agregue después no quede
+    // visible por accidente para este rol.
+    document.querySelectorAll('[data-nav]').forEach((el) => {
+      if (el.dataset.nav !== 'mis-permisos') el.remove();
     });
-    // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/
-    // Personal) se quedó sin ningún enlace adentro, se quita el submenú
-    // completo para no dejar un encabezado colapsable vacío.
     document.querySelectorAll('.nav-group').forEach((group) => {
       if (!group.querySelector('[data-nav]')) group.remove();
     });
+  } else {
+    // admin/viewer son cuentas administrativas, no fichas de empleado -- no
+    // les corresponde el autoservicio de "Mis permisos".
+    document.querySelector('[data-nav="mis-permisos"]')?.remove();
+
+    // Cuentas de solo consulta: se quitan del menú las secciones que no
+    // pueden ver (Router también las bloquea si alguien escribe el hash a
+    // mano, esto es solo para que ni aparezcan como opción).
+    if (window.APP_ROLE === 'viewer') {
+      ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'permisos-vacaciones'].forEach((name) => {
+        document.querySelector(`[data-nav="${name}"]`)?.remove();
+      });
+      // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/
+      // Personal) se quedó sin ningún enlace adentro, se quita el submenú
+      // completo para no dejar un encabezado colapsable vacío.
+      document.querySelectorAll('.nav-group').forEach((group) => {
+        if (!group.querySelector('[data-nav]')) group.remove();
+      });
+    }
   }
 
   const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -56,5 +73,5 @@
     if (e.target === modalBackdrop) closeModal();
   });
 
-  Router.init('dashboard');
+  Router.init(window.APP_ROLE === 'empleado' ? 'mis-permisos' : 'dashboard');
 })();

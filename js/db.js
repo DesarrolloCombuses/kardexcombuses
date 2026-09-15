@@ -799,8 +799,11 @@ const DB = {
 
   // ---- Storage: firmas y fotos ------------------------------------------------
 
-  async uploadToBucket(bucket, blob, extension) {
-    const path = `${crypto.randomUUID()}.${extension}`;
+  // folder es opcional: lo usan los buckets donde cada empleado sube a su
+  // propia carpeta (ej. "permisos-soportes", aislado por RLS con
+  // storage.foldername -- ver sql/permisos_vacaciones_2026-09-15.sql).
+  async uploadToBucket(bucket, blob, extension, folder = null) {
+    const path = folder ? `${folder}/${crypto.randomUUID()}.${extension}` : `${crypto.randomUUID()}.${extension}`;
     const { error } = await window.supabaseClient.storage
       .from(bucket)
       .upload(path, blob, { contentType: blob.type || `image/${extension}` });
@@ -815,6 +818,101 @@ const DB = {
       .createSignedUrl(path, expiresInSeconds);
     if (error) throw error;
     return data.signedUrl;
+  },
+
+  // ---- Permisos y vacaciones ---------------------------------------------
+
+  // Id del empleado propio del usuario autenticado, o null si es una cuenta
+  // administrativa (kardex@/vinculaciones@) sin ficha de empleado asociada.
+  async getOwnEmployeeId() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_own_employee_id');
+    if (error) throw error;
+    return data;
+  },
+
+  // Ficha propia de solo lectura (nombre/cédula/cargo/área), para el
+  // encabezado de "Mis permisos". No pasa por employees directo -- esa
+  // tabla sigue protegida solo para kardex_is_authorized().
+  async getMiEmpleado() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mi_empleado');
+    if (error) throw error;
+    return data?.[0] || null;
+  },
+
+  // Directorio liviano (sin columnas sensibles) para que un empleado
+  // autenticado elija a quién lo reemplaza -- distinto de getEmployees(),
+  // que exige kardex_is_authorized() y no le sirve a este rol.
+  async getDirectorioEmpleados() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_directorio_empleados');
+    if (error) throw error;
+    return data;
+  },
+
+  async getMisPermisos() {
+    const { data, error } = await window.supabaseClient
+      .from('permisos_solicitudes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Bandeja de admin: RLS ya filtra a lo que kardex_is_authorized() puede
+  // ver (todas), con el nombre del empleado y del reemplazo embebidos.
+  async getPermisos() {
+    const { data, error } = await window.supabaseClient
+      .from('permisos_solicitudes')
+      .select(`
+        *,
+        employee:employees!permisos_solicitudes_employee_id_fkey ( nombre, cedula, cargo, area ),
+        reemplazo:employees!permisos_solicitudes_reemplazo_employee_id_fkey ( nombre )
+      `)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async createPermiso({ employeeId, tipoPermiso, fechaHoraInicio, fechaHoraFin, motivo, requiereReposicion, reemplazoEmployeeId, soporteFile }) {
+    let soporteUrl = null;
+    let soporteNombre = null;
+    if (soporteFile) {
+      const extension = (soporteFile.name.split('.').pop() || 'pdf').toLowerCase();
+      soporteUrl = await this.uploadToBucket('permisos-soportes', soporteFile, extension, employeeId);
+      soporteNombre = soporteFile.name;
+    }
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const { data, error } = await window.supabaseClient
+      .from('permisos_solicitudes')
+      .insert({
+        employee_id: employeeId,
+        tipo_permiso: tipoPermiso,
+        fecha_hora_inicio: fechaHoraInicio,
+        fecha_hora_fin: fechaHoraFin,
+        motivo: motivo || null,
+        requiere_reposicion: requiereReposicion,
+        reemplazo_employee_id: reemplazoEmployeeId || null,
+        soporte_url: soporteUrl,
+        soporte_nombre: soporteNombre,
+        creado_por_email: sessionData.session.user.email,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updatePermisoEstado(id, estado, { motivoRechazo, aprobadoPor } = {}) {
+    const { error } = await window.supabaseClient
+      .from('permisos_solicitudes')
+      .update({
+        estado,
+        motivo_rechazo: motivoRechazo || null,
+        aprobado_por: aprobadoPor || null,
+        aprobado_en: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ---- Tiempo real ------------------------------------------------------------

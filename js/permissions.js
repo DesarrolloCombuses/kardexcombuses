@@ -21,6 +21,10 @@ const VIEWER_ALLOWED_VIEWS = [
   'dashboard', 'inventario', 'inventario-historico', 'estadisticas', 'historial', 'facturas', 'ayuda',
 ];
 
+// Vistas visibles para el rol "empleado" (autoservicio: un colaborador que
+// solo pide/consulta sus propios permisos, sin nada más del ERP).
+const EMPLEADO_ALLOWED_VIEWS = ['mis-permisos'];
+
 window.Permissions = {
   getRole(email) {
     return AUTHORIZED_USERS[(email || '').trim().toLowerCase()] || null;
@@ -30,9 +34,24 @@ window.Permissions = {
     return this.getRole(email) !== null;
   },
 
+  // Resuelve el rol de una cuenta: primero contra la lista fija de arriba
+  // (admin/viewer, sin ir a la base de datos), y si no está ahí, revisa si
+  // el correo coincide con el email_personal de algún empleado activo (rol
+  // "empleado", autoservicio de permisos). No escala tener a cientos de
+  // empleados en AUTHORIZED_USERS uno por uno, por eso ese segundo camino
+  // vive en la base de datos (kardex_own_employee_id(), ver
+  // sql/permisos_vacaciones_2026-09-15.sql) en vez de acá.
+  async resolveRole(email) {
+    const staticRole = this.getRole(email);
+    if (staticRole) return staticRole;
+    const ownId = await DB.getOwnEmployeeId();
+    return ownId ? 'empleado' : null;
+  },
+
   canAccessView(role, view) {
     if (role === 'admin') return true;
     if (role === 'viewer') return VIEWER_ALLOWED_VIEWS.includes(view);
+    if (role === 'empleado') return EMPLEADO_ALLOWED_VIEWS.includes(view);
     return false;
   },
 };

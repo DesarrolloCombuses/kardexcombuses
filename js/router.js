@@ -12,6 +12,11 @@ const Router = {
   },
 
   init(defaultView = 'dashboard') {
+    // Se guarda para el fallback de _render(): cada rol tiene una vista de
+    // "inicio" distinta (ej. el rol empleado no puede ver "dashboard"), así
+    // que no se puede mandar siempre a 'dashboard' a quien le nieguen el
+    // acceso a una vista -- eso sería un loop infinito para ese rol.
+    this.defaultView = defaultView;
     window.addEventListener('hashchange', () => this._render());
     if (!location.hash) location.hash = `#/${defaultView}`;
     this._render();
@@ -22,15 +27,17 @@ const Router = {
   },
 
   _render() {
-    const name = (location.hash.replace('#/', '') || 'dashboard').split('?')[0];
+    const name = (location.hash.replace('#/', '') || this.defaultView || 'dashboard').split('?')[0];
     if (!this.views[name]) return;
 
     // Defensa extra además de ocultar los enlaces del menú: si alguien
     // escribe a mano el hash de una sección que su cuenta no tiene
     // permitida (ej. #/salida con una cuenta de solo consulta), lo manda
-    // de vuelta al panel en vez de montar esa vista.
+    // de vuelta a su vista de inicio en vez de montar esa vista. Usar
+    // this.defaultView (no 'dashboard' fijo) evita un loop infinito con
+    // roles que no pueden ver dashboard (ej. el rol empleado).
     if (window.APP_ROLE && !Permissions.canAccessView(window.APP_ROLE, name)) {
-      this.navigate('dashboard');
+      this.navigate(this.defaultView || 'dashboard');
       return;
     }
 
