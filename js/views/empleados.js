@@ -1515,7 +1515,11 @@ Router.register('empleados', {
     <tr class="doc-header">
       <td class="brand-cell">
         <div class="brand">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="8.5" stroke="#1c4fa0" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(-15 12 12)"/>
+            <circle cx="12" cy="12" r="8.5" stroke="#2fa84f" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(105 12 12)"/>
+            <circle cx="12" cy="12" r="8.5" stroke="#f2941d" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(225 12 12)"/>
+          </svg>
           COMBUSES
         </div>
       </td>
