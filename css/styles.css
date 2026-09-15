@@ -5,9 +5,13 @@
   --navy-800: #0f2043;
   --navy-700: #16305f;
 
-  --blue-600: #2f6fed;
-  --blue-700: #2456c9;
-  --blue-50: #eef4ff;
+  /* El nombre quedó de cuando el acento era azul -- ahora son el verde
+     institucional (mismo verde del sidebar/login), pero renombrar la
+     variable implicaría tocar cada uno de sus ~30 usos en este archivo
+     sin necesidad. */
+  --blue-600: #0f8a4f;
+  --blue-700: #0c6e3f;
+  --blue-50: #e6f6ec;
 
   --slate-50: #f6f7fa;
   --slate-100: #eef0f4;
@@ -612,8 +616,8 @@ a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md);
 .bar-track { background: var(--slate-100); border-radius: 999px; height: 10px; overflow: hidden; }
 .bar-fill {
   display: block; height: 100%; border-radius: 999px; width: 0%;
-  background: linear-gradient(90deg, var(--blue-600), #6fa1ff);
-  box-shadow: 0 0 10px rgba(47, 111, 237, 0.45);
+  background: linear-gradient(90deg, var(--blue-600), #6be3a0);
+  box-shadow: 0 0 10px rgba(15, 138, 79, 0.45);
   transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .bar-row .bar-value {
