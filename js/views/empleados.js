@@ -1481,26 +1481,28 @@ Router.register('empleados', {
 <meta charset="UTF-8" />
 <title>Certificación laboral — ${datos.nombre}</title>
 <style>
-  @page { size: letter; margin: 14mm; }
+  @page { size: letter; margin: 18mm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 24px; font-size: 13px; line-height: 1.6; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 30px 34px; font-size: 13.5px; line-height: 1.7; }
   table { width: 100%; border-collapse: collapse; }
-  .doc-header td { border: 1.5px solid #000; padding: 8px 10px; vertical-align: middle; }
-  .doc-header .brand-cell { width: 26%; }
-  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: #0a1930; }
+  .doc-header td { border: 1.6px solid #000; padding: 12px 14px; vertical-align: middle; }
+  .doc-header .brand-cell { width: 24%; }
+  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: #0a1930; }
   .doc-header .brand svg { flex: none; }
-  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 15px; letter-spacing: 0.02em; }
-  .doc-header .meta-cell { width: 22%; font-size: 11.5px; line-height: 1.55; }
+  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 16px; letter-spacing: 0.02em; }
+  .doc-header .meta-cell { width: 22%; font-size: 12px; line-height: 1.6; }
   .doc-header .meta-cell b { font-weight: 700; }
-  .empresa { text-align: center; font-weight: 700; margin: 18px 0 4px; }
-  .nit { text-align: center; margin: 0 0 22px; }
-  .expedicion { margin: 0 0 22px; }
-  .parrafo { margin: 0 0 16px; text-align: justify; }
-  .firma { margin-top: 55px; }
-  .firma .nombre { font-weight: 700; border-top: 1px solid #000; display: inline-block; padding-top: 4px; }
-  .footer-dir { margin-top: 30px; font-size: 11.5px; }
-  .aprobacion { margin-top: 24px; }
-  .aprobacion td, .aprobacion th { border: 1px solid #000; padding: 6px 8px; font-size: 10.5px; }
+  .empresa { text-align: center; font-weight: 700; margin: 30px 0 6px; }
+  .nit { text-align: center; margin: 0 0 34px; }
+  .expedicion { margin: 0 0 34px; }
+  .interese { text-align: center; font-weight: 700; margin: 0 0 30px; }
+  .parrafo { margin: 0 0 22px; text-align: left; }
+  .firma { margin-top: 70px; }
+  .firma .linea { display: block; width: 250px; border-top: 1px solid #000; margin-bottom: 6px; }
+  .firma .nombre { font-weight: 700; }
+  .footer-dir { margin-top: 40px; font-size: 12px; }
+  .aprobacion { margin-top: 28px; }
+  .aprobacion td, .aprobacion th { border: 1px solid #000; padding: 7px 9px; font-size: 11px; }
   .aprobacion th { background: #f3f4f6; font-weight: 700; text-align: left; }
   .print-actions { margin-bottom: 16px; }
   .print-actions button { font: inherit; padding: 8px 16px; border-radius: 6px; border: none; background: #2f6fed; color: #fff; font-weight: 600; cursor: pointer; }
@@ -1513,7 +1515,7 @@ Router.register('empleados', {
     <tr class="doc-header">
       <td class="brand-cell">
         <div class="brand">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7z" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" stroke="#0a1930" stroke-width="1.8" stroke-linejoin="round"/></svg>
           COMBUSES
         </div>
       </td>
@@ -1531,7 +1533,7 @@ Router.register('empleados', {
 
   <p class="expedicion"><strong>Fecha de expedición:</strong> ${fechaExpedicion}.</p>
 
-  <p style="text-align:center;font-weight:700;margin:0 0 16px">A QUIEN INTERESE.</p>
+  <p class="interese">A QUIEN INTERESE.</p>
 
   <p class="parrafo">El suscrito Coordinador Administrativo y de Gestión del Talento Humano de la <strong>COMPAÑÍA METROPOLITANA DE BUSES S.A. (COMBUSES S.A.)</strong>, certifica que:</p>
 
@@ -1540,6 +1542,7 @@ Router.register('empleados', {
   <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
 
   <div class="firma">
+    <span class="linea"></span>
     <span class="nombre">SARA MEDINA MONTOYA</span><br>
     Coordinadora Gestión Humana<br>
     COMPAÑÍA METROPOLITANA DE BUSES S.A.
