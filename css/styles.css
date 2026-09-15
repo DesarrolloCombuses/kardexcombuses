@@ -68,9 +68,11 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .login-brand {
   position: relative;
   overflow: hidden;
+  /* Verde esmeralda institucional, igual al del menú lateral (antes era
+     azul genérico, sin relación con los colores reales de la marca). */
   background:
-    radial-gradient(circle at 15% 15%, rgba(47, 111, 237, 0.35), transparent 45%),
-    linear-gradient(160deg, var(--navy-700), var(--navy-900) 65%);
+    radial-gradient(circle at 15% 15%, rgba(15, 138, 79, 0.4), transparent 45%),
+    linear-gradient(160deg, #0b4a2c, #063d24 65%);
   color: #fff;
   padding: 3rem;
   display: flex;
@@ -83,7 +85,7 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
   width: 480px;
   height: 480px;
   border-radius: 50%;
-  background: rgba(47, 111, 237, 0.12);
+  background: rgba(15, 138, 79, 0.18);
   right: -180px;
   bottom: -180px;
 }
@@ -94,10 +96,11 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .brand-mark {
   width: 34px; height: 34px; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.12);
+  background: #fff;
   border-radius: 9px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-.brand-mark svg { width: 19px; height: 19px; color: #fff; }
+.brand-mark svg { width: 23px; height: 23px; }
 
 .login-brand-body { position: relative; z-index: 1; }
 .login-brand-body h1 { font-size: 2.15rem; font-weight: 800; margin: 2.5rem 0 0.75rem; letter-spacing: -0.02em; line-height: 1.2; }
@@ -105,7 +108,7 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
 
 .login-features { list-style: none; padding: 0; margin: 2.25rem 0 0; display: flex; flex-direction: column; gap: 0.9rem; }
 .login-features li { display: flex; align-items: center; gap: 0.65rem; color: rgba(255, 255, 255, 0.92); font-size: 0.92rem; }
-.login-features svg { width: 22px; height: 22px; flex: none; padding: 4px; background: rgba(47, 111, 237, 0.35); border-radius: 50%; color: #a7c4ff; }
+.login-features svg { width: 22px; height: 22px; flex: none; padding: 4px; background: rgba(15, 138, 79, 0.4); border-radius: 50%; color: #8de3b3; }
 
 .login-brand-footer { color: rgba(255, 255, 255, 0.4); font-size: 0.8rem; position: relative; z-index: 1; }
 
@@ -116,7 +119,7 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
   text-align: center;
   margin-bottom: 2rem;
 }
-.login-mobile-brand .brand-mark { display: inline-flex; vertical-align: middle; margin-right: 0.5rem; background: var(--navy-900); }
+.login-mobile-brand .brand-mark { display: inline-flex; vertical-align: middle; margin-right: 0.5rem; }
 .login-mobile-brand span:last-child { display: inline; vertical-align: middle; font-weight: 700; font-size: 0.9rem; color: var(--navy-900); }
 
 .login-card { width: 100%; max-width: 380px; min-width: 0; }
