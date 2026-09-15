@@ -820,7 +820,7 @@ Router.register('empleados', {
     if (pazYSalvoBtn) pazYSalvoBtn.addEventListener('click', () => this._abrirPazYSalvo(empleado));
 
     const certificadoBtn = document.getElementById('empleado-certificado-btn');
-    if (certificadoBtn) certificadoBtn.addEventListener('click', () => this._generarCertificadoLaboral(empleado));
+    if (certificadoBtn) certificadoBtn.addEventListener('click', () => this._abrirCertificadoLaboral(empleado));
 
     this._cargarAuditoria(empleado.id);
     this._cargarDotacion(empleado.id);
@@ -1385,31 +1385,101 @@ Router.register('empleados', {
     ventana.document.close();
   },
 
-  // Un solo clic: a diferencia del paz y salvo, acá no hace falta ningún
-  // dato adicional -- todo lo que necesita el formato (nombre, cédula,
-  // cargo, fechas, salario) ya vive en el empleado/perfil. Mismo patrón de
-  // ventana nueva + Imprimir/Guardar PDF que _generarDocumentoPazYSalvo.
-  _generarCertificadoLaboral(empleado) {
+  // Antes de generar el documento oficial, se muestran los datos que van a
+  // quedar impresos para que Gestión Humana los revise/corrija -- un
+  // certificado laboral es un documento legal, así que un dato mal escrito
+  // (cargo, cédula, salario) no se puede corregir después de entregado.
+  // Prellenado con lo que ya hay en el empleado/perfil, pero todo editable
+  // solo para este documento (no toca la ficha real del empleado).
+  _abrirCertificadoLaboral(empleado) {
     const perfil = empleado.perfil_sociodemografico || {};
-    const sexo = perfil.sexo;
-    const esFemenino = sexo === 'Femenino';
-    const esMasculino = sexo === 'Masculino';
+    const hoy = new Date().toISOString().slice(0, 10);
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detalle-header">
+        <div class="detalle-header-info">
+          <div class="detalle-nombre">Certificado laboral — ${empleado.nombre}</div>
+          <div class="detalle-sub">Revisa y corrige lo que haga falta antes de generar el documento: queda impreso tal cual.</div>
+        </div>
+      </div>
+      <form id="certificado-form" class="form">
+        <div class="fieldset-grid">
+          <label>Nombre completo <span class="req-star">*</span><input type="text" id="certificado-nombre" value="${empleado.nombre || ''}" required /></label>
+          <label>Cédula <span class="req-star">*</span><input type="text" id="certificado-cedula" value="${empleado.cedula || ''}" required /></label>
+          <label>Cargo<input type="text" id="certificado-cargo" value="${empleado.cargo || ''}" /></label>
+          <label>Sexo (define "El señor" / "La señora" en el texto)
+            <select id="certificado-sexo">
+              <option value="">No especificado</option>
+              <option value="Masculino" ${perfil.sexo === 'Masculino' ? 'selected' : ''}>Masculino</option>
+              <option value="Femenino" ${perfil.sexo === 'Femenino' ? 'selected' : ''}>Femenino</option>
+            </select>
+          </label>
+          <label>Fecha de ingreso<input type="date" id="certificado-fecha-ingreso" value="${perfil.fecha_ingreso || ''}" /></label>
+          ${empleado.activo
+            ? '<label>Vinculación<input type="text" value="Vigente (el documento dirá &quot;hasta la fecha&quot;)" disabled /></label>'
+            : `<label>Fecha de salida<input type="date" id="certificado-fecha-salida" value="${empleado.fecha_salida || ''}" /></label>`}
+          <label>Salario mensual<input type="number" id="certificado-salario" min="0" step="1000" value="${empleado.salario ?? ''}" /></label>
+          <label>Fecha de expedición<input type="date" id="certificado-fecha-expedicion" value="${hoy}" /></label>
+        </div>
+        <div style="display:flex;gap:0.5rem">
+          <button type="submit">Generar certificado</button>
+          <button type="button" id="certificado-cancelar" class="btn-secondary">Cancelar</button>
+        </div>
+        <p id="certificado-msg" class="form-msg"></p>
+      </form>
+    `;
+
+    document.getElementById('certificado-cancelar').addEventListener('click', () => this._verDetalle(empleado));
+    document.getElementById('certificado-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('certificado-nombre').value.trim();
+      const cedula = document.getElementById('certificado-cedula').value.trim();
+      const msg = document.getElementById('certificado-msg');
+      if (!nombre || !cedula) {
+        msg.textContent = 'Nombre y cédula son obligatorios.';
+        msg.className = 'form-msg error';
+        return;
+      }
+      const salarioInput = document.getElementById('certificado-salario').value;
+      const fechaSalidaEl = document.getElementById('certificado-fecha-salida');
+      this._generarDocumentoCertificado(empleado, {
+        nombre,
+        cedula,
+        cargo: document.getElementById('certificado-cargo').value.trim(),
+        sexo: document.getElementById('certificado-sexo').value,
+        fechaIngreso: document.getElementById('certificado-fecha-ingreso').value || null,
+        fechaSalida: fechaSalidaEl ? (fechaSalidaEl.value || null) : null,
+        salario: salarioInput ? Number(salarioInput) : null,
+        fechaExpedicion: document.getElementById('certificado-fecha-expedicion').value || hoy,
+      });
+    });
+  },
+
+  // Con los datos ya revisados/confirmados en _abrirCertificadoLaboral, arma
+  // el documento final. Mismo patrón de ventana nueva + Imprimir/Guardar
+  // PDF que _generarDocumentoPazYSalvo. "activo" sigue viniendo del
+  // empleado real (no es editable acá): decide si el texto dice "está" o
+  // "estuvo" vinculado, que es un hecho, no un dato a corregir.
+  _generarDocumentoCertificado(empleado, datos) {
+    const esFemenino = datos.sexo === 'Femenino';
+    const esMasculino = datos.sexo === 'Masculino';
     const articulo = esFemenino ? 'La señora' : esMasculino ? 'El señor' : 'El/la señor/a';
     const identificado = esFemenino ? 'identificada' : esMasculino ? 'identificado' : 'identificado/a';
     const vinculado = esFemenino ? 'vinculada' : esMasculino ? 'vinculado' : 'vinculado/a';
     const verboVinculacion = empleado.activo ? 'está' : 'estuvo';
-    const desdeTexto = perfil.fecha_ingreso ? formatFecha(perfil.fecha_ingreso) : 'N/N';
-    const hastaTexto = empleado.activo ? 'hasta la fecha' : `hasta el ${formatFecha(empleado.fecha_salida)}`;
-    const salarioTexto = empleado.salario
-      ? `${numeroALetras(empleado.salario)} PESOS ($${Number(empleado.salario).toLocaleString('es-CO')})`
+    const desdeTexto = datos.fechaIngreso ? formatFecha(datos.fechaIngreso) : 'N/N';
+    const hastaTexto = empleado.activo ? 'hasta la fecha' : `hasta el ${datos.fechaSalida ? formatFecha(datos.fechaSalida) : 'N/N'}`;
+    const salarioTexto = datos.salario
+      ? `${numeroALetras(datos.salario)} PESOS ($${Number(datos.salario).toLocaleString('es-CO')})`
       : '(NO REGISTRA SALARIO EN EL SISTEMA -- completar a mano antes de entregar)';
-    const fechaExpedicion = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+    const fechaExpedicion = new Date(`${datos.fechaExpedicion}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const html = `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>Certificación laboral — ${empleado.nombre}</title>
+<title>Certificación laboral — ${datos.nombre}</title>
 <style>
   @page { size: letter; margin: 14mm; }
   * { box-sizing: border-box; }
@@ -1465,7 +1535,7 @@ Router.register('empleados', {
 
   <p class="parrafo">El suscrito Coordinador Administrativo y de Gestión del Talento Humano de la <strong>COMPAÑÍA METROPOLITANA DE BUSES S.A. (COMBUSES S.A.)</strong>, certifica que:</p>
 
-  <p class="parrafo">${articulo} <strong>${empleado.nombre}</strong>, ${identificado} con cédula de ciudadanía No. <strong>${empleado.cedula}</strong>, ${verboVinculacion} ${vinculado} laboralmente con esta organización desde el <strong>${desdeTexto}</strong> ${hastaTexto}, desempeñando el cargo de <strong>${empleado.cargo || 'N/N'}</strong>, y devengando como último salario mensual, la suma de ${salarioTexto} M/CTE.</p>
+  <p class="parrafo">${articulo} <strong>${datos.nombre}</strong>, ${identificado} con cédula de ciudadanía No. <strong>${datos.cedula}</strong>, ${verboVinculacion} ${vinculado} laboralmente con esta organización desde el <strong>${desdeTexto}</strong> ${hastaTexto}, desempeñando el cargo de <strong>${datos.cargo || 'N/N'}</strong>, y devengando como último salario mensual, la suma de ${salarioTexto} M/CTE.</p>
 
   <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
 
