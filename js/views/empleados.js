@@ -1419,7 +1419,7 @@ Router.register('empleados', {
           ${empleado.activo
             ? '<label>Vinculación<input type="text" value="Vigente (el documento dirá &quot;hasta la fecha&quot;)" disabled /></label>'
             : `<label>Fecha de salida<input type="date" id="certificado-fecha-salida" value="${empleado.fecha_salida || ''}" /></label>`}
-          <label>Salario mensual<input type="number" id="certificado-salario" min="0" step="1000" value="${empleado.salario ?? ''}" /></label>
+          <label>Salario mensual<input type="number" id="certificado-salario" min="0" value="${empleado.salario ?? ''}" /></label>
           <label>Fecha de expedición<input type="date" id="certificado-fecha-expedicion" value="${hoy}" /></label>
         </div>
         <div style="display:flex;gap:0.5rem">
