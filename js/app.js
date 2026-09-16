@@ -3,6 +3,7 @@
   if (!session) return;
 
   window.APP_ROLE = await Permissions.resolveRole(session.user.email);
+  window.APP_GRUPO = window.APP_ROLE === 'empleado' ? await DB.getMiGrupo() : null;
 
   document.getElementById('user-email').textContent = session.user.email;
   document.getElementById('user-avatar').textContent = session.user.email.slice(0, 2).toUpperCase();
@@ -16,9 +17,12 @@
     // Autoservicio de un colaborador: no es una cuenta administrativa, así
     // que se le quita TODO el menú salvo "Mis permisos" -- lista blanca en
     // vez de negra, para que un ítem nuevo que se agregue después no quede
-    // visible por accidente para este rol.
+    // visible por accidente para este rol. GESTION HUMANA además puede
+    // aprobar permisos (ver kardex_puede_aprobar_permisos()), así que
+    // también ve la bandeja de aprobación.
+    const extra = window.APP_GRUPO === 'GESTION HUMANA' ? ['permisos-vacaciones'] : [];
     document.querySelectorAll('[data-nav]').forEach((el) => {
-      if (el.dataset.nav !== 'mis-permisos') el.remove();
+      if (el.dataset.nav !== 'mis-permisos' && !extra.includes(el.dataset.nav)) el.remove();
     });
     document.querySelectorAll('.nav-group').forEach((group) => {
       if (!group.querySelector('[data-nav]')) group.remove();
@@ -27,12 +31,14 @@
     // admin/viewer son cuentas administrativas, no fichas de empleado -- no
     // les corresponde el autoservicio de "Mis permisos".
     document.querySelector('[data-nav="mis-permisos"]')?.remove();
+    // "Usuarios" (crear cuentas) es exclusivo del admin.
+    if (window.APP_ROLE !== 'admin') document.querySelector('[data-nav="usuarios"]')?.remove();
 
     // Cuentas de solo consulta: se quitan del menú las secciones que no
     // pueden ver (Router también las bloquea si alguien escribe el hash a
     // mano, esto es solo para que ni aparezcan como opción).
     if (window.APP_ROLE === 'viewer') {
-      ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'permisos-vacaciones'].forEach((name) => {
+      ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'permisos-vacaciones', 'usuarios'].forEach((name) => {
         document.querySelector(`[data-nav="${name}"]`)?.remove();
       });
       // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/

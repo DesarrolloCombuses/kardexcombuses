@@ -25,6 +25,15 @@ const VIEWER_ALLOWED_VIEWS = [
 // solo pide/consulta sus propios permisos, sin nada más del ERP).
 const EMPLEADO_ALLOWED_VIEWS = ['mis-permisos'];
 
+// Vistas extra que desbloquea cada grupo (ver sql/usuarios_grupos_2026-09-16.sql
+// y js/views/usuarios.js) por encima de EMPLEADO_ALLOWED_VIEWS. Por ahora
+// solo GESTION HUMANA tiene algo -- puede aprobar permisos, así que ve
+// también la bandeja de aprobación. Los demás grupos son solo un dato
+// organizativo todavía, sin vista extra.
+const GRUPO_EXTRA_VIEWS = {
+  'GESTION HUMANA': ['permisos-vacaciones'],
+};
+
 window.Permissions = {
   getRole(email) {
     return AUTHORIZED_USERS[(email || '').trim().toLowerCase()] || null;
@@ -48,10 +57,13 @@ window.Permissions = {
     return ownId ? 'empleado' : null;
   },
 
-  canAccessView(role, view) {
+  canAccessView(role, view, grupo) {
     if (role === 'admin') return true;
     if (role === 'viewer') return VIEWER_ALLOWED_VIEWS.includes(view);
-    if (role === 'empleado') return EMPLEADO_ALLOWED_VIEWS.includes(view);
+    if (role === 'empleado') {
+      if (EMPLEADO_ALLOWED_VIEWS.includes(view)) return true;
+      return (GRUPO_EXTRA_VIEWS[grupo] || []).includes(view);
+    }
     return false;
   },
 };

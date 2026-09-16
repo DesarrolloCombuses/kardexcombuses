@@ -915,6 +915,52 @@ const DB = {
     if (error) throw error;
   },
 
+  // ---- Usuarios (cuentas de acceso por grupo) --------------------------------
+
+  // Grupo del empleado autenticado, o null si no tiene ninguno asignado
+  // (incluye el caso admin/viewer, que no tienen ficha de empleado).
+  async getMiGrupo() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mi_grupo');
+    if (error) throw error;
+    return data;
+  },
+
+  // Crea (o actualiza el grupo de) la cuenta de Auth de un empleado. Corre en
+  // el servidor (Edge Function con service_role) porque crear un usuario de
+  // Auth no se puede hacer con la anon key desde el navegador.
+  async crearUsuario({ employeeId, email, alias, grupo }) {
+    const { data, error } = await window.supabaseClient.functions.invoke('kardex-crear-usuario', {
+      body: { employeeId, email, alias, grupo },
+    });
+    if (error) {
+      // Con un status distinto de 2xx, supabase-js deja el mensaje real (el
+      // {ok:false, message:...} que devuelve la función) en error.context
+      // (la Response cruda) en vez de en error.message -- sin esto se vería
+      // el genérico "Edge Function returned a non-2xx status code".
+      const detalle = await error.context?.json?.().catch(() => null);
+      throw new Error(detalle?.message || error.message);
+    }
+    if (!data?.ok) throw new Error(data?.message || 'No se pudo crear el usuario.');
+    return data;
+  },
+
+  async getUsuariosGrupos() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_empleado_grupos')
+      .select('*, employee:employees(nombre, cedula, cargo, area, email_personal)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async quitarGrupoUsuario(employeeId) {
+    const { error } = await window.supabaseClient
+      .from('kardex_empleado_grupos')
+      .delete()
+      .eq('employee_id', employeeId);
+    if (error) throw error;
+  },
+
   // ---- Tiempo real ------------------------------------------------------------
 
   // Se suscribe a INSERT/UPDATE/DELETE en una o varias tablas y llama a

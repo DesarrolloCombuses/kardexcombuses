@@ -135,6 +135,10 @@
               <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12.5" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 7.5h14" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 4V2.5M13.5 4V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 11.5l1.8 1.8L11.5 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Permisos y vacaciones
             </a>
+            <a href="#/usuarios" data-nav="usuarios">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.2" stroke="currentColor" stroke-width="1.5"/><path d="M4 17c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 4.3a3 3 0 010 5.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              Usuarios
+            </a>
           </div>
         </details>
 
@@ -1125,6 +1129,42 @@
           <div class="person-list" id="pv-lista"></div>
         </section>
 
+        <!-- ================= USUARIOS ================= -->
+        <section data-view="usuarios" class="view">
+          <p class="view-intro">Crea la cuenta de acceso de un empleado (para "Mis permisos") y asígnale un grupo. Por ahora solo GESTION HUMANA puede además aprobar permisos de cualquier empleado.</p>
+
+          <form id="us-form" class="form panel-card">
+            <label>Empleado
+              <div class="combobox" id="us-empleado-combobox">
+                <input type="text" id="us-empleado-input" autocomplete="off" placeholder="Buscar por nombre o cédula…" />
+                <input type="hidden" id="us-empleado-id" />
+                <ul class="combobox-list hidden" id="us-empleado-list"></ul>
+              </div>
+            </label>
+            <div class="fieldset-grid">
+              <label>Alias<input type="text" id="us-alias" placeholder="Ej. Ana desde Nómina" required /></label>
+              <label>Correo de acceso<input type="email" id="us-email" placeholder="correo@ejemplo.com" required /></label>
+              <label>Grupo<select id="us-grupo" required>
+                <option value="">Selecciona…</option>
+                <option>CONTABILIDAD</option>
+                <option>DIRECCION ADMINISTRATIVA</option>
+                <option>OPERACIONES</option>
+                <option>GESTION Y CONTROL DE FLOTA</option>
+                <option>GESTION HUMANA</option>
+                <option>DESARROLLO TECNOLOGICO</option>
+              </select></label>
+            </div>
+            <div>
+              <button type="submit">Crear usuario</button>
+              <p id="us-msg" class="form-msg"></p>
+            </div>
+            <div id="us-password-box" class="pp-banner pendiente hidden"></div>
+          </form>
+
+          <p class="empty-note" id="us-contador"></p>
+          <div class="person-list" id="us-lista"></div>
+        </section>
+
         <!-- ================= SINIESTROS DE TRANSITO ================= -->
         <section data-view="siniestros-transito" class="view">
           <p class="view-intro">Comparendos y accidentes de tránsito (archivo que sube RRHH) más siniestros de SST (Google Sheet, en vivo), todos cruzados por cédula -- los mismos datos que ya se consultan uno por uno en el Paz y Salvo.</p>
@@ -1571,6 +1611,7 @@
   <script src="js/views/dashboard.js"></script>
   <script src="js/views/mis-permisos.js"></script>
   <script src="js/views/permisos-vacaciones.js"></script>
+  <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>
   <script src="js/views/inventario-historico.js"></script>
   <script src="js/views/estadisticas.js"></script>

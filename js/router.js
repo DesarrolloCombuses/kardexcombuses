@@ -36,7 +36,7 @@ const Router = {
     // de vuelta a su vista de inicio en vez de montar esa vista. Usar
     // this.defaultView (no 'dashboard' fijo) evita un loop infinito con
     // roles que no pueden ver dashboard (ej. el rol empleado).
-    if (window.APP_ROLE && !Permissions.canAccessView(window.APP_ROLE, name)) {
+    if (window.APP_ROLE && !Permissions.canAccessView(window.APP_ROLE, name, window.APP_GRUPO)) {
       this.navigate(this.defaultView || 'dashboard');
       return;
     }
