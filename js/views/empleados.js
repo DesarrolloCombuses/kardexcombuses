@@ -1456,12 +1456,28 @@ Router.register('empleados', {
     });
   },
 
+  // Busca, entre los empleados activos ya cargados, a quien tenga hoy un
+  // cargo que cumpla el patrón dado -- para las firmas del certificado
+  // laboral (ver _generarDocumentoCertificado), que deben reflejar a quien
+  // ocupa el cargo en este momento, no un nombre fijo en el código.
+  _empleadoPorCargo(patron) {
+    return (this._employees || []).find((e) => e.activo && patron.test(e.cargo || ''));
+  },
+
   // Con los datos ya revisados/confirmados en _abrirCertificadoLaboral, arma
   // el documento final. Mismo patrón de ventana nueva + Imprimir/Guardar
   // PDF que _generarDocumentoPazYSalvo. "activo" sigue viniendo del
   // empleado real (no es editable acá): decide si el texto dice "está" o
   // "estuvo" vinculado, que es un hecho, no un dato a corregir.
   _generarDocumentoCertificado(empleado, datos) {
+    // Las firmas se resuelven por cargo (no por nombre fijo) para que el
+    // documento quede siempre con quien está hoy en cada cargo -- si mañana
+    // cambia el gerente o el coordinador administrativo, no hay que tocar
+    // código, solo que su cargo en Empleados diga esto mismo.
+    const gerente = this._empleadoPorCargo(/gerente\s+general/i);
+    const coordAdmin = this._empleadoPorCargo(/coordinador(a)?\s+administrativo/i);
+    const coordGH = this._empleadoPorCargo(/gesti[oó]n\s+humana/i);
+
     const esFemenino = datos.sexo === 'Femenino';
     const esMasculino = datos.sexo === 'Masculino';
     const articulo = esFemenino ? 'La señora' : esMasculino ? 'El señor' : 'El/la señor/a';
@@ -1547,8 +1563,8 @@ Router.register('empleados', {
 
   <div class="firma">
     <span class="linea"></span>
-    <span class="nombre">SARA MEDINA MONTOYA</span><br>
-    Coordinadora Gestión Humana<br>
+    <span class="nombre">${coordGH ? coordGH.nombre : 'COORDINACIÓN DE GESTIÓN HUMANA'}</span><br>
+    ${coordGH ? coordGH.cargo : 'Coordinador(a) Gestión Humana'}<br>
     COMPAÑÍA METROPOLITANA DE BUSES S.A.
   </div>
 
@@ -1561,9 +1577,9 @@ Router.register('empleados', {
       <th>Aprobado por:</th>
     </tr>
     <tr>
-      <td>Andrés A. Tuberquia Sánchez<br>Coord. Administrativo y de GTH</td>
+      <td>${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
       <td>Bravo Restrepo Abogados<br>Asesoría legal y jurídica</td>
-      <td>Rosemberg Dueñas Uribe<br>Gerente General</td>
+      <td>${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
     </tr>
     <tr>
       <td>Fecha: 13/04/2026</td>
