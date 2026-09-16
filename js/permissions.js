@@ -27,11 +27,16 @@ const EMPLEADO_ALLOWED_VIEWS = ['mis-permisos'];
 
 // Vistas extra que desbloquea cada grupo (ver sql/usuarios_grupos_2026-09-16.sql
 // y js/views/usuarios.js) por encima de EMPLEADO_ALLOWED_VIEWS. Por ahora
-// solo GESTION HUMANA tiene algo -- puede aprobar permisos, así que ve
-// también la bandeja de aprobación. Los demás grupos son solo un dato
-// organizativo todavía, sin vista extra.
+// solo GESTION HUMANA tiene algo -- todo el dominio de Personal (mismas
+// tablas que ya puede ver/editar/agregar admin ahí, ver
+// sql/gestion_humana_modulos_2026-09-16.sql), más la bandeja de aprobación
+// de permisos. Los demás grupos son solo un dato organizativo todavía, sin
+// vista extra.
 const GRUPO_EXTRA_VIEWS = {
-  'GESTION HUMANA': ['permisos-vacaciones'],
+  'GESTION HUMANA': [
+    'permisos-vacaciones', 'aspirantes', 'empleados',
+    'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil',
+  ],
 };
 
 window.Permissions = {

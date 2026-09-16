@@ -17,10 +17,13 @@
     // Autoservicio de un colaborador: no es una cuenta administrativa, así
     // que se le quita TODO el menú salvo "Mis permisos" -- lista blanca en
     // vez de negra, para que un ítem nuevo que se agregue después no quede
-    // visible por accidente para este rol. GESTION HUMANA además puede
-    // aprobar permisos (ver kardex_puede_aprobar_permisos()), así que
-    // también ve la bandeja de aprobación.
-    const extra = window.APP_GRUPO === 'GESTION HUMANA' ? ['permisos-vacaciones'] : [];
+    // visible por accidente para este rol. GESTION HUMANA además tiene todo
+    // el dominio de Personal (ver kardex_es_gestion_humana()), así que
+    // también ve esas vistas.
+    const extra = window.APP_GRUPO === 'GESTION HUMANA' ? [
+      'permisos-vacaciones', 'aspirantes', 'empleados',
+      'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil',
+    ] : [];
     document.querySelectorAll('[data-nav]').forEach((el) => {
       if (el.dataset.nav !== 'mis-permisos' && !extra.includes(el.dataset.nav)) el.remove();
     });
