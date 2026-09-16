@@ -117,6 +117,16 @@ function formatFecha(iso) {
   return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO') : '—';
 }
 
+// Para nombres de archivo descargables (PDF): sin tildes ni mayúsculas, y
+// sin caracteres que Windows no acepta en un nombre de archivo.
+function slugArchivo(texto) {
+  return String(texto || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 // Mismo criterio de períodos que Historial (ver js/views/historial.js):
 // Combuses entrega dotación 3 veces al año, el período se calcula solo a
 // partir de la fecha de entrega, sin depender de que alguien lo anote.
@@ -822,6 +832,9 @@ Router.register('empleados', {
     const certificadoBtn = document.getElementById('empleado-certificado-btn');
     if (certificadoBtn) certificadoBtn.addEventListener('click', () => this._abrirCertificadoLaboral(empleado));
 
+    const firmaBtn = document.getElementById('empleado-firma-btn');
+    if (firmaBtn) firmaBtn.addEventListener('click', () => this._abrirFirma(empleado));
+
     this._cargarAuditoria(empleado.id);
     this._cargarDotacion(empleado.id);
     this._cargarHistorialVinculacion(empleado);
@@ -964,6 +977,7 @@ Router.register('empleados', {
           <button type="button" id="empleado-inactivar-btn" class="btn-secondary">Marcar como inactivo</button>
           <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
           <button type="button" id="empleado-certificado-btn" class="btn-secondary">Certificado laboral</button>
+          <button type="button" id="empleado-firma-btn" class="btn-secondary">${empleado.firma_url ? 'Cambiar firma' : 'Agregar firma'}</button>
           <div id="empleado-inactivar-form" class="form hidden" style="max-width:260px;margin-top:0.7rem">
             <label>Fecha de salida<input type="date" id="empleado-inactivar-fecha" value="${hoy}" /></label>
             <label>Motivo de salida <span class="req-star">*</span><input type="text" id="empleado-inactivar-motivo" placeholder="Ej: renuncia voluntaria" required /></label>
@@ -981,6 +995,7 @@ Router.register('empleados', {
         <button type="button" id="empleado-activar-btn" class="btn-secondary">Marcar como activo</button>
         <button type="button" id="empleado-pazysalvo-btn" class="btn-secondary">Generar paz y salvo</button>
         <button type="button" id="empleado-certificado-btn" class="btn-secondary">Certificado laboral</button>
+        <button type="button" id="empleado-firma-btn" class="btn-secondary">${empleado.firma_url ? 'Cambiar firma' : 'Agregar firma'}</button>
         <p id="empleado-estado-msg" class="form-msg"></p>
       </div>
     `;
@@ -1386,6 +1401,78 @@ Router.register('empleados', {
   },
 
   // Antes de generar el documento oficial, se muestran los datos que van a
+  // Dibuja y guarda la firma que después queda estampada en el certificado
+  // laboral (ver _generarDocumentoCertificado) cuando a este empleado le
+  // toca firmar por su cargo (Gerente General, Coordinador Administrativo o
+  // Gestión Humana) -- se guarda en la ficha del empleado, no por cargo, así
+  // que si la persona cambia de cargo su firma la sigue acompañando.
+  async _abrirFirma(empleado) {
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+
+    let firmaActualHtml = '<p class="empty-note">Sin firma guardada todavía.</p>';
+    if (empleado.firma_url) {
+      try {
+        const url = await DB.getSignedUrl('firmas', empleado.firma_url);
+        firmaActualHtml = `<img src="${url}" alt="Firma actual" style="max-height:90px;background:#fff;border:1px solid var(--slate-200,#e5e7eb);border-radius:6px;padding:6px" />`;
+      } catch {
+        firmaActualHtml = '<p class="empty-note">No se pudo cargar la firma guardada.</p>';
+      }
+    }
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detalle-header">
+        <div class="detalle-header-info">
+          <div class="detalle-nombre">Firma para documentos — ${empleado.nombre}</div>
+          <div class="detalle-sub">Se estampa sola en el certificado laboral cuando a ${empleado.nombre} le toque firmar según su cargo (Gerente General, Coordinador Administrativo o Gestión Humana).</div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <h3 class="modal-section-title">Firma actual</h3>
+        ${firmaActualHtml}
+      </div>
+      <div class="modal-section">
+        <h3 class="modal-section-title">${empleado.firma_url ? 'Reemplazar firma' : 'Dibujar firma'}</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Dibuja con el mouse o el dedo, tal como quieres que salga impresa.</p>
+        <canvas id="firma-canvas" class="signature-canvas"></canvas>
+        <div style="display:flex;gap:0.5rem;margin-top:0.7rem;flex-wrap:wrap">
+          <button type="button" id="firma-guardar-btn">Guardar firma</button>
+          <button type="button" id="firma-limpiar-btn" class="btn-secondary">Limpiar</button>
+          <button type="button" id="firma-cancelar-btn" class="btn-secondary">Cancelar</button>
+        </div>
+        <p id="firma-msg" class="form-msg"></p>
+      </div>
+    `;
+
+    const pad = new SignaturePad(document.getElementById('firma-canvas'));
+    document.getElementById('firma-limpiar-btn').addEventListener('click', () => pad.clear());
+    document.getElementById('firma-cancelar-btn').addEventListener('click', () => this._verDetalle(empleado));
+    document.getElementById('firma-guardar-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('firma-msg');
+      if (pad.isEmpty()) {
+        msg.textContent = 'Dibuja la firma antes de guardar.';
+        msg.className = 'form-msg error';
+        return;
+      }
+      Loading.show('Guardando firma…');
+      try {
+        const blob = await pad.toBlob();
+        if (!blob) throw new Error('No se pudo capturar la firma, inténtalo de nuevo.');
+        const path = await DB.uploadToBucket('firmas', blob, 'png', 'certificados');
+        await DB.updateEmployee(empleado.id, { firma_url: path });
+        await this._load();
+        const actualizado = this._employees.find((e) => e.id === empleado.id) || empleado;
+        this._verDetalle(actualizado);
+      } catch (err) {
+        msg.textContent = 'No se pudo guardar la firma: ' + err.message;
+        msg.className = 'form-msg error';
+      } finally {
+        Loading.hide();
+      }
+    });
+  },
+
+  // Antes de generar el documento oficial, se muestran los datos que van a
   // quedar impresos para que Gestión Humana los revise/corrija -- un
   // certificado laboral es un documento legal, así que un dato mal escrito
   // (cargo, cédula, salario) no se puede corregir después de entregado.
@@ -1431,7 +1518,7 @@ Router.register('empleados', {
     `;
 
     document.getElementById('certificado-cancelar').addEventListener('click', () => this._verDetalle(empleado));
-    document.getElementById('certificado-form').addEventListener('submit', (e) => {
+    document.getElementById('certificado-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const nombre = document.getElementById('certificado-nombre').value.trim();
       const cedula = document.getElementById('certificado-cedula').value.trim();
@@ -1443,16 +1530,23 @@ Router.register('empleados', {
       }
       const salarioInput = document.getElementById('certificado-salario').value;
       const fechaSalidaEl = document.getElementById('certificado-fecha-salida');
-      this._generarDocumentoCertificado(empleado, {
-        nombre,
-        cedula,
-        cargo: document.getElementById('certificado-cargo').value.trim(),
-        sexo: document.getElementById('certificado-sexo').value,
-        fechaIngreso: document.getElementById('certificado-fecha-ingreso').value || null,
-        fechaSalida: fechaSalidaEl ? (fechaSalidaEl.value || null) : null,
-        salario: salarioInput ? Number(salarioInput) : null,
-        fechaExpedicion: document.getElementById('certificado-fecha-expedicion').value || hoy,
-      });
+      // Async porque busca la firma guardada de quien corresponda firmar
+      // (ver _generarDocumentoCertificado) antes de escribir el documento.
+      Loading.show('Generando certificado…');
+      try {
+        await this._generarDocumentoCertificado(empleado, {
+          nombre,
+          cedula,
+          cargo: document.getElementById('certificado-cargo').value.trim(),
+          sexo: document.getElementById('certificado-sexo').value,
+          fechaIngreso: document.getElementById('certificado-fecha-ingreso').value || null,
+          fechaSalida: fechaSalidaEl ? (fechaSalidaEl.value || null) : null,
+          salario: salarioInput ? Number(salarioInput) : null,
+          fechaExpedicion: document.getElementById('certificado-fecha-expedicion').value || hoy,
+        });
+      } finally {
+        Loading.hide();
+      }
     });
   },
 
@@ -1464,12 +1558,90 @@ Router.register('empleados', {
     return (this._employees || []).find((e) => e.activo && patron.test(e.cargo || ''));
   },
 
+  // Envoltura común para los documentos imprimibles (certificado laboral,
+  // paz y salvo): agrega el fondo gris + "hoja" centrada tamaño carta, para
+  // que en pantalla se vea como una página real y no como texto corrido de
+  // borde a borde del navegador -- y un botón "Descargar PDF" que genera el
+  // archivo de verdad con html2pdf.js (cargado desde CDN dentro de esta
+  // misma ventana nueva, no en app.html), en vez de depender de que la
+  // persona sepa usar "Imprimir > Guardar como PDF". Se deja también
+  // "Imprimir" como respaldo, por si html2pdf falla (ej. una firma cuya
+  // imagen no se pudo leer por CORS) -- el print nativo no depende de eso.
+  _paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
+    return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>${titulo}</title>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { background: #dde3ec; margin: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 26px 16px; }
+  .print-actions { max-width: 8.5in; margin: 0 auto 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .print-actions button { font: inherit; padding: 9px 18px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; }
+  .print-actions .btn-pdf { background: #2f6fed; color: #fff; }
+  .print-actions .btn-pdf:disabled { opacity: 0.6; cursor: default; }
+  .print-actions .btn-print { background: #fff; color: #2f6fed; border: 1.5px solid #2f6fed; }
+  .print-actions .estado { font-size: 12.5px; color: #445; }
+  .page { background: #fff; width: 8.5in; min-height: 11in; margin: 0 auto; box-shadow: 0 4px 24px rgba(15,23,42,.16); }
+  ${estilos}
+  @page { size: letter; margin: 0; }
+  @media print {
+    html, body { background: #fff; }
+    .print-actions { display: none; }
+    body { padding: 0; }
+    .page { box-shadow: none; margin: 0; width: auto; min-height: auto; }
+  }
+</style>
+</head>
+<body>
+  <div class="print-actions">
+    <button type="button" class="btn-pdf" id="btn-descargar-pdf">Descargar PDF</button>
+    <button type="button" class="btn-print" onclick="window.print()">Imprimir</button>
+    <span class="estado" id="pdf-estado"></span>
+  </div>
+  <div class="page">${cuerpoHtml}</div>
+  <script>
+    document.getElementById('btn-descargar-pdf').addEventListener('click', function () {
+      var boton = document.getElementById('btn-descargar-pdf');
+      var estado = document.getElementById('pdf-estado');
+      boton.disabled = true;
+      estado.textContent = 'Generando PDF…';
+      html2pdf()
+        .set({
+          filename: ${JSON.stringify(archivo)},
+          margin: 0,
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+        })
+        .from(document.querySelector('.page'))
+        .save()
+        .then(function () { estado.textContent = 'PDF descargado.'; })
+        .catch(function () { estado.textContent = 'No se pudo generar el PDF -- prueba con "Imprimir" y elige "Guardar como PDF".'; })
+        .finally(function () { boton.disabled = false; });
+    });
+  </script>
+</body>
+</html>`;
+  },
+
   // Con los datos ya revisados/confirmados en _abrirCertificadoLaboral, arma
-  // el documento final. Mismo patrón de ventana nueva + Imprimir/Guardar
-  // PDF que _generarDocumentoPazYSalvo. "activo" sigue viniendo del
-  // empleado real (no es editable acá): decide si el texto dice "está" o
-  // "estuvo" vinculado, que es un hecho, no un dato a corregir.
-  _generarDocumentoCertificado(empleado, datos) {
+  // el documento final. "activo" sigue viniendo del empleado real (no es
+  // editable acá): decide si el texto dice "está" o "estuvo" vinculado, que
+  // es un hecho, no un dato a corregir.
+  async _generarDocumentoCertificado(empleado, datos) {
+    // El popup hay que abrirlo YA, en el mismo tick del clic -- si se abre
+    // después de un await, el navegador lo trata como si no viniera de una
+    // acción del usuario y lo bloquea. Se llena con un mensaje de espera y
+    // se reemplaza más abajo cuando ya está todo listo.
+    const ventana = window.open('', '_blank');
+    if (!ventana) {
+      alert('El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.');
+      return;
+    }
+    ventana.document.write('<p style="font-family:Arial,Helvetica,sans-serif;padding:2rem;color:#445">Generando certificado…</p>');
+
     // Las firmas se resuelven por cargo (no por nombre fijo) para que el
     // documento quede siempre con quien está hoy en cada cargo -- si mañana
     // cambia el gerente o el coordinador administrativo, no hay que tocar
@@ -1477,6 +1649,25 @@ Router.register('empleados', {
     const gerente = this._empleadoPorCargo(/gerente\s+general/i);
     const coordAdmin = this._empleadoPorCargo(/coordinador(a)?\s+administrativo/i);
     const coordGH = this._empleadoPorCargo(/gesti[oó]n\s+humana/i);
+
+    // Firma dibujada y guardada desde "Agregar firma" en la ficha del
+    // empleado (ver _abrirFirma) -- si alguno de los 3 cargos no tiene firma
+    // guardada todavía, simplemente se deja el espacio en blanco de siempre
+    // para firmar a mano.
+    const resolverFirma = async (persona) => {
+      if (!persona?.firma_url) return null;
+      try {
+        return await DB.getSignedUrl('firmas', persona.firma_url);
+      } catch {
+        return null;
+      }
+    };
+    const [gerenteFirma, coordAdminFirma, coordGHFirma] = await Promise.all([
+      resolverFirma(gerente), resolverFirma(coordAdmin), resolverFirma(coordGH),
+    ]);
+    const imgFirma = (url, alto) => url
+      ? `<img src="${url}" crossorigin="anonymous" alt="Firma" style="max-height:${alto}px;display:block;margin-bottom:4px" />`
+      : '';
 
     const esFemenino = datos.sexo === 'Femenino';
     const esMasculino = datos.sexo === 'Masculino';
@@ -1491,42 +1682,7 @@ Router.register('empleados', {
       : '(NO REGISTRA SALARIO EN EL SISTEMA -- completar a mano antes de entregar)';
     const fechaExpedicion = new Date(`${datos.fechaExpedicion}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    const html = `<!doctype html>
-<html lang="es">
-<head>
-<meta charset="UTF-8" />
-<title>Certificación laboral — ${datos.nombre}</title>
-<style>
-  @page { size: letter; margin: 18mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 30px 34px; font-size: 13.5px; line-height: 1.7; }
-  table { width: 100%; border-collapse: collapse; }
-  .doc-header td { border: 1.6px solid #000; padding: 12px 14px; vertical-align: middle; }
-  .doc-header .brand-cell { width: 24%; }
-  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: #0a1930; }
-  .doc-header .brand svg { flex: none; }
-  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 16px; letter-spacing: 0.02em; }
-  .doc-header .meta-cell { width: 22%; font-size: 12px; line-height: 1.6; }
-  .doc-header .meta-cell b { font-weight: 700; }
-  .empresa { text-align: center; font-weight: 700; margin: 30px 0 6px; }
-  .nit { text-align: center; margin: 0 0 34px; }
-  .expedicion { margin: 0 0 34px; }
-  .interese { text-align: center; font-weight: 700; margin: 0 0 30px; }
-  .parrafo { margin: 0 0 22px; text-align: left; }
-  .firma { margin-top: 70px; }
-  .firma .linea { display: block; width: 250px; border-top: 1px solid #000; margin-bottom: 6px; }
-  .firma .nombre { font-weight: 700; }
-  .footer-dir { margin-top: 40px; font-size: 12px; }
-  .aprobacion { margin-top: 28px; }
-  .aprobacion td, .aprobacion th { border: 1px solid #000; padding: 7px 9px; font-size: 11px; }
-  .aprobacion th { background: #f3f4f6; font-weight: 700; text-align: left; }
-  .print-actions { margin-bottom: 16px; }
-  .print-actions button { font: inherit; padding: 8px 16px; border-radius: 6px; border: none; background: #2f6fed; color: #fff; font-weight: 600; cursor: pointer; }
-  @media print { .print-actions { display: none; } body { padding: 0; } }
-</style>
-</head>
-<body>
-  <div class="print-actions"><button type="button" onclick="window.print()">Imprimir / Guardar PDF</button></div>
+    const cuerpoHtml = `
   <table>
     <tr class="doc-header">
       <td class="brand-cell">
@@ -1562,7 +1718,7 @@ Router.register('empleados', {
   <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
 
   <div class="firma">
-    <span class="linea"></span>
+    ${coordGHFirma ? imgFirma(coordGHFirma, 70) : '<span class="linea"></span>'}
     <span class="nombre">${coordGH ? coordGH.nombre : 'COORDINACIÓN DE GESTIÓN HUMANA'}</span><br>
     ${coordGH ? coordGH.cargo : 'Coordinador(a) Gestión Humana'}<br>
     COMPAÑÍA METROPOLITANA DE BUSES S.A.
@@ -1577,9 +1733,9 @@ Router.register('empleados', {
       <th>Aprobado por:</th>
     </tr>
     <tr>
-      <td>${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
+      <td>${imgFirma(coordAdminFirma, 36)}${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
       <td>Bravo Restrepo Abogados<br>Asesoría legal y jurídica</td>
-      <td>${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
+      <td>${imgFirma(gerenteFirma, 36)}${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
     </tr>
     <tr>
       <td>Fecha: 13/04/2026</td>
@@ -1587,14 +1743,39 @@ Router.register('empleados', {
       <td>Fecha: 14/04/2026</td>
     </tr>
   </table>
-</body>
-</html>`;
+`;
 
-    const ventana = window.open('', '_blank');
-    if (!ventana) {
-      alert('El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.');
-      return;
-    }
+    const estilos = `
+  .page { padding: 30px 34px; font-size: 13.5px; line-height: 1.7; }
+  table { width: 100%; border-collapse: collapse; }
+  .doc-header td { border: 1.6px solid #000; padding: 12px 14px; vertical-align: middle; }
+  .doc-header .brand-cell { width: 24%; }
+  .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: #0a1930; }
+  .doc-header .brand svg { flex: none; }
+  .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 16px; letter-spacing: 0.02em; }
+  .doc-header .meta-cell { width: 22%; font-size: 12px; line-height: 1.6; }
+  .doc-header .meta-cell b { font-weight: 700; }
+  .empresa { text-align: center; font-weight: 700; margin: 30px 0 6px; }
+  .nit { text-align: center; margin: 0 0 34px; }
+  .expedicion { margin: 0 0 34px; }
+  .interese { text-align: center; font-weight: 700; margin: 0 0 30px; }
+  .parrafo { margin: 0 0 22px; text-align: left; }
+  .firma { margin-top: 70px; }
+  .firma .linea { display: block; width: 250px; border-top: 1px solid #000; margin-bottom: 6px; }
+  .firma .nombre { font-weight: 700; }
+  .footer-dir { margin-top: 40px; font-size: 12px; }
+  .aprobacion { margin-top: 28px; }
+  .aprobacion td, .aprobacion th { border: 1px solid #000; padding: 7px 9px; font-size: 11px; }
+  .aprobacion th { background: #f3f4f6; font-weight: 700; text-align: left; }
+`;
+
+    const html = this._paginaImprimible({
+      titulo: `Certificación laboral — ${datos.nombre}`,
+      estilos,
+      cuerpoHtml,
+      archivo: `certificado-laboral-${slugArchivo(datos.nombre)}.pdf`,
+    });
+
     ventana.document.open();
     ventana.document.write(html);
     ventana.document.close();
