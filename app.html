@@ -792,7 +792,7 @@
 
         <!-- ================= PERSONAL: ALERTAS ================= -->
         <section data-view="personal-alertas" class="view">
-          <p class="view-intro">Personas mayores de 50 años, personas sin dotación entregada y conductores sin base asignada en la planta activa -- seguimiento para gestión humana, SG-SST y bodega.</p>
+          <p class="view-intro">Personas mayores de 50 años, personas sin dotación entregada, personas con el perfil sin actualizar y conductores sin base asignada en la planta activa -- seguimiento para gestión humana, SG-SST y bodega.</p>
 
           <div class="toolbar">
             <label class="filtro-inline">
@@ -821,12 +821,27 @@
               <div class="section-heading">
                 <h2>Sin dotación entregada</h2>
                 <p class="view-intro" id="pa-sindotacion-subtitulo" style="margin:0.2rem 0 0">0 persona(s)</p>
+                <p class="view-intro" id="pa-sindotacion-proxima" style="margin:0.2rem 0 0"></p>
               </div>
               <div id="pa-sindotacion-lista" class="detalle-list detalle-list-scroll"></div>
             </div>
             <div class="panel-card chart-card">
               <div class="section-heading"><h2>Sin dotación entregada por cargo</h2></div>
               <div id="pa-bars-sindotacion-cargo" class="ranked-bars"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Perfil sin actualizar</h2>
+                <p class="view-intro" id="pa-sinperfil-subtitulo" style="margin:0.2rem 0 0">0 persona(s)</p>
+              </div>
+              <div id="pa-sinperfil-lista" class="detalle-list detalle-list-scroll"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Perfil sin actualizar por cargo</h2></div>
+              <div id="pa-bars-sinperfil-cargo" class="ranked-bars"></div>
             </div>
           </div>
 

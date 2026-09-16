@@ -42,6 +42,13 @@ Router.register('personal-alertas', {
     this._dotacionIds = dotacionIds;
     this._llenarFiltroCargo(this._empleadosAll);
     this._aplicarFiltro();
+
+    // periodoDeFecha (definida en empleados.js, se carga antes en app.html)
+    // ya clasifica cualquier fecha en su período de entrega (Abril/Agosto/
+    // Diciembre) -- aplicada a la fecha de hoy, ese mismo período es el que
+    // todavía no ha cerrado, o sea la próxima entrega.
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    document.getElementById('pa-sindotacion-proxima').textContent = `Próxima entrega estimada: ${periodoDeFecha(hoyISO)}`;
   },
 
   // Cargo se llena con los valores que realmente existen en los datos (no
@@ -79,6 +86,15 @@ Router.register('personal-alertas', {
       .filter((e) => !this._dotacionIds.has(e.id))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     this._renderSinDotacion(sinDotacion);
+
+    // Mismo criterio que la tarjeta "Perfiles pendientes" de Empleados
+    // (perfil_sociodemografico ausente = todavía no diligenció el link
+    // público de actualización), pero acá como alerta de seguimiento, igual
+    // que sinDotacion.
+    const sinPerfil = empleados
+      .filter((e) => !e.perfil_sociodemografico)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    this._renderSinPerfil(sinPerfil);
 
     // Solo activos (ya viene filtrado desde onEnter) -- a un conductor
     // inactivo no tiene sentido pedirle que se le complete la base, esta
@@ -121,6 +137,23 @@ Router.register('personal-alertas', {
         </div>
       `).join('');
     this._renderRankedBars('pa-bars-sindotacion-cargo', distribucion(items, (e) => e.cargo));
+  },
+
+  // Igual patrón que _renderSinDotacion -- para que gestión humana sepa a
+  // quién le falta diligenciar el link público sin tener que ir a Empleados
+  // y filtrar por "Pendiente" uno por uno.
+  _renderSinPerfil(items) {
+    document.getElementById('pa-sinperfil-subtitulo').textContent = `${items.length} persona(s)`;
+    const lista = document.getElementById('pa-sinperfil-lista');
+    lista.innerHTML = items.length === 0
+      ? '<p class="empty-note">Todos tienen su perfil sociodemográfico actualizado.</p>'
+      : items.map((e) => `
+        <div class="detalle-list-item">
+          <span class="detalle-list-item-main">${e.nombre}</span>
+          <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · CC ${e.cedula}</span>
+        </div>
+      `).join('');
+    this._renderRankedBars('pa-bars-sinperfil-cargo', distribucion(items, (e) => e.cargo));
   },
 
   // Cruce Empleados + vehículo asignado: conductores activos a los que
