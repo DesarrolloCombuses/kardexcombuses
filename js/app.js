@@ -4,6 +4,7 @@
 
   window.APP_ROLE = await Permissions.resolveRole(session.user.email);
   window.APP_GRUPO = window.APP_ROLE === 'empleado' ? await DB.getMiGrupo() : null;
+  window.APP_PERMISOS_MODULOS = window.APP_ROLE === 'empleado' ? await DB.getMisPermisosModulos() : null;
 
   document.getElementById('user-email').textContent = session.user.email;
   document.getElementById('user-avatar').textContent = session.user.email.slice(0, 2).toUpperCase();
@@ -24,6 +25,12 @@
       'permisos-vacaciones', 'aspirantes', 'empleados',
       'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil',
     ] : [];
+    // Permisos sueltos por módulo (ver DB.getMisPermisosModulos()): cualquier
+    // módulo donde el admin le haya dado "ver" a esta cuenta puntual, por
+    // encima de lo que ya da el grupo.
+    Object.keys(window.APP_PERMISOS_MODULOS || {}).forEach((modulo) => {
+      if (window.APP_PERMISOS_MODULOS[modulo].ver && !extra.includes(modulo)) extra.push(modulo);
+    });
     document.querySelectorAll('[data-nav]').forEach((el) => {
       if (el.dataset.nav !== 'mis-permisos' && !extra.includes(el.dataset.nav)) el.remove();
     });

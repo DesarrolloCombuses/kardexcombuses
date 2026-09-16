@@ -62,12 +62,18 @@ window.Permissions = {
     return ownId ? 'empleado' : null;
   },
 
-  canAccessView(role, view, grupo) {
+  // permisosModulos: mapa { [modulo]: {ver,agregar,editar,borrar} } del
+  // empleado autenticado (ver DB.getMisPermisosModulos() y
+  // sql/permisos_granulares_2026-09-16.sql) -- permisos sueltos que el
+  // admin le dio a esta cuenta puntual, por encima de lo que ya da el
+  // grupo.
+  canAccessView(role, view, grupo, permisosModulos) {
     if (role === 'admin') return true;
     if (role === 'viewer') return VIEWER_ALLOWED_VIEWS.includes(view);
     if (role === 'empleado') {
       if (EMPLEADO_ALLOWED_VIEWS.includes(view)) return true;
-      return (GRUPO_EXTRA_VIEWS[grupo] || []).includes(view);
+      if ((GRUPO_EXTRA_VIEWS[grupo] || []).includes(view)) return true;
+      return !!permisosModulos?.[view]?.ver;
     }
     return false;
   },

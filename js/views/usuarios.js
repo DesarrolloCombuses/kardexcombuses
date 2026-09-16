@@ -2,6 +2,40 @@
 // asigna un grupo. La creación real de la cuenta de Supabase Auth pasa por
 // la Edge Function kardex-crear-usuario (ver DB.crearUsuario) -- acá solo se
 // arma el formulario y se pinta el directorio de cuentas ya creadas.
+//
+// Además, cada usuario puede tener permisos sueltos por módulo (ver/agregar/
+// editar/borrar), aditivos por encima de lo que ya da su grupo -- ver
+// sql/permisos_granulares_2026-09-16.sql. Se editan en el modal compartido
+// (#modal-backdrop), mismo patrón que el detalle de Historial.
+
+// Mismos módulos que sql/permisos_granulares_2026-09-16.sql, agrupados como
+// en el sidebar para que la matriz se lea igual de organizada.
+const SECCIONES_PERMISOS = [
+  { titulo: 'Inventario', modulos: [
+    { key: 'inventario', label: 'Inventario' },
+    { key: 'inventario-historico', label: 'Historial de inventario' },
+    { key: 'nueva-prenda', label: 'Nueva prenda' },
+    { key: 'estadisticas', label: 'Estadísticas' },
+  ] },
+  { titulo: 'Movimientos', modulos: [
+    { key: 'entrada', label: 'Entrada' },
+    { key: 'salida', label: 'Salida' },
+    { key: 'historial', label: 'Historial' },
+    { key: 'facturas', label: 'Facturas' },
+  ] },
+  { titulo: 'Personal', modulos: [
+    { key: 'aspirantes', label: 'Selección de personal' },
+    { key: 'empleados', label: 'Empleados' },
+    { key: 'personal-cumpleanos', label: 'Cumpleaños' },
+    { key: 'personal-alertas', label: 'Alertas' },
+    { key: 'personal-conductores', label: 'Conductores por ruta' },
+    { key: 'personal-perfil', label: 'Perfil sociodemográfico' },
+    { key: 'permisos-vacaciones', label: 'Permisos y vacaciones' },
+  ] },
+  { titulo: 'Siniestros', modulos: [
+    { key: 'siniestros-transito', label: 'Comparendos, accidentes y siniestros' },
+  ] },
+];
 
 Router.register('usuarios', {
   title: 'Usuarios',
@@ -80,6 +114,7 @@ Router.register('usuarios', {
           <div class="person-meta"><span>${u.employee?.nombre || '—'} · CC ${u.employee?.cedula || '—'}</span></div>
         </div>
         <span class="tag activo">${u.grupo}</span>
+        <button type="button" class="btn-secondary" data-permisos="${u.employee_id}">Editar permisos</button>
         <button type="button" class="btn-secondary" data-quitar="${u.employee_id}">Quitar grupo</button>
       </div>
     `).join('');
@@ -87,6 +122,80 @@ Router.register('usuarios', {
     lista.querySelectorAll('[data-quitar]').forEach((btn) => {
       btn.addEventListener('click', () => this._quitarGrupo(btn.dataset.quitar));
     });
+    lista.querySelectorAll('[data-permisos]').forEach((btn) => {
+      btn.addEventListener('click', () => this._abrirPermisos(btn.dataset.permisos));
+    });
+  },
+
+  async _abrirPermisos(employeeId) {
+    const usuario = this._usuarios.find((u) => u.employee_id === employeeId);
+    Loading.show('Cargando permisos…');
+    let permisos;
+    try {
+      permisos = await DB.getPermisosUsuario(employeeId);
+    } catch (err) {
+      Loading.hide();
+      alert('No se pudieron cargar los permisos: ' + err.message);
+      return;
+    }
+    Loading.hide();
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="modal-header">
+        <span class="modal-header-fecha">Permisos de ${usuario?.alias || 'este usuario'}</span>
+      </div>
+      <p class="view-intro">Permisos sueltos por módulo, además de lo que ya le da su grupo (${usuario?.grupo || '—'}).</p>
+      <div class="table-wrap">
+        <table id="perm-tabla">
+          <thead><tr><th>Módulo</th><th style="text-align:center">Ver</th><th style="text-align:center">Agregar</th><th style="text-align:center">Editar</th><th style="text-align:center">Borrar</th></tr></thead>
+          <tbody>
+            ${SECCIONES_PERMISOS.map((seccion) => `
+              <tr><td colspan="5" style="background:var(--slate-50);font-weight:700;color:var(--slate-500);font-size:0.76rem;text-transform:uppercase;letter-spacing:0.04em">${seccion.titulo}</td></tr>
+              ${seccion.modulos.map((m) => {
+                const p = permisos[m.key] || {};
+                return `
+                  <tr data-modulo="${m.key}">
+                    <td>${m.label}</td>
+                    <td style="text-align:center"><input type="checkbox" data-accion="ver" ${p.ver ? 'checked' : ''} /></td>
+                    <td style="text-align:center"><input type="checkbox" data-accion="agregar" ${p.agregar ? 'checked' : ''} /></td>
+                    <td style="text-align:center"><input type="checkbox" data-accion="editar" ${p.editar ? 'checked' : ''} /></td>
+                    <td style="text-align:center"><input type="checkbox" data-accion="borrar" ${p.borrar ? 'checked' : ''} /></td>
+                  </tr>
+                `;
+              }).join('')}
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:1.2rem">
+        <button type="button" id="perm-guardar-btn">Guardar permisos</button>
+        <p id="perm-msg" class="form-msg"></p>
+      </div>
+    `;
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
+
+    document.getElementById('perm-guardar-btn').addEventListener('click', () => this._guardarPermisos(employeeId));
+  },
+
+  async _guardarPermisos(employeeId) {
+    const msg = document.getElementById('perm-msg');
+    const filas = [...document.querySelectorAll('#perm-tabla tr[data-modulo]')].map((tr) => {
+      const get = (accion) => tr.querySelector(`input[data-accion="${accion}"]`).checked;
+      return { modulo: tr.dataset.modulo, ver: get('ver'), agregar: get('agregar'), editar: get('editar'), borrar: get('borrar') };
+    });
+
+    Loading.show('Guardando…');
+    try {
+      await DB.guardarPermisosUsuario(employeeId, filas);
+      msg.textContent = 'Permisos guardados.';
+      msg.className = 'form-msg success';
+    } catch (err) {
+      msg.textContent = 'No se pudo guardar: ' + err.message;
+      msg.className = 'form-msg error';
+    } finally {
+      Loading.hide();
+    }
   },
 
   async _quitarGrupo(employeeId) {

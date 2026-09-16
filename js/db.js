@@ -961,6 +961,55 @@ const DB = {
     if (error) throw error;
   },
 
+  // Permisos sueltos por módulo (ver/agregar/editar/borrar), aditivos por
+  // encima de lo que ya da el grupo -- ver sql/permisos_granulares_2026-09-16.sql.
+  async getMisPermisosModulos() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mis_permisos_modulos');
+    if (error) throw error;
+    const mapa = {};
+    (data || []).forEach((fila) => { mapa[fila.modulo] = fila; });
+    return mapa;
+  },
+
+  async getPermisosUsuario(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_permisos_usuario')
+      .select('*')
+      .eq('employee_id', employeeId);
+    if (error) throw error;
+    const mapa = {};
+    (data || []).forEach((fila) => { mapa[fila.modulo] = fila; });
+    return mapa;
+  },
+
+  // permisos: array de { modulo, ver, agregar, editar, borrar }. Se
+  // reemplazan todas las filas de ese empleado por las que traigan al
+  // menos un flag en true (más simple que ir comparando fila por fila).
+  async guardarPermisosUsuario(employeeId, permisos) {
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const { error: delError } = await window.supabaseClient
+      .from('kardex_permisos_usuario')
+      .delete()
+      .eq('employee_id', employeeId);
+    if (delError) throw delError;
+
+    const filas = permisos
+      .filter((p) => p.ver || p.agregar || p.editar || p.borrar)
+      .map((p) => ({
+        employee_id: employeeId,
+        modulo: p.modulo,
+        ver: !!p.ver,
+        agregar: !!p.agregar,
+        editar: !!p.editar,
+        borrar: !!p.borrar,
+        creado_por_email: sessionData.session.user.email,
+      }));
+    if (filas.length === 0) return;
+
+    const { error: insError } = await window.supabaseClient.from('kardex_permisos_usuario').insert(filas);
+    if (insError) throw insError;
+  },
+
   // ---- Tiempo real ------------------------------------------------------------
 
   // Se suscribe a INSERT/UPDATE/DELETE en una o varias tablas y llama a
