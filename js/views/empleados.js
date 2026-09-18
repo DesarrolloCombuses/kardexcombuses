@@ -368,34 +368,38 @@ Router.register('empleados', {
   // Las fechas van como números de serie de Excel (ver fechaCeldaExcel) con
   // formato d/m/aaaa, para que en Excel se puedan ordenar/filtrar como
   // fecha de verdad y no como texto.
+  //
+  // Las columnas que el admin le ocultó a esta cuenta desde Usuarios (ver
+  // DB.camposOcultosEmpleados, sql/columnas_ocultas_empleados_2026-09-18.sql)
+  // ni siquiera aparecen acá -- no es que salgan vacías, la columna entera
+  // se omite del archivo.
   _buildExcel(empleados) {
-    const header = [
-      'Cédula', 'Nombre', 'Estado', 'Cargo', 'Área', 'Base', 'Ruta', 'Vehículo',
-      'Teléfono', 'Email personal', 'Fecha de ingreso', 'Fecha de salida', 'Motivo de renuncia',
-      ...CAMPOS_SOCIODEMOGRAFICOS.filter((c) => c.id !== 'fecha_ingreso').map((c) => c.label),
-      'Perfil completo',
-    ];
+    const ocultos = DB.camposOcultosEmpleados();
+    const columnasCore = [
+      { label: 'Cédula', get: (e) => e.cedula },
+      { label: 'Nombre', get: (e) => e.nombre },
+      { label: 'Estado', get: (e) => (e.activo ? 'Activo' : 'Retirado') },
+      { label: 'Cargo', get: (e) => e.cargo || '' },
+      { label: 'Área', get: (e) => e.area || '' },
+      { label: 'Base', get: (e) => e.base || '' },
+      { label: 'Ruta', get: (e) => e.ruta || '' },
+      { label: 'Vehículo', get: (e) => e.numero_interno || '' },
+      { id: 'telefono', label: 'Teléfono', get: (e) => e.telefono || '' },
+      { id: 'email_personal', label: 'Email personal', get: (e) => e.email_personal || '' },
+      { id: 'fecha_ingreso', label: 'Fecha de ingreso', get: (e) => fechaCeldaExcel((e.perfil_sociodemografico || {}).fecha_ingreso) },
+      { id: 'fecha_salida', label: 'Fecha de salida', get: (e) => fechaCeldaExcel(e.fecha_salida) },
+      { id: 'motivo_renuncia', label: 'Motivo de renuncia', get: (e) => e.motivo_renuncia || '' },
+    ].filter((c) => !c.id || !ocultos.has(c.id));
+    const columnasPerfil = CAMPOS_SOCIODEMOGRAFICOS.filter((c) => c.id !== 'fecha_ingreso' && !ocultos.has(c.id));
+
+    const header = [...columnasCore.map((c) => c.label), ...columnasPerfil.map((c) => c.label), 'Perfil completo'];
     const camposFecha = new Set(['Fecha de ingreso', 'Fecha de salida', 'Fecha de nacimiento']);
 
     const filas = empleados.map((e) => {
       const p = e.perfil_sociodemografico || {};
-      const fila = {
-        'Cédula': e.cedula,
-        'Nombre': e.nombre,
-        'Estado': e.activo ? 'Activo' : 'Retirado',
-        'Cargo': e.cargo || '',
-        'Área': e.area || '',
-        'Base': e.base || '',
-        'Ruta': e.ruta || '',
-        'Vehículo': e.numero_interno || '',
-        'Teléfono': e.telefono || '',
-        'Email personal': e.email_personal || '',
-        'Fecha de ingreso': fechaCeldaExcel(p.fecha_ingreso),
-        'Fecha de salida': fechaCeldaExcel(e.fecha_salida),
-        'Motivo de renuncia': e.motivo_renuncia || '',
-      };
-      CAMPOS_SOCIODEMOGRAFICOS.forEach((campo) => {
-        if (campo.id === 'fecha_ingreso') return; // ya va arriba con los demás datos laborales
+      const fila = {};
+      columnasCore.forEach((c) => { fila[c.label] = c.get(e); });
+      columnasPerfil.forEach((campo) => {
         const valor = p[campo.id];
         if (campo.type === 'date') fila[campo.label] = fechaCeldaExcel(valor);
         else if (campo.type === 'checkbox') fila[campo.label] = valor ? 'Sí' : 'No';

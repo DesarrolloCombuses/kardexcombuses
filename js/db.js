@@ -615,29 +615,77 @@ const DB = {
   // trae contactos de emergencia e hijos (1 a muchos, PostgREST los
   // devuelve como arreglo) para no tener que pedirlos aparte al abrir cada
   // ficha o formulario de empleado.
-  // PostgREST solo devuelve hasta 1000 filas por consulta (límite del lado
-  // del servidor, no algo que se pueda subir desde el cliente) -- con más de
-  // 1000 empleados en la tabla, sin paginar se perdía en silencio todo lo
-  // que quedara después del corte alfabético (ej. apellidos con "V" en
-  // adelante), sin ningún error visible.
+  //
+  // Pasa por el RPC kardex_empleados_con_perfil (ver
+  // sql/columnas_ocultas_empleados_2026-09-18.sql) en vez de un select()
+  // directo -- si el admin le ocultó columnas a esta cuenta desde Usuarios,
+  // el propio servidor arma la respuesta sin esas claves (no depende de qué
+  // pida el cliente). Mismo shape de retorno que antes (array plano con
+  // perfil_sociodemografico/contactos_emergencia/hijos_empleado embebidos),
+  // así que las vistas que ya la llaman no cambian.
+  //
+  // El RPC no soporta paginar con .range() como un select() normal, así que
+  // recibe límite/desde y se repite el mismo bucle -- PostgREST igual capa
+  // en 1000 filas por llamada (límite del lado del servidor, no algo que se
+  // pueda subir desde el cliente) -- con más de 1000 empleados en la tabla,
+  // sin paginar se perdía en silencio todo lo que quedara después del corte
+  // alfabético (ej. apellidos con "V" en adelante), sin ningún error visible.
   async getEmployeesConPerfil({ onlyActive = true } = {}) {
     const PAGE_SIZE = 1000;
     let empleados = [];
     let desde = 0;
+    let camposOcultos = [];
     for (;;) {
-      let query = window.supabaseClient
-        .from('employees')
-        .select('*, perfil_sociodemografico ( * ), contactos_emergencia ( * ), hijos_empleado ( * )')
-        .order('nombre')
-        .range(desde, desde + PAGE_SIZE - 1);
-      if (onlyActive) query = query.eq('activo', true);
-      const { data, error } = await query;
+      const { data, error } = await window.supabaseClient.rpc('kardex_empleados_con_perfil', {
+        p_only_active: onlyActive,
+        p_limit: PAGE_SIZE,
+        p_offset: desde,
+      });
       if (error) throw error;
-      empleados = empleados.concat(data);
-      if (data.length < PAGE_SIZE) break;
+      empleados = empleados.concat(data.empleados);
+      camposOcultos = data.campos_ocultos || [];
+      if (data.empleados.length < PAGE_SIZE) break;
       desde += PAGE_SIZE;
     }
+    this._camposOcultosEmpleados = new Set(camposOcultos);
     return empleados;
+  },
+
+  // Campos que la cuenta actual tiene ocultos en Empleados (ver y
+  // descargar) -- se llena como efecto de getEmployeesConPerfil, que
+  // siempre se llama antes de usar esto (ver _buildExcel en
+  // js/views/empleados.js). Vacío para admin/GESTION HUMANA o cualquier
+  // cuenta sin restricción configurada.
+  camposOcultosEmpleados() {
+    return this._camposOcultosEmpleados || new Set();
+  },
+
+  // Columnas ocultas configuradas hoy para un empleado puntual -- para
+  // precargar el formulario "Editar permisos" en Usuarios.
+  async getColumnasOcultasEmpleado(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_columnas_ocultas_empleados')
+      .select('campo')
+      .eq('employee_id', employeeId);
+    if (error) throw error;
+    return new Set((data || []).map((f) => f.campo));
+  },
+
+  // Mismo patrón borrar-todo-y-reinsertar que guardarPermisosUsuario --
+  // más simple que llevar el control de qué campo se marcó/desmarcó.
+  async guardarColumnasOcultasEmpleado(employeeId, campos) {
+    const { error: delError } = await window.supabaseClient
+      .from('kardex_columnas_ocultas_empleados')
+      .delete()
+      .eq('employee_id', employeeId);
+    if (delError) throw delError;
+    if (!campos.length) return;
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const creadoPorEmail = sessionData?.session?.user?.email || 'desconocido';
+    const { error } = await window.supabaseClient
+      .from('kardex_columnas_ocultas_empleados')
+      .insert(campos.map((campo) => ({ employee_id: employeeId, campo, creado_por_email: creadoPorEmail })));
+    if (error) throw error;
   },
 
   // ---- Contactos de emergencia e hijos ---------------------------------------

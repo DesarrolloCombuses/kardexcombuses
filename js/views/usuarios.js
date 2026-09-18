@@ -37,6 +37,25 @@ const SECCIONES_PERMISOS = [
   ] },
 ];
 
+// Columnas de Empleados que se pueden ocultar por cuenta (ver
+// sql/columnas_ocultas_empleados_2026-09-18.sql) -- a diferencia de
+// SECCIONES_PERMISOS, esto NO es aditivo: es una restricción sobre lo que
+// ya daría el módulo/grupo, real en el servidor (kardex_empleados_con_perfil
+// arma la respuesta sin esas claves). id/nombre/cédula/cargo/área/base/
+// ruta/vehículo quedan siempre visibles a propósito -- otras vistas
+// (Conductores por ruta, por ejemplo) agrupan por esos campos.
+const CAMPOS_EMPLEADO_CORE = [
+  { id: 'telefono', label: 'Teléfono' },
+  { id: 'email_personal', label: 'Correo personal' },
+  { id: 'salario', label: 'Salario' },
+  { id: 'fecha_salida', label: 'Fecha de salida' },
+  { id: 'motivo_renuncia', label: 'Motivo de renuncia' },
+];
+const CAMPOS_EMPLEADO_RELACIONES = [
+  { id: 'contactos_emergencia', label: 'Contactos de emergencia' },
+  { id: 'hijos_empleado', label: 'Hijos' },
+];
+
 Router.register('usuarios', {
   title: 'Usuarios',
 
@@ -131,14 +150,26 @@ Router.register('usuarios', {
     const usuario = this._usuarios.find((u) => u.employee_id === employeeId);
     Loading.show('Cargando permisos…');
     let permisos;
+    let columnasOcultas;
     try {
-      permisos = await DB.getPermisosUsuario(employeeId);
+      [permisos, columnasOcultas] = await Promise.all([
+        DB.getPermisosUsuario(employeeId),
+        DB.getColumnasOcultasEmpleado(employeeId),
+      ]);
     } catch (err) {
       Loading.hide();
       alert('No se pudieron cargar los permisos: ' + err.message);
       return;
     }
     Loading.hide();
+
+    const filaColumna = (c) => `
+      <tr data-campo="${c.id}">
+        <td style="text-align:center"><input type="checkbox" data-campo-check ${columnasOcultas.has(c.id) ? '' : 'checked'} /></td>
+        <td>${c.label}</td>
+      </tr>
+    `;
+    const tituloGrupoColumnas = (texto) => `<tr><td colspan="2" style="background:var(--slate-50);font-weight:700;color:var(--slate-500);font-size:0.76rem;text-transform:uppercase;letter-spacing:0.04em">${texto}</td></tr>`;
 
     document.getElementById('modal-body').innerHTML = `
       <div class="modal-header">
@@ -167,6 +198,24 @@ Router.register('usuarios', {
           </tbody>
         </table>
       </div>
+
+      <div class="modal-section" style="margin-top:1.4rem">
+        <h3 class="modal-section-title">Columnas visibles de Empleados</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">Por defecto ve todo. Desmarca lo que esta cuenta NO deba ver ni descargar en Excel -- aplica en cualquier vista donde vea información de empleados (Empleados, Alertas, Cumpleaños, Conductores, Perfil).</p>
+        <div class="table-wrap">
+          <table id="col-tabla">
+            <tbody>
+              ${tituloGrupoColumnas('Datos laborales y contacto')}
+              ${CAMPOS_EMPLEADO_CORE.map(filaColumna).join('')}
+              ${tituloGrupoColumnas('Perfil sociodemográfico')}
+              ${CAMPOS_SOCIODEMOGRAFICOS.map(filaColumna).join('')}
+              ${tituloGrupoColumnas('Relaciones')}
+              ${CAMPOS_EMPLEADO_RELACIONES.map(filaColumna).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div style="margin-top:1.2rem">
         <button type="button" id="perm-guardar-btn">Guardar permisos</button>
         <p id="perm-msg" class="form-msg"></p>
@@ -184,10 +233,16 @@ Router.register('usuarios', {
       const get = (accion) => tr.querySelector(`input[data-accion="${accion}"]`).checked;
       return { modulo: tr.dataset.modulo, ver: get('ver'), agregar: get('agregar'), editar: get('editar'), borrar: get('borrar') };
     });
+    const columnasOcultas = [...document.querySelectorAll('#col-tabla tr[data-campo]')]
+      .filter((tr) => !tr.querySelector('input[data-campo-check]').checked)
+      .map((tr) => tr.dataset.campo);
 
     Loading.show('Guardando…');
     try {
-      await DB.guardarPermisosUsuario(employeeId, filas);
+      await Promise.all([
+        DB.guardarPermisosUsuario(employeeId, filas),
+        DB.guardarColumnasOcultasEmpleado(employeeId, columnasOcultas),
+      ]);
       msg.textContent = 'Permisos guardados.';
       msg.className = 'form-msg success';
     } catch (err) {
