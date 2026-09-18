@@ -688,6 +688,35 @@ const DB = {
     if (error) throw error;
   },
 
+  // ¿Esta cuenta está restringida a solo ver empleados activos? (ver
+  // sql/solo_activos_empleados_2026-09-18.sql) -- para precargar el
+  // checkbox en "Editar permisos".
+  async getSoloActivosEmpleado(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_restriccion_activos_empleados')
+      .select('employee_id')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+    if (error) throw error;
+    return !!data;
+  },
+
+  async guardarSoloActivosEmpleado(employeeId, soloActivos) {
+    if (soloActivos) {
+      const { data: sessionData } = await window.supabaseClient.auth.getSession();
+      const { error } = await window.supabaseClient
+        .from('kardex_restriccion_activos_empleados')
+        .upsert({ employee_id: employeeId, creado_por_email: sessionData?.session?.user?.email || 'desconocido' });
+      if (error) throw error;
+    } else {
+      const { error } = await window.supabaseClient
+        .from('kardex_restriccion_activos_empleados')
+        .delete()
+        .eq('employee_id', employeeId);
+      if (error) throw error;
+    }
+  },
+
   // ---- Contactos de emergencia e hijos ---------------------------------------
 
   // Ambas son listas (un empleado puede tener varios), así que en vez de un

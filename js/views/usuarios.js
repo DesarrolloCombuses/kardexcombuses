@@ -151,10 +151,12 @@ Router.register('usuarios', {
     Loading.show('Cargando permisos…');
     let permisos;
     let columnasOcultas;
+    let soloActivos;
     try {
-      [permisos, columnasOcultas] = await Promise.all([
+      [permisos, columnasOcultas, soloActivos] = await Promise.all([
         DB.getPermisosUsuario(employeeId),
         DB.getColumnasOcultasEmpleado(employeeId),
+        DB.getSoloActivosEmpleado(employeeId),
       ]);
     } catch (err) {
       Loading.hide();
@@ -202,6 +204,10 @@ Router.register('usuarios', {
       <div class="modal-section" style="margin-top:1.4rem">
         <h3 class="modal-section-title">Columnas visibles de Empleados</h3>
         <p class="view-intro" style="margin:0 0 0.6rem">Por defecto ve todo. Desmarca lo que esta cuenta NO deba ver ni descargar en Excel -- aplica en cualquier vista donde vea información de empleados (Empleados, Alertas, Cumpleaños, Conductores, Perfil).</p>
+        <label class="checkbox-label" style="display:block;margin:0 0 1rem">
+          <input type="checkbox" id="col-solo-activos" ${soloActivos ? 'checked' : ''} />
+          Mostrarle solo empleados activos (nunca inactivos/retirados, ni pidiendo "Todos" desde el buscador)
+        </label>
         <div class="table-wrap">
           <table id="col-tabla">
             <tbody>
@@ -236,12 +242,14 @@ Router.register('usuarios', {
     const columnasOcultas = [...document.querySelectorAll('#col-tabla tr[data-campo]')]
       .filter((tr) => !tr.querySelector('input[data-campo-check]').checked)
       .map((tr) => tr.dataset.campo);
+    const soloActivos = document.getElementById('col-solo-activos').checked;
 
     Loading.show('Guardando…');
     try {
       await Promise.all([
         DB.guardarPermisosUsuario(employeeId, filas),
         DB.guardarColumnasOcultasEmpleado(employeeId, columnasOcultas),
+        DB.guardarSoloActivosEmpleado(employeeId, soloActivos),
       ]);
       msg.textContent = 'Permisos guardados.';
       msg.className = 'form-msg success';
