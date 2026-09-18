@@ -43,8 +43,10 @@ const RUTA_A_CUENTA: Record<string, string> = {
   "700": "urbana",
   "2": "urbana2",
   "41": "urbana2",
+  "313": "urbana2",
   AEROPUERTO: "urbana",
   "URBANAS ZAMORA-ARANJUEZ": "urbana2",
+  "ARANJUEZ - GUADALUPE": "urbana2",
 };
 
 // La ruta puede llegar como "700", "Ruta 700" o "R700" según quién la
