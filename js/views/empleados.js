@@ -81,7 +81,7 @@ function valorCampoDetalle(campo, valor) {
 // una cuenta/flota en Sonar, así que cada ruta nueva se agrega en los dos
 // lados: acá solo decide si se ofrece el envío, la Edge Function decide con
 // qué cuenta se envía).
-const RUTAS_SONAR = ['700', '2', '41', 'AEROPUERTO'];
+const RUTAS_SONAR = ['700', '2', '41', 'AEROPUERTO', 'URBANAS ZAMORA-ARANJUEZ'];
 
 // La ruta puede quedar escrita como "700", "Ruta 700" o "R700" según quién
 // la digite -- si tiene dígitos se compara solo por esos (para no depender
