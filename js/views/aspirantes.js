@@ -37,6 +37,17 @@ function firmaNombreAspirante(nombre) {
     .join('|');
 }
 
+// Mismo criterio que descripcionEstadoEmpleado() en js/views/empleados.js --
+// deja claro si es un reingreso real (inactivo, con fecha y motivo de
+// salida) en vez de solo decir "inactivo" a secas.
+function descripcionEstadoEmpleadoAspirante(h) {
+  if (h.activo) return 'activo';
+  let desc = 'inactivo';
+  if (h.fecha_salida) desc += ` desde el ${formatFechaAspirante(h.fecha_salida)}`;
+  if (h.motivo_renuncia) desc += ` (motivo: ${h.motivo_renuncia})`;
+  return desc;
+}
+
 Router.register('aspirantes', {
   title: 'Selección de personal',
 
@@ -388,11 +399,11 @@ Router.register('aspirantes', {
     );
     if (homonimos.length) {
       const detalle = homonimos
-        .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${h.activo ? 'activo' : 'inactivo'})`)
+        .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${descripcionEstadoEmpleadoAspirante(h)})`)
         .join('\n');
       const continuarNombre = confirm(
         `Ya existe un empleado con el mismo nombre pero cédula distinta:\n\n${detalle}\n\n` +
-        `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona (reingreso), cancela y corrige la cédula del aspirante antes de seleccionar -- seleccionar así crea un registro duplicado.`
+        `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona que vuelve a la empresa (reingreso), cancela y corrige la cédula del aspirante antes de seleccionar -- seleccionar así crea un registro duplicado.`
       );
       if (!continuarNombre) {
         alert('No se seleccionó al candidato. Corrige la cédula en su ficha de aspirante antes de reintentar.');

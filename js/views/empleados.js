@@ -142,6 +142,18 @@ function firmaNombre(nombre) {
     .join('|');
 }
 
+// Para los avisos de "ya existe alguien con este nombre/cédula": deja claro
+// si es un reingreso real (inactivo, con fecha y motivo de salida) en vez de
+// solo decir "inactivo" a secas -- es la información que hace falta para
+// decidir si es la misma persona o un homónimo.
+function descripcionEstadoEmpleado(h) {
+  if (h.activo) return 'activo';
+  let desc = 'inactivo';
+  if (h.fecha_salida) desc += ` desde el ${formatFecha(h.fecha_salida)}`;
+  if (h.motivo_renuncia) desc += ` (motivo: ${h.motivo_renuncia})`;
+  return desc;
+}
+
 // Mismo criterio de períodos que Historial (ver js/views/historial.js):
 // Combuses entrega dotación 3 veces al año, el período se calcula solo a
 // partir de la fecha de entrega, sin depender de que alguien lo anote.
@@ -2158,11 +2170,11 @@ Router.register('empleados', {
       );
       if (homonimos.length) {
         const detalle = homonimos
-          .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${h.activo ? 'activo' : 'inactivo'})`)
+          .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${descripcionEstadoEmpleado(h)})`)
           .join('\n');
         const continuar = confirm(
           `Ya existe un empleado con el mismo nombre pero cédula distinta:\n\n${detalle}\n\n` +
-          `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona, cancela y corrige la cédula antes de guardar -- guardar así crea un registro duplicado.`
+          `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona que vuelve a la empresa (reingreso), cancela y corrige la cédula antes de guardar -- guardar así crea un registro duplicado.`
         );
         if (!continuar) {
           msg.textContent = 'Creación cancelada.';
