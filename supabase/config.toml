@@ -431,3 +431,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/subir-foto-perfil-publico/deno.json"
 entrypoint = "./functions/subir-foto-perfil-publico/index.ts"
+
+# verify_jwt = false porque también la llama el cron (sin JWT real, con el
+# header x-cron-secret) -- la función valida ella misma la llamada, sea de
+# cron o de un usuario con sesión (ver autorizarLlamada en index.ts).
+[functions.sync-siniestros]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-siniestros/deno.json"
+entrypoint = "./functions/sync-siniestros/index.ts"

@@ -99,6 +99,7 @@ Router.register('siniestros-transito', {
     if (!this._bound) {
       document.getElementById('st-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('st-filtro-tipo').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('st-sst-actualizar-btn').addEventListener('click', () => this._actualizarSiniestrosAhora());
       this._bound = true;
     }
 
@@ -130,9 +131,10 @@ Router.register('siniestros-transito', {
       sstMsg.classList.add('hidden');
     } catch (err) {
       this._siniestros = [];
-      sstMsg.textContent = 'No se pudieron cargar los siniestros de SST en este momento (puede que el Google Sheet publicado esté caído o su link haya cambiado). Comparendos y accidentes sí se muestran normalmente.';
+      sstMsg.textContent = 'No se pudieron cargar los siniestros de SST en este momento. Comparendos y accidentes sí se muestran normalmente.';
       sstMsg.classList.remove('hidden');
     }
+    this._renderEstadoSync();
 
     // Lista unificada para la tabla/búsqueda/ranking -- las tres fuentes
     // comparten muy pocas columnas, así que cada una arma su propio texto de
@@ -171,6 +173,39 @@ Router.register('siniestros-transito', {
 
     this._render();
     this._aplicarFiltro();
+  },
+
+  // Hace cuánto se sincronizó por última vez la copia de siniestros SST en
+  // Supabase -- para que quede claro que no es "en vivo" y se note si el
+  // cron lleva mucho tiempo sin poder correr (ej. si Google cambió el link).
+  _renderEstadoSync() {
+    const el = document.getElementById('st-sst-sync-estado');
+    const ultima = Siniestros.ultimaSincronizacion();
+    if (!ultima) {
+      el.textContent = 'Siniestros SST: sin sincronizar todavía.';
+      return;
+    }
+    const fecha = new Date(ultima);
+    const minutos = Math.round((Date.now() - fecha.getTime()) / 60000);
+    const hace = minutos < 1 ? 'hace un momento'
+      : minutos < 60 ? `hace ${minutos} min`
+        : `hace ${Math.round(minutos / 60)} h`;
+    el.textContent = `Siniestros SST actualizados ${hace} (${fecha.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}).`;
+  },
+
+  async _actualizarSiniestrosAhora() {
+    const boton = document.getElementById('st-sst-actualizar-btn');
+    const estado = document.getElementById('st-sst-sync-estado');
+    boton.disabled = true;
+    estado.textContent = 'Actualizando siniestros…';
+    try {
+      await Siniestros.actualizarAhora();
+      await this.onEnter();
+    } catch (err) {
+      estado.textContent = 'No se pudo actualizar: ' + err.message;
+    } finally {
+      boton.disabled = false;
+    }
   },
 
   _render() {

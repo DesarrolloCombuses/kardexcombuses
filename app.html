@@ -1191,7 +1191,11 @@
 
         <!-- ================= SINIESTROS DE TRANSITO ================= -->
         <section data-view="siniestros-transito" class="view">
-          <p class="view-intro">Comparendos y accidentes de tránsito (archivo que sube RRHH) más siniestros de SST (Google Sheet, en vivo), todos cruzados por cédula -- los mismos datos que ya se consultan uno por uno en el Paz y Salvo.</p>
+          <p class="view-intro">Comparendos y accidentes de tránsito (archivo que sube RRHH) más siniestros de SST (sincronizados desde un Google Sheet cada hora), todos cruzados por cédula -- los mismos datos que ya se consultan uno por uno en el Paz y Salvo.</p>
+          <div class="toolbar">
+            <span class="muted" id="st-sst-sync-estado">Siniestros SST: sin sincronizar todavía.</span>
+            <button type="button" class="btn-secondary" id="st-sst-actualizar-btn">Actualizar siniestros ahora</button>
+          </div>
           <p id="st-sst-msg" class="form-msg error hidden"></p>
 
           <div class="st-section" data-tone="blue">
