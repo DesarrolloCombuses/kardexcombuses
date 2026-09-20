@@ -63,8 +63,17 @@ function stParseFecha(valor) {
   if (!valor) return null;
   const s = String(valor).trim();
   if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const d = new Date(s);
+  // Se arma con los componentes (constructor de 3 argumentos, hora local) en
+  // vez de new Date(s) sobre el string completo -- si "s" no trae hora/zona
+  // explícita (puede pasar según cómo serialice el timestamptz), new Date()
+  // la interpreta como medianoche UTC, que en Colombia (UTC-5) corre la
+  // fecha -- y a veces el mes -- un día hacia atrás. Como acá solo importa
+  // el día calendario (para mostrar y para agrupar por mes), se ignora la
+  // hora a propósito.
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, yyyy, mm, dd] = isoMatch;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
     return isNaN(d.getTime()) ? null : d;
   }
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
@@ -100,6 +109,10 @@ Router.register('siniestros-transito', {
       document.getElementById('st-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('st-filtro-tipo').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('st-sst-actualizar-btn').addEventListener('click', () => this._actualizarSiniestrosAhora());
+      document.getElementById('st-mes-select').addEventListener('change', () => {
+        const porMes = this._mesesConDatos();
+        this._renderRanking(porMes.get(document.getElementById('st-mes-select').value) || [], 'st-ranking-mes');
+      });
       this._bound = true;
     }
 
@@ -234,15 +247,73 @@ Router.register('siniestros-transito', {
     stRenderBarChart('st-bars-conciliacion', stDistribucion(this._siniestros, (s) => s.conciliacion));
     stRenderBarChart('st-bars-definicion', stDistribucion(this._siniestros, (s) => (s.definicion === 'N/N' ? null : s.definicion)));
 
-    this._renderRanking();
+    this._renderRanking(this._items, 'st-ranking');
+    this._renderTopMensual();
+  },
+
+  // Agrupa this._items por mes calendario (según su fecha ya parseada) --
+  // para el trend "Incidentes por mes" y para el top de conductores de un
+  // mes puntual (en vez de solo el acumulado histórico de "st-ranking").
+  _mesesConDatos() {
+    const porMes = new Map();
+    this._items.forEach((it) => {
+      const fecha = stParseFecha(it.fecha);
+      if (!fecha) return;
+      const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      if (!porMes.has(key)) porMes.set(key, []);
+      porMes.get(key).push(it);
+    });
+    return porMes;
+  },
+
+  _capitaliza(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  },
+
+  // "Top del mes" (selector) + "Incidentes por mes" (tendencia, últimos 12
+  // meses con datos) -- para ver de un vistazo si un conductor puntual se
+  // repite mes a mes, no solo su total histórico.
+  _renderTopMensual() {
+    const porMes = this._mesesConDatos();
+    const hoy = new Date();
+    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+
+    // El selector incluye el mes actual aunque todavía no tenga incidentes
+    // registrados (para poder confirmar "0 en lo que va del mes" de una),
+    // más todos los meses que sí tienen datos.
+    const meses = [...new Set([mesActual, ...porMes.keys()])].sort().reverse();
+
+    const sel = document.getElementById('st-mes-select');
+    const seleccionPrevia = sel.value;
+    sel.innerHTML = meses.map((k) => {
+      const [anio, mes] = k.split('-').map(Number);
+      const label = new Date(anio, mes - 1, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+      return `<option value="${k}">${this._capitaliza(label)}</option>`;
+    }).join('');
+    sel.value = meses.includes(seleccionPrevia) ? seleccionPrevia : mesActual;
+
+    this._renderRanking(porMes.get(sel.value) || [], 'st-ranking-mes');
+
+    // Tendencia: últimos 12 meses con datos, más reciente primero -- mismo
+    // orden que el resto de listas de esta app (cumpleaños próximos,
+    // historial, etc.).
+    const ultimos12 = [...porMes.keys()].sort().reverse().slice(0, 12);
+    const dist = ultimos12.map((k) => {
+      const [anio, mes] = k.split('-').map(Number);
+      const label = new Date(anio, mes - 1, 1).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' });
+      return { label: this._capitaliza(label), count: (porMes.get(k) || []).length };
+    });
+    stRenderBarChart('st-bars-mensual', dist);
   },
 
   // Leaderboard de conductores con más incidentes (comparendos + accidentes
   // + siniestros sumados) -- el dato que más le sirve a SST para saber a
-  // quién llamar primero a una charla de seguridad vial.
-  _renderRanking() {
+  // quién llamar primero a una charla de seguridad vial. Reutilizado tanto
+  // para el acumulado histórico (st-ranking) como para el top de un mes
+  // puntual (st-ranking-mes).
+  _renderRanking(items, elId) {
     const porCedula = new Map();
-    this._items.forEach((it) => {
+    items.forEach((it) => {
       if (!it.cedula) return;
       const actual = porCedula.get(it.cedula) || { nombre: it.nombre, count: 0 };
       if (!actual.nombre && it.nombre) actual.nombre = it.nombre;
@@ -254,9 +325,9 @@ Router.register('siniestros-transito', {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const el = document.getElementById('st-ranking');
+    const el = document.getElementById(elId);
     if (!ranking.length) {
-      el.innerHTML = '<p class="empty-note">Sin datos todavía.</p>';
+      el.innerHTML = '<p class="empty-note">Sin incidentes en este período.</p>';
       return;
     }
     const max = ranking[0].count || 1;
