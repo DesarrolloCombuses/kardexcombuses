@@ -345,6 +345,21 @@ const DB = {
     return data;
   },
 
+  // Parque automotor: tabla que carga aparte quien administra la flota (no
+  // desde este ERP), con la placa/interno de cada bus y las fechas de
+  // vencimiento de sus documentos (SOAT, gases, tecnomecánica, tarjeta de
+  // operación). select('*') a propósito: son columnas con espacios/mayúsculas
+  // en el nombre ("Fecha Vencimiento Soat", etc.) y son pocas filas, no vale
+  // la pena listar cada una a mano y arriesgar un typo en el nombre entre
+  // comillas.
+  async getParqueAutomotor() {
+    const { data, error } = await window.supabaseClient
+      .from('parque_automotor')
+      .select('*');
+    if (error) throw error;
+    return data;
+  },
+
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,
   // cédula, cargo al que aspiraba) y deja el vínculo guardado en
   // aspirantes.employee_id -- así no se puede convertir dos veces por error

@@ -35,6 +35,9 @@ const SECCIONES_PERMISOS = [
   { titulo: 'Siniestros', modulos: [
     { key: 'siniestros-transito', label: 'Comparendos, accidentes y siniestros' },
   ] },
+  { titulo: 'Parque automotor', modulos: [
+    { key: 'parque-automotor', label: 'Vencimiento de documentos' },
+  ] },
 ];
 
 // Columnas de Empleados que se pueden ocultar por cuenta (ver
