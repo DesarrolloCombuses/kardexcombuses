@@ -16,3 +16,7 @@ sql/accidentes_infracciones_import_*.sql
 # Reportes/exports generados con datos personales reales de empleados
 # (cedulas, nombres) para revisión local -- nunca a git.
 _export_local/
+
+# Exports de BUK u otras fuentes externas con cedulas/nombres reales que el
+# usuario deja sueltos en la carpeta del proyecto para comparar -- nunca a git.
+personal.csv

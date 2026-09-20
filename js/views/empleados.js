@@ -717,6 +717,15 @@ Router.register('empleados', {
         </div>
       </div>
 
+      ${empleado.revision_pendiente ? `
+      <div class="callout warn">
+        <div>
+          <strong>Pendiente de confirmar</strong>
+          ${escapeHtml(empleado.revision_pendiente)}
+        </div>
+      </div>
+      ` : ''}
+
       <div class="detalle-facts">
         <div class="detalle-fact">
           <div class="detalle-fact-value">${empleado.cargo || '—'}</div>
@@ -1963,6 +1972,7 @@ Router.register('empleados', {
             <label>Motivo de salida<input type="text" id="empleado-motivo-renuncia" value="${empleado?.motivo_renuncia || ''}" /></label>
           </div>
           <label class="checkbox-label"><input type="checkbox" id="empleado-activo" ${!empleado || empleado.activo ? 'checked' : ''} /> Empleado activo</label>
+          <label style="display:block; margin-top:0.6rem">Nota interna / pendiente de revisión (opcional)<textarea id="empleado-revision-pendiente" rows="2" placeholder="Ej: confirmar con Gestión Humana si esta persona reingresó de verdad o es un duplicado.">${escapeHtml(empleado?.revision_pendiente || '')}</textarea></label>
         </fieldset>
         <fieldset>
           <legend>Vehículo asignado (conductores)</legend>
@@ -2175,6 +2185,7 @@ Router.register('empleados', {
       salario: document.getElementById('empleado-salario').value ? Number(document.getElementById('empleado-salario').value) : null,
       fecha_salida: document.getElementById('empleado-fecha-salida').value || null,
       motivo_renuncia: document.getElementById('empleado-motivo-renuncia').value.trim() || null,
+      revision_pendiente: document.getElementById('empleado-revision-pendiente').value.trim() || null,
       activo: document.getElementById('empleado-activo').checked,
       numero_interno: document.getElementById('empleado-numero-interno').value.trim() || null,
       ruta: document.getElementById('empleado-ruta').value.trim() || null,

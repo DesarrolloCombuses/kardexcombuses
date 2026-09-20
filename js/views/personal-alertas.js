@@ -104,6 +104,14 @@ Router.register('personal-alertas', {
       .filter((e) => /conductor/i.test(e.cargo || '') && !e.base)
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     this._renderConductoresSinBase(conductoresSinBase);
+
+    // Casos que alguien dejó marcados con una nota interna (ej. "¿esto es un
+    // reingreso real o un duplicado?") mientras se confirma con una fuente
+    // externa -- se edita/limpia desde "Editar" en la ficha del empleado.
+    const pendientesConfirmar = empleados
+      .filter((e) => e.revision_pendiente)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    this._renderPendientesConfirmar(pendientesConfirmar);
   },
 
   // Lista de personas (para saber quiénes son, ej. para exámenes médicos
@@ -173,6 +181,22 @@ Router.register('personal-alertas', {
         </div>
       `).join('');
     this._renderRankedBars('pa-bars-sinbase-ruta', distribucion(items, (e) => e.ruta));
+  },
+
+  // Lista simple (sin gráfico de barras -- no es una distribución, son casos
+  // puntuales) de empleados con una nota interna pendiente de confirmar.
+  _renderPendientesConfirmar(items) {
+    document.getElementById('pa-pendientes-subtitulo').textContent = `${items.length} caso(s)`;
+    const lista = document.getElementById('pa-pendientes-lista');
+    lista.innerHTML = items.length === 0
+      ? '<p class="empty-note">Sin casos pendientes de confirmar.</p>'
+      : items.map((e) => `
+        <div class="detalle-list-item">
+          <span class="detalle-list-item-main">${e.nombre}</span>
+          <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · CC ${e.cedula}</span>
+          <span class="detalle-list-item-sub">${escapeHtml(e.revision_pendiente)}</span>
+        </div>
+      `).join('');
   },
 
   // Ranking tipo "leaderboard" (rango + barra a color + %) -- más visual
