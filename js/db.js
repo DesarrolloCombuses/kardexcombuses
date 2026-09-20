@@ -345,19 +345,43 @@ const DB = {
     return data;
   },
 
-  // Parque automotor: tabla que carga aparte quien administra la flota (no
-  // desde este ERP), con la placa/interno de cada bus y las fechas de
-  // vencimiento de sus documentos (SOAT, gases, tecnomecánica, tarjeta de
-  // operación). select('*') a propósito: son columnas con espacios/mayúsculas
-  // en el nombre ("Fecha Vencimiento Soat", etc.) y son pocas filas, no vale
-  // la pena listar cada una a mano y arriesgar un typo en el nombre entre
-  // comillas.
-  async getParqueAutomotor() {
+  // Parque automotor: se lee de flota_vehiculos/flota_documentos_estado, las
+  // tablas reales del "Portal de Documentos" que usan los coordinadores de
+  // ruta (programa aparte, mismo proyecto de Supabase) -- ahí es donde
+  // realmente se suben los PDF/fotos de SOAT, tecnomecánica, tarjeta de
+  // operación y mantenimiento preventivo, con storage_path apuntando al
+  // archivo real en el bucket "flota-documentos". La tabla vieja
+  // parque_automotor (un import congelado, sin los archivos reales) ya no
+  // se usa acá.
+  async getFlotaVehiculos() {
     const { data, error } = await window.supabaseClient
-      .from('parque_automotor')
+      .from('flota_vehiculos')
+      .select('*')
+      .order('placa');
+    if (error) throw error;
+    return data;
+  },
+
+  // flota_documentos_estado es una vista: un renglón por documento (placa +
+  // tipo) con el estado de vencimiento ya calculado (VENCIDO/POR_VENCER/
+  // VIGENTE/SIN_FECHA, mismo umbral de 30 días que se usaba acá) y el
+  // storage_path si ya se subió el archivo real.
+  async getFlotaDocumentosEstado() {
+    const { data, error } = await window.supabaseClient
+      .from('flota_documentos_estado')
       .select('*');
     if (error) throw error;
     return data;
+  },
+
+  // URL firmada (expira pronto, el bucket es privado) para abrir/descargar
+  // el documento real de un vehículo.
+  async getUrlDocumentoFlota(storagePath) {
+    const { data, error } = await window.supabaseClient
+      .storage.from('flota-documentos')
+      .createSignedUrl(storagePath, 300);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   // Crea el empleado a partir de los datos ya digitados del aspirante (nombre,

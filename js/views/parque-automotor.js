@@ -1,35 +1,30 @@
-// Parque automotor: vencimientos de documentos de cada bus (SOAT, gases,
-// tecnomecánica y tarjeta de operación) para que quede visible en la app
-// cuándo se le vence algo a cada vehículo, sin depender de revisar el
-// archivo original a mano. La tabla parque_automotor la carga aparte quien
-// administra la flota (no este módulo) -- acá solo se lee y se avisa.
+// Parque automotor: vencimientos y documentos reales de cada bus. Se lee de
+// flota_vehiculos / flota_documentos_estado -- las tablas del "Portal de
+// Documentos" que usan los coordinadores de ruta (programa aparte, mismo
+// proyecto de Supabase: ver carpeta portal-documentos-rutas), que es donde
+// de verdad se sube el PDF/foto de cada documento. Antes esta vista leía
+// parque_automotor (un import congelado con solo el NOMBRE de cada archivo,
+// nunca el archivo real) -- se dejó de usar por completo.
 
-const PA_DOCUMENTOS = [
-  { campo: 'Fecha Vencimiento Soat', label: 'SOAT' },
-  { campo: 'Fecha Vencimiento Gases', label: 'Revisión de gases' },
-  { campo: 'Fecha Vencimiento Tecnomecanica', label: 'Tecnomecánica' },
-  { campo: 'Fecha Vencimiento Tecnomecanica Bim', label: 'Tecnomec. bimensual' },
-  { campo: 'Fecha Vencimiento Operacion', label: 'Tarjeta de operación' },
-];
+// Documentos que se muestran como columna fija de la tabla (los que aplican
+// a casi todos los vehículos). Certificación de amparo y licencia de
+// tránsito no se muestran ahí porque muy pocos vehículos los tienen
+// registrados todavía -- igual aparecen en la ficha de detalle si existen.
+const PA_TIPOS_TABLA = ['SOAT', 'TECNOMECANICA', 'TARJETA_OPERACION', 'MANTENIMIENTO_PREVENTIVO'];
 
-const PA_DIAS_POR_VENCER = 30;
+const PA_TIPO_LABELS = {
+  SOAT: 'SOAT',
+  TECNOMECANICA: 'Tecnomecánica',
+  TARJETA_OPERACION: 'Tarjeta de operación',
+  MANTENIMIENTO_PREVENTIVO: 'Mantenimiento preventivo',
+  CERTIFICACION_AMPARO: 'Certificación de amparo',
+  LICENCIA_TRANSITO: 'Licencia de tránsito',
+};
 
-// Copia local a propósito (mismo criterio que el resto de vistas de este
-// proyecto: cada una se mantiene autocontenida). Las fechas llegan como
-// texto "d/m/aaaa" o "dd/mm/aaaa" -- se parsea por componentes (constructor
-// de 3 argumentos, hora local) para no correr el día por el mismo problema
-// de "new Date(string)" interpretando medianoche UTC que ya se corrigió en
-// js/views/siniestros-transito.js.
-function paParseFecha(valor) {
-  if (!valor) return null;
-  const s = String(valor).trim();
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (!m) return null;
-  let [, dd, mm, yyyy] = m;
-  if (yyyy.length === 2) yyyy = '20' + yyyy;
-  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-  return isNaN(d.getTime()) ? null : d;
-}
+// estado_vencimiento ya viene calculado desde flota_documentos_estado (SQL,
+// mismo umbral de 30 días) -- acá solo se traduce a tag/texto para pintarlo.
+const PA_ESTADO_TAG = { VENCIDO: 'descartado', POR_VENCER: 'pendiente', VIGENTE: 'completo', SIN_FECHA: 'inactivo-tag' };
+const PA_ESTADO_PESO = { VENCIDO: 3, POR_VENCER: 2, VIGENTE: 1, SIN_FECHA: 0 };
 
 function paEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -39,32 +34,35 @@ function paVacio(v) {
   return v === null || v === undefined || String(v).trim() === '';
 }
 
-// Ficha del vehículo: agrupa el resto de columnas de parque_automotor (las
-// que no son fecha de vencimiento) para mostrarlas en el modal de detalle.
-const PA_SECCIONES_FICHA = [
-  { titulo: 'Identificación', campos: [
-    ['Empresa', 'Empresa'], ['Marca', 'Marca'], ['Modelo', 'Modelo'],
-    ['Motor', 'N.º de motor'], ['Chasis', 'Chasis'], ['Serial', 'Serial'],
-  ] },
-  { titulo: 'Capacidad y ruta', campos: [
-    ['CapacidadSentados', 'Capacidad sentados'], ['CapacidadPie', 'Capacidad de pie'],
-    ['Ruta', 'Ruta'], ['Nombre Ruta', 'Nombre de ruta'],
-  ] },
-  { titulo: 'Propietario y contrato', campos: [
-    ['Propietario', 'Identificación propietario'], ['Nombres Propietarios', 'Nombre del propietario'],
-    ['Contrato', 'N.º de contrato'], ['Fecha Contrato', 'Fecha de contrato'],
-  ] },
-];
+// fecha_vencimiento/fecha_ingreso/etc. llegan como "aaaa-mm-dd" (columna date
+// de Postgres) -- se parsea por componentes (constructor de 3 argumentos,
+// hora local) en vez de "new Date(string)", que en una zona horaria detrás
+// de UTC (Colombia, UTC-5) puede correr la fecha un día hacia atrás si se
+// interpreta como medianoche UTC. Mismo criterio que ya se usa en
+// js/views/siniestros-transito.js.
+function paParseFechaIso(valor) {
+  if (!valor) return null;
+  const m = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const [, yyyy, mm, dd] = m;
+  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+  return isNaN(d.getTime()) ? null : d;
+}
 
-// "Fecha Ingreso"/"FechaRetiro" traen fechas centinela cuando no hay dato
-// real (ej. "2/01/1900" o "31/12/3000") en vez de venir vacías -- se tratan
-// como "sin dato" para no mostrar una fecha absurda como si fuera real.
-function paFechaVigencia(valor) {
-  const fecha = paParseFecha(valor);
-  if (!fecha) return null;
-  const anio = fecha.getFullYear();
-  if (anio <= 1901 || anio >= 2999) return null;
-  return fecha;
+function paFormatFecha(valor) {
+  const d = paParseFechaIso(valor);
+  return d ? d.toLocaleDateString('es-CO') : null;
+}
+
+function paTextoEstado(doc) {
+  const fechaTexto = paFormatFecha(doc.fecha_vencimiento);
+  if (doc.estado_vencimiento === 'SIN_FECHA' || !fechaTexto) return 'Sin fecha registrada';
+  if (doc.estado_vencimiento === 'VIGENTE') return `Vigente hasta ${fechaTexto}`;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const fecha = paParseFechaIso(doc.fecha_vencimiento);
+  const dias = Math.round((fecha.getTime() - hoy.getTime()) / 86400000);
+  if (doc.estado_vencimiento === 'VENCIDO') return `Vencido hace ${Math.abs(dias)} día(s) — ${fechaTexto}`;
+  return (dias === 0 ? 'Vence hoy' : `Vence en ${dias} día(s)`) + ` — ${fechaTexto}`;
 }
 
 function paCampoDetalle(label, valor, claseExtra) {
@@ -77,25 +75,18 @@ function paCampoDetalle(label, valor, claseExtra) {
   `;
 }
 
-// Estado de un documento puntual a partir de su fecha de vencimiento.
-// "peso" ordena de más a menos urgente, para sacar el peor estado de un
-// vehículo entre sus 5 documentos.
-function paEstadoDocumento(valor) {
-  const fecha = paParseFecha(valor);
-  if (!fecha) return { estado: 'sin_dato', peso: 0, tag: 'inactivo-tag', texto: 'Sin dato' };
-  const hoy = new Date();
-  const hoyMedianoche = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-  const dias = Math.round((fecha.getTime() - hoyMedianoche.getTime()) / 86400000);
-  const fechaTexto = fecha.toLocaleDateString('es-CO');
-  if (dias < 0) {
-    return { estado: 'vencido', peso: 3, tag: 'descartado', texto: `Vencido hace ${Math.abs(dias)} día(s) — ${fechaTexto}` };
-  }
-  if (dias <= PA_DIAS_POR_VENCER) {
-    const cuando = dias === 0 ? 'Vence hoy' : `Vence en ${dias} día(s)`;
-    return { estado: 'por_vencer', peso: 2, tag: 'pendiente', texto: `${cuando} — ${fechaTexto}` };
-  }
-  return { estado: 'vigente', peso: 1, tag: 'completo', texto: `Vigente hasta ${fechaTexto}` };
-}
+const PA_SECCIONES_FICHA = [
+  { titulo: 'Identificación', campos: [
+    ['marca', 'Marca'], ['modelo', 'Modelo'], ['clase', 'Clase'], ['motor', 'N.º de motor'], ['chasis', 'Chasis'],
+  ] },
+  { titulo: 'Ruta', campos: [
+    ['ruta', 'Ruta'], ['nombre_ruta', 'Nombre de ruta'],
+  ] },
+  { titulo: 'Propietario y contrato', campos: [
+    ['propietario_nit', 'NIT/identificación propietario'], ['propietario_nombre', 'Nombre del propietario'],
+    ['contrato', 'N.º de contrato'],
+  ] },
+];
 
 Router.register('parque-automotor', {
   title: 'Parque automotor',
@@ -106,42 +97,83 @@ Router.register('parque-automotor', {
       document.getElementById('pa-filtro-estado-doc').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-mostrar-desvinculados').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-tbody').addEventListener('click', (e) => {
-        const btn = e.target.closest('.pa-ver-ficha');
-        if (!btn) return;
-        const vehiculo = this._filasRenderizadas[Number(btn.dataset.idx)];
-        if (vehiculo) this._verDetalle(vehiculo);
+        const btnFicha = e.target.closest('.pa-ver-ficha');
+        if (btnFicha) { this._verDetalle(this._filasRenderizadas[Number(btnFicha.dataset.idx)]); return; }
+        const btnDoc = e.target.closest('.pa-ver-doc');
+        if (btnDoc) this._abrirDocumento(btnDoc);
+      });
+      document.getElementById('modal-body').addEventListener('click', (e) => {
+        const btnDoc = e.target.closest('.pa-ver-doc');
+        if (btnDoc) this._abrirDocumento(btnDoc);
       });
       this._bound = true;
     }
 
-    const filas = await DB.getParqueAutomotor();
-    this._vehiculos = filas
-      .map((f) => {
-        const docs = PA_DOCUMENTOS.map((d) => ({ ...d, ...paEstadoDocumento(f[d.campo]) }));
-        const peorEstado = docs.reduce((peor, d) => (d.peso > peor.peso ? d : peor), { peso: -1, estado: 'sin_dato' });
+    const [vehiculos, documentos] = await Promise.all([
+      DB.getFlotaVehiculos(),
+      DB.getFlotaDocumentosEstado(),
+    ]);
+
+    const docsPorPlaca = new Map();
+    documentos.forEach((d) => {
+      if (!docsPorPlaca.has(d.placa)) docsPorPlaca.set(d.placa, []);
+      docsPorPlaca.get(d.placa).push(d);
+    });
+
+    this._vehiculos = vehiculos
+      .map((v) => {
+        const docs = (docsPorPlaca.get(v.placa) || []).map((d) => ({
+          tipo: d.tipo,
+          label: PA_TIPO_LABELS[d.tipo] || d.tipo,
+          estado: d.estado_vencimiento,
+          tag: PA_ESTADO_TAG[d.estado_vencimiento] || 'inactivo-tag',
+          peso: PA_ESTADO_PESO[d.estado_vencimiento] ?? 0,
+          texto: paTextoEstado(d),
+          storagePath: d.storage_path,
+          nombreArchivo: d.nombre_archivo_original,
+        }));
+        const docsTabla = PA_TIPOS_TABLA.map((tipo) =>
+          docs.find((d) => d.tipo === tipo) || { tipo, label: PA_TIPO_LABELS[tipo], estado: 'SIN_FECHA', tag: 'inactivo-tag', peso: 0, texto: 'Sin registrar', storagePath: null }
+        );
+        const peorEstado = docsTabla.reduce((peor, d) => (d.peso > peor.peso ? d : peor), { peso: -1, estado: 'SIN_FECHA' });
         return {
-          interno: f['Interno'] || '—',
-          placa: f['Placa'] || '—',
-          clase: f['Clase'] || '—',
-          estado: (f['Estado'] || '').trim().toUpperCase(),
-          vinculado: (f['Estado'] || '').trim().toUpperCase() === 'VINCULADO',
-          docs,
-          tieneVencido: docs.some((d) => d.estado === 'vencido'),
-          tienePorVencer: docs.some((d) => d.estado === 'por_vencer'),
+          placa: v.placa,
+          interno: v.interno || '—',
+          clase: v.clase || '—',
+          vinculado: !!v.vinculado,
+          operante: !!v.operante,
+          docsTabla,
+          docsTodos: docs,
+          tieneVencido: docsTabla.some((d) => d.estado === 'VENCIDO'),
+          tienePorVencer: docsTabla.some((d) => d.estado === 'POR_VENCER'),
           peorEstado: peorEstado.estado,
-          raw: f,
+          raw: v,
         };
       })
-      // Vinculados primero, y entre ellos los que necesitan atención primero
-      // -- así lo más urgente queda arriba en vez de perderse en la lista.
       .sort((a, b) => {
         if (a.vinculado !== b.vinculado) return a.vinculado ? -1 : 1;
-        const orden = { vencido: 0, por_vencer: 1, vigente: 2, sin_dato: 3 };
+        const orden = { VENCIDO: 0, POR_VENCER: 1, VIGENTE: 2, SIN_FECHA: 3 };
         return (orden[a.peorEstado] ?? 9) - (orden[b.peorEstado] ?? 9);
       });
 
     this._render();
     this._aplicarFiltro();
+  },
+
+  async _abrirDocumento(btn) {
+    const path = btn.dataset.path;
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Abriendo…';
+    try {
+      const url = await DB.getUrlDocumentoFlota(path);
+      window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      alert('No se pudo abrir el documento: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   },
 
   _render() {
@@ -173,12 +205,18 @@ Router.register('parque-automotor', {
     this._renderTabla(filtrados);
   },
 
+  // Cada tag de documento lleva su botón "Ver documento" solo si ya existe
+  // el archivo real (storage_path); si no, se avisa que falta subirlo en el
+  // Portal de Documentos en vez de mostrar un botón que no llevaría a nada.
+  _tagDocumentoHtml(d) {
+    const boton = d.storagePath
+      ? `<button type="button" class="btn-secondary pa-ver-doc" data-path="${paEscapeHtml(d.storagePath)}" style="margin-top:0.3rem;padding:0.15rem 0.5rem;font-size:0.72rem">Ver documento</button>`
+      : `<div class="muted" style="font-size:0.72rem;margin-top:0.2rem">Sin archivo subido</div>`;
+    return `<span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.texto)}</span>${boton}`;
+  },
+
   _renderTabla(vehiculos) {
     const tbody = document.getElementById('pa-tbody');
-    // Se guarda la lista tal cual quedó filtrada -- el botón "Ver ficha" de
-    // cada fila referencia su posición acá (data-idx) en vez de buscar por
-    // interno/placa, para no fallar si algún vehículo repite interno (ya
-    // pasa en los datos reales: hay más filas que internos distintos).
     this._filasRenderizadas = vehiculos;
     if (!vehiculos.length) {
       tbody.innerHTML = '<tr><td colspan="10" class="empty-note">Sin resultados con estos filtros.</td></tr>';
@@ -189,17 +227,14 @@ Router.register('parque-automotor', {
         <td data-label="Interno">${paEscapeHtml(v.interno)}</td>
         <td data-label="Placa">${paEscapeHtml(v.placa)}</td>
         <td data-label="Clase">${paEscapeHtml(v.clase)}</td>
-        <td data-label="Estado"><span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${paEscapeHtml(v.estado || 'Sin dato')}</span></td>
-        ${v.docs.map((d) => `<td data-label="${paEscapeHtml(d.label)}"><span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.texto)}</span></td>`).join('')}
+        <td data-label="Estado"><span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${v.vinculado ? 'Vinculado' : 'Desvinculado'}</span></td>
+        <td data-label="Operante"><span class="tag ${v.operante ? 'completo' : 'pendiente'}">${v.operante ? 'Sí' : 'No'}</span></td>
+        ${v.docsTabla.map((d) => `<td data-label="${paEscapeHtml(d.label)}">${this._tagDocumentoHtml(d)}</td>`).join('')}
         <td data-label="Ficha"><button type="button" class="btn-secondary pa-ver-ficha" data-idx="${i}">Ver ficha</button></td>
       </tr>
     `).join('');
   },
 
-  // Ficha completa del vehículo -- el resto de columnas de parque_automotor
-  // que no caben en la tabla (identificación, capacidad, propietario,
-  // contrato, fechas de vigencia) más los mismos 5 documentos ya calculados
-  // para esa fila.
   _verDetalle(v) {
     const f = v.raw;
     const seccionesHtml = PA_SECCIONES_FICHA.map((s) => `
@@ -209,14 +244,13 @@ Router.register('parque-automotor', {
       </div>
     `).join('');
 
-    const fechaIngreso = paFechaVigencia(f['Fecha Ingreso']);
-    const fechaRetiro = paFechaVigencia(f['FechaRetiro']);
     const vigenciaHtml = `
       <div class="detalle-card">
         <div class="detalle-card-header"><h4 class="detalle-card-title">Vigencia en la flota</h4></div>
         <div class="detalle-grid">
-          ${paCampoDetalle('Fecha de ingreso', fechaIngreso ? fechaIngreso.toLocaleDateString('es-CO') : null)}
-          ${paCampoDetalle('Fecha de retiro', fechaRetiro ? fechaRetiro.toLocaleDateString('es-CO') : null)}
+          ${paCampoDetalle('Fecha de ingreso', paFormatFecha(f.fecha_ingreso))}
+          ${paCampoDetalle('Fecha de retiro', paFormatFecha(f.fecha_retiro))}
+          ${paCampoDetalle('Fecha de contrato', paFormatFecha(f.fecha_contrato))}
         </div>
       </div>
     `;
@@ -225,35 +259,15 @@ Router.register('parque-automotor', {
       <div class="detalle-card">
         <div class="detalle-card-header"><h4 class="detalle-card-title">Documentos</h4></div>
         <div class="detalle-grid">
-          ${v.docs.map((d) => `
+          ${v.docsTodos.map((d) => `
             <div class="detalle-field">
               <div class="detalle-field-label">${paEscapeHtml(d.label)}</div>
-              <div class="detalle-field-value"><span class="tag ${d.tag}">${paEscapeHtml(d.texto)}</span></div>
+              <div class="detalle-field-value">${this._tagDocumentoHtml(d)}</div>
             </div>
-          `).join('')}
+          `).join('') || '<p class="empty-note">Sin documentos registrados en el Portal de Documentos.</p>'}
         </div>
-        ${!paVacio(f['Comentario']) ? paCampoDetalle('Comentario', f['Comentario'], 'detalle-field-full') : ''}
       </div>
     `;
-
-    // Estos 4 campos hoy solo traen el NOMBRE del archivo que se subió en el
-    // sistema donde se administra la flota (fuera de Kardex) -- no hay un
-    // PDF/foto real accesible desde acá para abrir o descargar, así que se
-    // muestran como texto simple con una aclaración en vez de simular un
-    // botón "Ver" que no llevaría a ningún lado.
-    const archivos = [
-      ['Foto del vehículo', f['Foto vehiculo']],
-      ['SOAT (archivo)', f['SOAT VIRTUAL']],
-      ['Tecnomecánica (archivo)', f['TECNOMECANICA VIRTUAL']],
-      ['Tarjeta de operación (archivo)', f['TARJETA DE OPERACION VIRTUAL']],
-    ].filter(([, valor]) => !paVacio(valor));
-    const archivosHtml = archivos.length ? `
-      <div class="modal-section">
-        <h3 class="modal-section-title">Archivos referenciados</h3>
-        <p class="empty-note" style="margin-bottom:0.6rem">Por ahora solo se guardó el nombre de estos archivos, no el archivo en sí -- no se pueden abrir ni descargar desde acá todavía.</p>
-        <div class="detalle-grid">${archivos.map(([label, valor]) => paCampoDetalle(label, valor)).join('')}</div>
-      </div>
-    ` : '';
 
     document.getElementById('modal-body').innerHTML = `
       <div class="detalle-header">
@@ -262,13 +276,13 @@ Router.register('parque-automotor', {
           <div class="detalle-sub">${paEscapeHtml(v.clase)}</div>
         </div>
         <div class="detalle-tags">
-          <span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${paEscapeHtml(v.estado || 'Sin dato')}</span>
+          <span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${v.vinculado ? 'Vinculado' : 'Desvinculado'}</span>
+          <span class="tag ${v.operante ? 'completo' : 'pendiente'}">${v.operante ? 'Operante' : 'No operante'}</span>
         </div>
       </div>
       ${seccionesHtml}
       ${vigenciaHtml}
       ${documentosHtml}
-      ${archivosHtml}
     `;
     document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
