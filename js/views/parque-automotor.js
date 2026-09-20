@@ -35,6 +35,48 @@ function paEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function paVacio(v) {
+  return v === null || v === undefined || String(v).trim() === '';
+}
+
+// Ficha del vehículo: agrupa el resto de columnas de parque_automotor (las
+// que no son fecha de vencimiento) para mostrarlas en el modal de detalle.
+const PA_SECCIONES_FICHA = [
+  { titulo: 'Identificación', campos: [
+    ['Empresa', 'Empresa'], ['Marca', 'Marca'], ['Modelo', 'Modelo'],
+    ['Motor', 'N.º de motor'], ['Chasis', 'Chasis'], ['Serial', 'Serial'],
+  ] },
+  { titulo: 'Capacidad y ruta', campos: [
+    ['CapacidadSentados', 'Capacidad sentados'], ['CapacidadPie', 'Capacidad de pie'],
+    ['Ruta', 'Ruta'], ['Nombre Ruta', 'Nombre de ruta'],
+  ] },
+  { titulo: 'Propietario y contrato', campos: [
+    ['Propietario', 'Identificación propietario'], ['Nombres Propietarios', 'Nombre del propietario'],
+    ['Contrato', 'N.º de contrato'], ['Fecha Contrato', 'Fecha de contrato'],
+  ] },
+];
+
+// "Fecha Ingreso"/"FechaRetiro" traen fechas centinela cuando no hay dato
+// real (ej. "2/01/1900" o "31/12/3000") en vez de venir vacías -- se tratan
+// como "sin dato" para no mostrar una fecha absurda como si fuera real.
+function paFechaVigencia(valor) {
+  const fecha = paParseFecha(valor);
+  if (!fecha) return null;
+  const anio = fecha.getFullYear();
+  if (anio <= 1901 || anio >= 2999) return null;
+  return fecha;
+}
+
+function paCampoDetalle(label, valor, claseExtra) {
+  const vacio = paVacio(valor);
+  return `
+    <div class="detalle-field ${claseExtra || ''}">
+      <div class="detalle-field-label">${paEscapeHtml(label)}</div>
+      <div class="detalle-field-value ${vacio ? 'pendiente' : ''}">${vacio ? 'Sin dato' : paEscapeHtml(valor)}</div>
+    </div>
+  `;
+}
+
 // Estado de un documento puntual a partir de su fecha de vencimiento.
 // "peso" ordena de más a menos urgente, para sacar el peor estado de un
 // vehículo entre sus 5 documentos.
@@ -63,6 +105,12 @@ Router.register('parque-automotor', {
       document.getElementById('pa-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('pa-filtro-estado-doc').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-mostrar-desvinculados').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('pa-tbody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.pa-ver-ficha');
+        if (!btn) return;
+        const vehiculo = this._filasRenderizadas[Number(btn.dataset.idx)];
+        if (vehiculo) this._verDetalle(vehiculo);
+      });
       this._bound = true;
     }
 
@@ -81,6 +129,7 @@ Router.register('parque-automotor', {
           tieneVencido: docs.some((d) => d.estado === 'vencido'),
           tienePorVencer: docs.some((d) => d.estado === 'por_vencer'),
           peorEstado: peorEstado.estado,
+          raw: f,
         };
       })
       // Vinculados primero, y entre ellos los que necesitan atención primero
@@ -126,18 +175,102 @@ Router.register('parque-automotor', {
 
   _renderTabla(vehiculos) {
     const tbody = document.getElementById('pa-tbody');
+    // Se guarda la lista tal cual quedó filtrada -- el botón "Ver ficha" de
+    // cada fila referencia su posición acá (data-idx) en vez de buscar por
+    // interno/placa, para no fallar si algún vehículo repite interno (ya
+    // pasa en los datos reales: hay más filas que internos distintos).
+    this._filasRenderizadas = vehiculos;
     if (!vehiculos.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty-note">Sin resultados con estos filtros.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="empty-note">Sin resultados con estos filtros.</td></tr>';
       return;
     }
-    tbody.innerHTML = vehiculos.map((v) => `
+    tbody.innerHTML = vehiculos.map((v, i) => `
       <tr>
         <td data-label="Interno">${paEscapeHtml(v.interno)}</td>
         <td data-label="Placa">${paEscapeHtml(v.placa)}</td>
         <td data-label="Clase">${paEscapeHtml(v.clase)}</td>
         <td data-label="Estado"><span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${paEscapeHtml(v.estado || 'Sin dato')}</span></td>
         ${v.docs.map((d) => `<td data-label="${paEscapeHtml(d.label)}"><span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.texto)}</span></td>`).join('')}
+        <td data-label="Ficha"><button type="button" class="btn-secondary pa-ver-ficha" data-idx="${i}">Ver ficha</button></td>
       </tr>
     `).join('');
+  },
+
+  // Ficha completa del vehículo -- el resto de columnas de parque_automotor
+  // que no caben en la tabla (identificación, capacidad, propietario,
+  // contrato, fechas de vigencia) más los mismos 5 documentos ya calculados
+  // para esa fila.
+  _verDetalle(v) {
+    const f = v.raw;
+    const seccionesHtml = PA_SECCIONES_FICHA.map((s) => `
+      <div class="detalle-card">
+        <div class="detalle-card-header"><h4 class="detalle-card-title">${paEscapeHtml(s.titulo)}</h4></div>
+        <div class="detalle-grid">${s.campos.map(([campo, label]) => paCampoDetalle(label, f[campo])).join('')}</div>
+      </div>
+    `).join('');
+
+    const fechaIngreso = paFechaVigencia(f['Fecha Ingreso']);
+    const fechaRetiro = paFechaVigencia(f['FechaRetiro']);
+    const vigenciaHtml = `
+      <div class="detalle-card">
+        <div class="detalle-card-header"><h4 class="detalle-card-title">Vigencia en la flota</h4></div>
+        <div class="detalle-grid">
+          ${paCampoDetalle('Fecha de ingreso', fechaIngreso ? fechaIngreso.toLocaleDateString('es-CO') : null)}
+          ${paCampoDetalle('Fecha de retiro', fechaRetiro ? fechaRetiro.toLocaleDateString('es-CO') : null)}
+        </div>
+      </div>
+    `;
+
+    const documentosHtml = `
+      <div class="detalle-card">
+        <div class="detalle-card-header"><h4 class="detalle-card-title">Documentos</h4></div>
+        <div class="detalle-grid">
+          ${v.docs.map((d) => `
+            <div class="detalle-field">
+              <div class="detalle-field-label">${paEscapeHtml(d.label)}</div>
+              <div class="detalle-field-value"><span class="tag ${d.tag}">${paEscapeHtml(d.texto)}</span></div>
+            </div>
+          `).join('')}
+        </div>
+        ${!paVacio(f['Comentario']) ? paCampoDetalle('Comentario', f['Comentario'], 'detalle-field-full') : ''}
+      </div>
+    `;
+
+    // Estos 4 campos hoy solo traen el NOMBRE del archivo que se subió en el
+    // sistema donde se administra la flota (fuera de Kardex) -- no hay un
+    // PDF/foto real accesible desde acá para abrir o descargar, así que se
+    // muestran como texto simple con una aclaración en vez de simular un
+    // botón "Ver" que no llevaría a ningún lado.
+    const archivos = [
+      ['Foto del vehículo', f['Foto vehiculo']],
+      ['SOAT (archivo)', f['SOAT VIRTUAL']],
+      ['Tecnomecánica (archivo)', f['TECNOMECANICA VIRTUAL']],
+      ['Tarjeta de operación (archivo)', f['TARJETA DE OPERACION VIRTUAL']],
+    ].filter(([, valor]) => !paVacio(valor));
+    const archivosHtml = archivos.length ? `
+      <div class="modal-section">
+        <h3 class="modal-section-title">Archivos referenciados</h3>
+        <p class="empty-note" style="margin-bottom:0.6rem">Por ahora solo se guardó el nombre de estos archivos, no el archivo en sí -- no se pueden abrir ni descargar desde acá todavía.</p>
+        <div class="detalle-grid">${archivos.map(([label, valor]) => paCampoDetalle(label, valor)).join('')}</div>
+      </div>
+    ` : '';
+
+    document.getElementById('modal-body').innerHTML = `
+      <div class="detalle-header">
+        <div class="detalle-header-info">
+          <div class="detalle-nombre">${paEscapeHtml(v.placa)} <span class="muted" style="font-weight:500">· Interno ${paEscapeHtml(v.interno)}</span></div>
+          <div class="detalle-sub">${paEscapeHtml(v.clase)}</div>
+        </div>
+        <div class="detalle-tags">
+          <span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${paEscapeHtml(v.estado || 'Sin dato')}</span>
+        </div>
+      </div>
+      ${seccionesHtml}
+      ${vigenciaHtml}
+      ${documentosHtml}
+      ${archivosHtml}
+    `;
+    document.getElementById('modal-box').classList.add('modal-wide');
+    document.getElementById('modal-backdrop').classList.remove('hidden');
   },
 });
