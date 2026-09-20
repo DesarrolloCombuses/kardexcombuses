@@ -21,6 +21,22 @@ function formatFechaHoraAspirante(iso) {
   return iso ? new Date(iso).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 }
 
+// "Firma" de un nombre: mismas palabras sin importar el orden. Debe
+// coincidir exactamente con firmaNombre() en js/views/empleados.js -- ahí
+// está el porqué (detectar duplicados como "MEDINA URREGO X" vs "X MEDINA
+// URREGO" con cédula distinta, que fue como se generaron ~174 empleados
+// duplicados en una carga masiva anterior).
+function firmaNombreAspirante(nombre) {
+  return String(nombre || '')
+    .toUpperCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
 Router.register('aspirantes', {
   title: 'Selección de personal',
 
@@ -348,6 +364,38 @@ Router.register('aspirantes', {
       );
       if (!continuar) {
         alert('No se seleccionó al candidato. Si la cédula está mal escrita, corrígela en su ficha de aspirante antes de reintentar.');
+        return;
+      }
+    }
+
+    // Aviso por nombre igual con OTRA cédula -- distinto del chequeo de
+    // arriba (que busca la MISMA cédula). Es la misma causa que generó los
+    // ~174 empleados duplicados de la carga masiva: alguien que ya trabajó
+    // acá vuelve a postularse, y si su cédula quedó digitada distinta en
+    // esta postulación, el chequeo por cédula no lo detecta. Solo avisa, no
+    // bloquea -- puede haber homónimos reales.
+    Loading.show('Verificando nombre…');
+    let empleadosExistentes;
+    try {
+      empleadosExistentes = await DB.getEmployees({ onlyActive: false });
+    } catch (err) {
+      empleadosExistentes = [];
+    }
+    Loading.hide();
+    const firma = firmaNombreAspirante(aspirante.nombre);
+    const homonimos = empleadosExistentes.filter(
+      (emp) => emp.cedula !== aspirante.cedula && firmaNombreAspirante(emp.nombre) === firma
+    );
+    if (homonimos.length) {
+      const detalle = homonimos
+        .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${h.activo ? 'activo' : 'inactivo'})`)
+        .join('\n');
+      const continuarNombre = confirm(
+        `Ya existe un empleado con el mismo nombre pero cédula distinta:\n\n${detalle}\n\n` +
+        `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona (reingreso), cancela y corrige la cédula del aspirante antes de seleccionar -- seleccionar así crea un registro duplicado.`
+      );
+      if (!continuarNombre) {
+        alert('No se seleccionó al candidato. Corrige la cédula en su ficha de aspirante antes de reintentar.');
         return;
       }
     }
