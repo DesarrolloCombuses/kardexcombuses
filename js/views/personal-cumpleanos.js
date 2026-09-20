@@ -77,21 +77,35 @@ Router.register('personal-cumpleanos', {
 
   // Lista de próximos cumpleaños (nombre, cargo, fecha y cuántos días
   // faltan) más un ranking por cargo, para saber tanto a quién felicitar
-  // como qué cargo concentra más cumpleaños en el rango.
+  // como qué cargo concentra más cumpleaños en el rango. La fecha va en una
+  // "hojita de calendario" (día + mes) bien visible a la izquierda, y el de
+  // hoy se destaca en rosa/morado con un ícono de pastel -- antes todo era
+  // texto gris plano, había que leer con cuidado para ubicar la fecha.
   _renderCumpleanos(items) {
     document.getElementById('cu-cumple-subtitulo').textContent =
       `${items.length} en los próximos ${DIAS_CUMPLE_PROXIMO} días`;
     const lista = document.getElementById('cu-cumple-lista');
+    const iconoPastel = '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5v2.2M8 3.2c0 .7.9 1.1.9 1.9 0 .5-.4.9-.9.9s-.9-.4-.9-.9c0-.8.9-1.2.9-1.9zM12 3.2c0 .7.9 1.1.9 1.9 0 .5-.4.9-.9.9s-.9-.4-.9-.9c0-.8.9-1.2.9-1.9z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><rect x="3.2" y="10.2" width="13.6" height="6.3" rx="1.4" stroke="currentColor" stroke-width="1.3"/><path d="M3.2 12.8c1.4.9 2.7.9 4 0 1.4-.9 2.7-.9 4 0 1.4.9 2.7.9 4 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M4.5 10.2V8.6a1.4 1.4 0 011.4-1.4h8.2a1.4 1.4 0 011.4 1.4v1.6" stroke="currentColor" stroke-width="1.3"/></svg>';
     lista.innerHTML = items.length === 0
       ? `<p class="empty-note">Sin cumpleaños en los próximos ${DIAS_CUMPLE_PROXIMO} días.</p>`
       : items.map(({ e, dias }) => {
-        const fechaTexto = new Date(`${e.perfil_sociodemografico.fecha_nacimiento}T00:00:00`)
-          .toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
-        const cuando = dias === 0 ? 'Hoy' : dias === 1 ? 'Mañana' : `En ${dias} días`;
+        const fechaNacimiento = new Date(`${e.perfil_sociodemografico.fecha_nacimiento}T00:00:00`);
+        const diaNum = fechaNacimiento.toLocaleDateString('es-CO', { day: 'numeric' });
+        const mesAbrev = fechaNacimiento.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+        const esHoy = dias === 0;
+        const esManana = dias === 1;
+        const cuando = esHoy ? 'Hoy' : esManana ? 'Mañana' : `En ${dias} días`;
         return `
-          <div class="detalle-list-item">
-            <span class="detalle-list-item-main">${e.nombre}</span>
-            <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'} · ${fechaTexto} · ${cuando}</span>
+          <div class="cumple-item ${esHoy ? 'es-hoy' : ''}">
+            <div class="cumple-fecha-badge ${esHoy ? 'es-hoy' : ''}">
+              <span class="cumple-fecha-dia">${diaNum}</span>
+              <span class="cumple-fecha-mes">${mesAbrev}</span>
+            </div>
+            <div class="cumple-item-info">
+              <span class="detalle-list-item-main">${e.nombre}</span>
+              <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'}</span>
+            </div>
+            <span class="cumple-cuando-chip ${esHoy ? 'es-hoy' : esManana ? 'es-manana' : ''}">${esHoy ? iconoPastel : ''}${cuando}</span>
           </div>
         `;
       }).join('');

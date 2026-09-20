@@ -1114,6 +1114,41 @@ tbody tr:hover { background: var(--slate-50); }
    la altura y se deja scroll propio en vez de estirar toda la tarjeta. */
 .detalle-list-scroll { max-height: 340px; overflow-y: auto; padding-right: 0.25rem; }
 
+/* Cumpleaños: la fecha va en una "hojita de calendario" a la izquierda (día
+   grande + mes) en vez de enterrada en el texto gris -- es el dato que más
+   se busca de un vistazo en esta lista. El de hoy se destaca con un
+   degradado rosa/morado (tomado de la misma paleta que ya usan las barras
+   de este módulo) para que salte a la vista sin tener que leer el texto. */
+.cumple-item {
+  display: flex; align-items: center; gap: 0.85rem;
+  background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius);
+  padding: 0.55rem 0.9rem;
+}
+.cumple-item.es-hoy { background: #fdf0f8; border-color: #f2c0e0; }
+.cumple-fecha-badge {
+  flex: none; width: 44px; height: 44px; border-radius: 10px;
+  background: var(--white); border: 1px solid var(--slate-200);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+}
+.cumple-fecha-dia { font-size: 1.05rem; font-weight: 800; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+.cumple-fecha-mes { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--slate-500); }
+.cumple-fecha-badge.es-hoy { background: linear-gradient(160deg, #ef5da8, #a970ff); border-color: transparent; }
+.cumple-fecha-badge.es-hoy .cumple-fecha-dia, .cumple-fecha-badge.es-hoy .cumple-fecha-mes { color: var(--white); }
+.cumple-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.05rem; }
+.cumple-item-info .detalle-list-item-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cumple-cuando-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px;
+  background: var(--slate-100); color: var(--slate-600);
+}
+.cumple-cuando-chip svg { width: 13px; height: 13px; flex: none; }
+.cumple-cuando-chip.es-manana { background: var(--blue-50); color: var(--blue-700); }
+.cumple-cuando-chip.es-hoy { background: linear-gradient(135deg, #ef5da8, #a970ff); color: var(--white); }
+@media (max-width: 480px) {
+  .cumple-item { flex-wrap: wrap; }
+  .cumple-cuando-chip { margin-left: calc(44px + 0.85rem); }
+}
+
 @media (max-width: 640px) {
   .person-row { flex-wrap: wrap; }
   .person-info { flex: 1 1 100%; order: 1; }
