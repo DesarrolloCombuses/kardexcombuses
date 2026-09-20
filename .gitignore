@@ -12,3 +12,7 @@ sql/import_perfil_*.sql
 # Igual: comparendos/accidentes de tránsito reales (cédula, nombre, lesiones)
 # subidos a mano por el usuario -- nunca a git.
 sql/accidentes_infracciones_import_*.sql
+
+# Reportes/exports generados con datos personales reales de empleados
+# (cedulas, nombres) para revisión local -- nunca a git.
+_export_local/

@@ -127,6 +127,21 @@ function slugArchivo(texto) {
     .replace(/(^-|-$)/g, '');
 }
 
+// "Firma" de un nombre: mismas palabras sin importar el orden (ej. "MEDINA
+// URREGO CRISTHIAN DANIEL" y "CRISTHIAN DANIEL MEDINA URREGO" dan la misma
+// firma) -- para detectar posibles empleados duplicados por nombre. Debe
+// coincidir con la normalización que usa el reporte de duplicados (SQL).
+function firmaNombre(nombre) {
+  return String(nombre || '')
+    .toUpperCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
 // Mismo criterio de períodos que Historial (ver js/views/historial.js):
 // Combuses entrega dotación 3 veces al año, el período se calcula solo a
 // partir de la fecha de entrega, sin depender de que alguien lo anote.
@@ -2119,6 +2134,33 @@ Router.register('empleados', {
           return;
         }
       }
+
+      // Aviso por nombre igual con OTRA cédula -- distinto del chequeo de
+      // arriba (que busca la MISMA cédula). Esta es la causa real de la
+      // mayoría de empleados duplicados que ya hay en la base: la misma
+      // persona cargada dos veces desde fuentes distintas, cada una con una
+      // cédula distinta, así que el chequeo por cédula no las cruza. Solo
+      // avisa -- no bloquea, porque sí puede haber dos personas distintas
+      // con el mismo nombre (más común de lo que parece).
+      const firma = firmaNombre(nombre);
+      const homonimos = (this._employees || []).filter(
+        (emp) => emp.cedula !== cedula && firmaNombre(emp.nombre) === firma
+      );
+      if (homonimos.length) {
+        const detalle = homonimos
+          .map((h) => `- ${h.nombre} (CC ${h.cedula}, ${h.activo ? 'activo' : 'inactivo'})`)
+          .join('\n');
+        const continuar = confirm(
+          `Ya existe un empleado con el mismo nombre pero cédula distinta:\n\n${detalle}\n\n` +
+          `¿Es una persona DISTINTA (puede pasar con nombres comunes)? Si en realidad es la misma persona, cancela y corrige la cédula antes de guardar -- guardar así crea un registro duplicado.`
+        );
+        if (!continuar) {
+          msg.textContent = 'Creación cancelada.';
+          msg.className = 'form-msg';
+          return;
+        }
+      }
+
       msg.textContent = 'Guardando…';
       msg.className = 'form-msg';
     }
