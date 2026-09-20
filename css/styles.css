@@ -1363,6 +1363,16 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
 .siniestro-pendiente { background: var(--danger-bg); }
 .btn-icon-danger { background: var(--danger-bg); color: var(--danger-text); border: none; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem; line-height: 1; }
 .btn-icon-danger:hover { background: #fbdad6; }
+
+/* Parque automotor: celda compacta de documento (tag corto + fecha chica +
+   botón-ícono "ver" solo si ya hay archivo real) y columna "Vehículo" con
+   la placa como dato principal y el interno/clase como dato secundario. */
+.pa-doc-cell { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.pa-doc-fecha { font-size: 0.74rem; color: var(--slate-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pa-doc-link { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; border: 1px solid var(--slate-200); border-radius: 6px; background: var(--white); color: var(--slate-700); cursor: pointer; padding: 0; }
+.pa-doc-link:hover { background: var(--blue-50); border-color: var(--blue-600); color: var(--blue-700); }
+.pa-vehiculo-placa { font-weight: 700; }
+.pa-vehiculo-sub { font-size: 0.76rem; margin-top: 0.1rem; }
 @media (max-width: 720px) {
   .siniestro-row { grid-template-columns: 1fr; }
   .siniestro-head { display: none; }

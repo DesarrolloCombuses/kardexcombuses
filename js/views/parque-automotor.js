@@ -23,7 +23,12 @@ const PA_TIPO_LABELS = {
 
 // estado_vencimiento ya viene calculado desde flota_documentos_estado (SQL,
 // mismo umbral de 30 días) -- acá solo se traduce a tag/texto para pintarlo.
+// El tag muestra siempre la MISMA palabra corta (igual que el resto de tags
+// de esta app: "Activo", "Pendiente", etc.) -- el detalle completo (fecha
+// exacta, días) va aparte, no adentro del tag, para que la tabla se lea de
+// un vistazo en vez de una frase larga por celda.
 const PA_ESTADO_TAG = { VENCIDO: 'descartado', POR_VENCER: 'pendiente', VIGENTE: 'completo', SIN_FECHA: 'inactivo-tag' };
+const PA_ESTADO_LABEL = { VENCIDO: 'Vencido', POR_VENCER: 'Por vencer', VIGENTE: 'Vigente', SIN_FECHA: 'Sin registrar' };
 const PA_ESTADO_PESO = { VENCIDO: 3, POR_VENCER: 2, VIGENTE: 1, SIN_FECHA: 0 };
 
 function paEscapeHtml(v) {
@@ -127,13 +132,15 @@ Router.register('parque-automotor', {
           label: PA_TIPO_LABELS[d.tipo] || d.tipo,
           estado: d.estado_vencimiento,
           tag: PA_ESTADO_TAG[d.estado_vencimiento] || 'inactivo-tag',
+          corto: PA_ESTADO_LABEL[d.estado_vencimiento] || d.estado_vencimiento,
           peso: PA_ESTADO_PESO[d.estado_vencimiento] ?? 0,
           texto: paTextoEstado(d),
+          fechaTexto: paFormatFecha(d.fecha_vencimiento),
           storagePath: d.storage_path,
           nombreArchivo: d.nombre_archivo_original,
         }));
         const docsTabla = PA_TIPOS_TABLA.map((tipo) =>
-          docs.find((d) => d.tipo === tipo) || { tipo, label: PA_TIPO_LABELS[tipo], estado: 'SIN_FECHA', tag: 'inactivo-tag', peso: 0, texto: 'Sin registrar', storagePath: null }
+          docs.find((d) => d.tipo === tipo) || { tipo, label: PA_TIPO_LABELS[tipo], estado: 'SIN_FECHA', tag: 'inactivo-tag', corto: 'Sin registrar', peso: 0, texto: 'Sin registrar en el Portal de Documentos', fechaTexto: null, storagePath: null }
         );
         const peorEstado = docsTabla.reduce((peor, d) => (d.peso > peor.peso ? d : peor), { peso: -1, estado: 'SIN_FECHA' });
         return {
@@ -205,30 +212,43 @@ Router.register('parque-automotor', {
     this._renderTabla(filtrados);
   },
 
-  // Cada tag de documento lleva su botón "Ver documento" solo si ya existe
-  // el archivo real (storage_path); si no, se avisa que falta subirlo en el
-  // Portal de Documentos en vez de mostrar un botón que no llevaría a nada.
+  // Celda de un documento: tag corto (una palabra, mismo criterio que el
+  // resto de tags de la app) + fecha en chico aparte + un botón-ícono "ver"
+  // solo si ya existe el archivo real -- así la tabla se lee de un vistazo
+  // en vez de una frase larga por celda. El detalle completo (días exactos)
+  // queda en el title (tooltip) para quien lo necesite.
   _tagDocumentoHtml(d) {
     const boton = d.storagePath
-      ? `<button type="button" class="btn-secondary pa-ver-doc" data-path="${paEscapeHtml(d.storagePath)}" style="margin-top:0.3rem;padding:0.15rem 0.5rem;font-size:0.72rem">Ver documento</button>`
-      : `<div class="muted" style="font-size:0.72rem;margin-top:0.2rem">Sin archivo subido</div>`;
-    return `<span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.texto)}</span>${boton}`;
+      ? `<button type="button" class="pa-doc-link pa-ver-doc" data-path="${paEscapeHtml(d.storagePath)}" title="Ver documento" aria-label="Ver documento de ${paEscapeHtml(d.label)}">
+          <svg viewBox="0 0 20 20" fill="none" width="14" height="14"><path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.3" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>`
+      : '';
+    return `
+      <div class="pa-doc-cell">
+        <span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.corto)}</span>
+        ${d.fechaTexto ? `<span class="pa-doc-fecha">${paEscapeHtml(d.fechaTexto)}</span>` : ''}
+        ${boton}
+      </div>
+    `;
   },
 
   _renderTabla(vehiculos) {
     const tbody = document.getElementById('pa-tbody');
     this._filasRenderizadas = vehiculos;
     if (!vehiculos.length) {
-      tbody.innerHTML = '<tr><td colspan="10" class="empty-note">Sin resultados con estos filtros.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-note">Sin resultados con estos filtros.</td></tr>';
       return;
     }
     tbody.innerHTML = vehiculos.map((v, i) => `
       <tr>
-        <td data-label="Interno">${paEscapeHtml(v.interno)}</td>
-        <td data-label="Placa">${paEscapeHtml(v.placa)}</td>
-        <td data-label="Clase">${paEscapeHtml(v.clase)}</td>
-        <td data-label="Estado"><span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${v.vinculado ? 'Vinculado' : 'Desvinculado'}</span></td>
-        <td data-label="Operante"><span class="tag ${v.operante ? 'completo' : 'pendiente'}">${v.operante ? 'Sí' : 'No'}</span></td>
+        <td data-label="Vehículo">
+          <div class="pa-vehiculo-placa">${paEscapeHtml(v.placa)}</div>
+          <div class="pa-vehiculo-sub muted">Interno ${paEscapeHtml(v.interno)} · ${paEscapeHtml(v.clase)}</div>
+        </td>
+        <td data-label="Estado">
+          <span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${v.vinculado ? 'Vinculado' : 'Desvinculado'}</span>
+          ${!v.operante ? '<div style="margin-top:0.3rem"><span class="tag pendiente">No operante</span></div>' : ''}
+        </td>
         ${v.docsTabla.map((d) => `<td data-label="${paEscapeHtml(d.label)}">${this._tagDocumentoHtml(d)}</td>`).join('')}
         <td data-label="Ficha"><button type="button" class="btn-secondary pa-ver-ficha" data-idx="${i}">Ver ficha</button></td>
       </tr>
