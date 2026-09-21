@@ -69,21 +69,86 @@ const Router = {
     document.body.classList.remove('sidebar-open');
     const backdrop = document.getElementById('sidebar-backdrop');
     if (backdrop) backdrop.classList.add('hidden');
-    if (view.onEnter) {
-      Promise.resolve(view.onEnter()).catch((err) => this._showError(name, err));
+    if (view.onEnter) this._entrar(name, view);
+  },
+
+  // Corre onEnter de la vista. Antes quita el aviso de error de una entrada
+  // anterior: sin eso el banner rojo se quedaba pegado aunque la vista ya
+  // hubiera cargado bien la segunda vez (se veía la lista completa y arriba
+  // seguía el "No se pudo cargar esta sección" viejo).
+  async _entrar(name, view) {
+    this._quitarError(name);
+    try {
+      await view.onEnter();
+    } catch (err) {
+      if (await this._sesionPerdida(err)) return;
+      this._showError(name, err);
     }
+  },
+
+  // Botón "Reintentar" del aviso de error. Llama antes a onLeave para que
+  // la vista suelte lo que armó en su onEnter (ej. la suscripción a
+  // Realtime de Dashboard/Historial) en vez de armarlo dos veces.
+  reintentar(name) {
+    const view = this.views[name];
+    if (!view) return;
+    if (view.onLeave) view.onLeave();
+    this._entrar(name, view);
+  },
+
+  // La base responde "No autorizado" (o un error de JWT) no solo cuando a la
+  // cuenta le falta un permiso, sino también cuando la petición le llega SIN
+  // sesión: supabase-js manda la llave pública en vez del token del usuario
+  // si no logra renovarlo (token vencido, pestaña que estuvo dormida, red
+  // que se cayó un momento). Si de verdad ya no hay sesión guardada, no
+  // tiene sentido dejar el mensaje suelto: se manda al login con el motivo.
+  async _sesionPerdida(err) {
+    if (!/no autorizado|jwt/i.test(err?.message || '')) return false;
+    try {
+      const { data } = await window.supabaseClient.auth.getSession();
+      if (data?.session) return false;
+    } catch (_) {
+      return false;
+    }
+    sessionStorage.setItem('kardex_auth_error', 'Tu sesión venció. Ingresa de nuevo.');
+    window.location.href = 'index.html';
+    return true;
+  },
+
+  // Solo el aviso que arma _showError (hijo directo de la sección), no otros
+  // elementos .view-error que una vista pinte por su cuenta (ej. Historial).
+  _quitarError(viewName) {
+    document.querySelector(`[data-view="${viewName}"] > .view-error`)?.remove();
   },
 
   _showError(viewName, err) {
     console.error(`Error cargando la vista "${viewName}":`, err);
     const section = document.querySelector(`[data-view="${viewName}"]`);
     if (!section) return;
-    let banner = section.querySelector('.view-error');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.className = 'view-error';
-      section.prepend(banner);
+    this._quitarError(viewName);
+
+    const mensaje = err.message || err;
+    const banner = document.createElement('div');
+    banner.className = 'view-error';
+
+    const texto = document.createElement('span');
+    texto.textContent = `No se pudo cargar esta sección: ${mensaje}`;
+    banner.append(texto);
+
+    if (/no autorizado/i.test(mensaje)) {
+      const pista = document.createElement('div');
+      pista.className = 'view-error-pista';
+      pista.textContent = 'Si tu cuenta sí tiene acceso a esta sección, suele ser que la sesión se venció: toca "Reintentar" o cierra sesión y vuelve a entrar.';
+      banner.append(pista);
     }
-    banner.textContent = `No se pudo cargar esta sección: ${err.message || err}`;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-secondary view-error-retry';
+    btn.textContent = 'Reintentar';
+    btn.addEventListener('click', () => this.reintentar(viewName));
+    banner.append(btn);
+
+    section.prepend(banner);
   },
 };

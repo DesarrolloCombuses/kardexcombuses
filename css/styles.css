@@ -363,6 +363,8 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
   background: var(--danger-bg); color: var(--danger-text); border: 1px solid #f5c2bc;
   border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.88rem;
 }
+.view-error-pista { margin-top: 0.35rem; font-size: 0.82rem; opacity: 0.85; }
+.view-error-retry { margin-top: 0.6rem; padding: 0.35rem 0.9rem; font-size: 0.82rem; }
 
 /* =====================================================================
    App shell: sidebar + topbar
