@@ -165,6 +165,10 @@
               <svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5.5" width="15" height="8" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 9h15" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="15.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="14" cy="15.5" r="1.6" stroke="currentColor" stroke-width="1.4"/></svg>
               Vencimiento de documentos
             </a>
+            <a href="#/alertas-vencimientos" data-nav="alertas-vencimientos">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4 4 0 00-4 4v2.3c0 .85-.32 1.67-.9 2.3L4 13h12l-1.1-1.4a3.3 3.3 0 01-.9-2.3V7a4 4 0 00-4-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.3 16a1.8 1.8 0 003.4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Alertas de vencimientos
+            </a>
           </div>
         </details>
 
@@ -1420,6 +1424,66 @@
           </div>
         </section>
 
+        <!-- ================= ALERTAS DE VENCIMIENTOS ================= -->
+        <section data-view="alertas-vencimientos" class="view">
+          <p class="view-intro">Documentos vencidos o por vencer en los próximos 30 días de toda la flota (SOAT, tecnomecánica, tarjeta de operación y demás), para seguimiento rápido sin tener que revisar vehículo por vehículo en Parque automotor.</p>
+
+          <div class="cards cards--compact">
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.3M10 13v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="av-kpi-vencidos">0</div>
+                <div class="card-label">Vehículos con un documento vencido</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4 4 0 00-4 4v2.3c0 .85-.32 1.67-.9 2.3L4 13h12l-1.1-1.4a3.3 3.3 0 01-.9-2.3V7a4 4 0 00-4-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.3 16a1.8 1.8 0 003.4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="av-kpi-por-vencer">0</div>
+                <div class="card-label">Vehículos con vencimiento en 30 días</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <label class="filtro-inline">
+              Ver por ruta
+              <select id="av-filtro-ruta" data-todos="Todas las rutas"><option value="">Todas las rutas</option></select>
+            </label>
+            <label class="filtro-inline">
+              <input type="checkbox" id="av-mostrar-desvinculados" />
+              Mostrar desvinculados
+            </label>
+            <span class="muted" id="av-contador"></span>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Documentos vencidos</h2></div>
+              <div id="av-lista-vencidos" class="detalle-list detalle-list-scroll"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Vencidos por ruta</h2></div>
+              <div id="av-bars-vencidos-ruta" class="ranked-bars"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Por vencer en los próximos 30 días</h2></div>
+              <div id="av-lista-por-vencer" class="detalle-list detalle-list-scroll"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Por vencer por ruta</h2></div>
+              <div id="av-bars-porvencer-ruta" class="ranked-bars"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- ================= HISTORIAL ================= -->
         <section data-view="historial" class="view">
           <div class="toolbar">
@@ -1746,6 +1810,7 @@
   <script src="js/views/personal-perfil.js"></script>
   <script src="js/views/siniestros-transito.js"></script>
   <script src="js/views/parque-automotor.js"></script>
+  <script src="js/views/alertas-vencimientos.js"></script>
   <script src="js/views/historial.js"></script>
   <script src="js/views/facturas.js"></script>
   <script src="js/views/ayuda.js"></script>
