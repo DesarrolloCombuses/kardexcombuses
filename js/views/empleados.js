@@ -83,6 +83,12 @@ function valorCampoDetalle(campo, valor) {
 // qué cuenta se envía).
 const RUTAS_SONAR = ['700', '2', '41', '313', 'AEROPUERTO', 'URBANAS ZAMORA-ARANJUEZ', 'ARANJUEZ - GUADALUPE'];
 
+// Nombres de ruta sin dígitos que son, en realidad, otra forma de escribir
+// una ruta que ya está en RUTAS_SONAR (en la flota la ruta 2 se llama
+// ZAMORA) -- alguien puede digitar el nombre en vez del código. También
+// debe repetirse en sonar-insert-driver/index.ts.
+const ALIAS_RUTA = { ZAMORA: '2' };
+
 // La ruta puede quedar escrita como "700", "Ruta 700" o "R700" según quién
 // la digite -- si tiene dígitos se compara solo por esos (para no depender
 // del formato); las rutas con nombre (ej. "AEROPUERTO", sin dígitos) se
@@ -90,7 +96,7 @@ const RUTAS_SONAR = ['700', '2', '41', '313', 'AEROPUERTO', 'URBANAS ZAMORA-ARAN
 function normalizaRuta(ruta) {
   const texto = String(ruta || '').trim().toUpperCase();
   const digitos = texto.replace(/\D/g, '');
-  return digitos || texto;
+  return digitos || ALIAS_RUTA[texto] || texto;
 }
 
 function esRutaSonar(ruta) {

@@ -53,10 +53,15 @@ const RUTA_A_CUENTA: Record<string, string> = {
 // digitó -- si tiene dígitos se usa solo esos; las rutas con nombre (ej.
 // "AEROPUERTO", sin dígitos) se comparan por el texto completo. Debe
 // coincidir con normalizaRuta() en js/views/empleados.js.
+// Nombres de ruta sin dígitos que son otra forma de escribir una ruta ya
+// configurada arriba (en la flota la ruta 2 se llama ZAMORA). Debe coincidir
+// con ALIAS_RUTA en js/views/empleados.js.
+const ALIAS_RUTA: Record<string, string> = { ZAMORA: "2" };
+
 function normalizaRuta(ruta: string): string {
   const texto = String(ruta || "").trim().toUpperCase();
   const digitos = texto.replace(/\D/g, "");
-  return digitos || texto;
+  return digitos || ALIAS_RUTA[texto] || texto;
 }
 
 function xmlEscape(s: unknown): string {
