@@ -100,6 +100,7 @@ Router.register('parque-automotor', {
     if (!this._bound) {
       document.getElementById('pa-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('pa-filtro-estado-doc').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('pa-filtro-ruta').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-mostrar-desvinculados').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-tbody').addEventListener('click', (e) => {
         const btnFicha = e.target.closest('.pa-ver-ficha');
@@ -147,6 +148,7 @@ Router.register('parque-automotor', {
           placa: v.placa,
           interno: v.interno || '—',
           clase: v.clase || '—',
+          ruta: v.nombre_ruta || v.ruta || null,
           vinculado: !!v.vinculado,
           operante: !!v.operante,
           docsTabla,
@@ -163,6 +165,7 @@ Router.register('parque-automotor', {
         return (orden[a.peorEstado] ?? 9) - (orden[b.peorEstado] ?? 9);
       });
 
+    this._llenarFiltroRuta(this._vehiculos);
     this._render();
     this._aplicarFiltro();
   },
@@ -190,9 +193,20 @@ Router.register('parque-automotor', {
     document.getElementById('pa-kpi-por-vencer').textContent = vinculados.filter((v) => !v.tieneVencido && v.tienePorVencer).length;
   },
 
+  // Ruta se llena con los valores que realmente existen en los datos (no
+  // una lista fija), mismo patrón que el filtro de cargo de Empleados.
+  _llenarFiltroRuta(vehiculos) {
+    const sel = document.getElementById('pa-filtro-ruta');
+    const actual = sel.value;
+    const opciones = [...new Set(vehiculos.map((v) => v.ruta).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    sel.innerHTML = `<option value="">${sel.dataset.todos}</option>` + opciones.map((v) => `<option value="${v}">${paEscapeHtml(v)}</option>`).join('');
+    if (opciones.includes(actual)) sel.value = actual;
+  },
+
   _aplicarFiltro() {
     const q = document.getElementById('pa-search').value.trim().toLowerCase();
     const estadoDoc = document.getElementById('pa-filtro-estado-doc').value;
+    const ruta = document.getElementById('pa-filtro-ruta').value;
     const mostrarDesvinculados = document.getElementById('pa-mostrar-desvinculados').checked;
 
     let filtrados = this._vehiculos;
@@ -200,6 +214,7 @@ Router.register('parque-automotor', {
     if (estadoDoc === 'vencido') filtrados = filtrados.filter((v) => v.tieneVencido);
     else if (estadoDoc === 'por_vencer') filtrados = filtrados.filter((v) => !v.tieneVencido && v.tienePorVencer);
     else if (estadoDoc === 'al_dia') filtrados = filtrados.filter((v) => !v.tieneVencido && !v.tienePorVencer);
+    if (ruta) filtrados = filtrados.filter((v) => v.ruta === ruta);
     if (q) {
       filtrados = filtrados.filter((v) =>
         v.placa.toLowerCase().includes(q) || v.interno.toLowerCase().includes(q)
