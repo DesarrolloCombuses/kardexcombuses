@@ -33,6 +33,7 @@ const SECCIONES_PERMISOS = [
     { key: 'personal-alertas', label: 'Alertas' },
     { key: 'personal-conductores', label: 'Conductores por ruta' },
     { key: 'personal-perfil', label: 'Perfil sociodemográfico' },
+    { key: 'personal-rotacion', label: 'Rotación de personal' },
     { key: 'permisos-vacaciones', label: 'Permisos y vacaciones' },
   ] },
   { titulo: 'Siniestros', modulos: [

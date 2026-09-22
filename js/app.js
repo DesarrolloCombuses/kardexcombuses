@@ -24,7 +24,7 @@
     // también ve esas vistas.
     const extra = window.APP_GRUPO === 'GESTION HUMANA' ? [
       'permisos-vacaciones', 'aspirantes', 'empleados',
-      'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil',
+      'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion',
     ] : [];
     // Permisos sueltos por módulo (ver DB.getMisPermisosModulos()): cualquier
     // módulo donde el admin le haya dado "ver" a esta cuenta puntual, por
@@ -49,7 +49,7 @@
     // pueden ver (Router también las bloquea si alguien escribe el hash a
     // mano, esto es solo para que ni aparezcan como opción).
     if (window.APP_ROLE === 'viewer') {
-      ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'permisos-vacaciones', 'usuarios'].forEach((name) => {
+      ['nueva-prenda', 'entrada', 'salida', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion', 'permisos-vacaciones', 'usuarios'].forEach((name) => {
         document.querySelector(`[data-nav="${name}"]`)?.remove();
       });
       // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/
