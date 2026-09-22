@@ -11,6 +11,7 @@
 const AUTHORIZED_USERS = {
   'kardex@combuses.com.co': 'admin',
   'vinculaciones@combuses.com.co': 'admin',
+  'desarrollotecnologico@combuses.com.co': 'admin', // cuenta del desarrollador
   'analistafacturacion@combuses.com.co': 'viewer',
   'contabilidad@combuses.com.co': 'viewer',
 };
