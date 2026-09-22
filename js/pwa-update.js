@@ -56,28 +56,51 @@
     hadController = true;
   });
 
+  // Cada cuánto preguntar si ya hay versión nueva publicada. Con la app
+  // abierta todo el día (el caso normal acá: se deja en una pestaña fija),
+  // el navegador por su cuenta puede tardar hasta 24h en revisar el service
+  // worker, así que sin este chequeo la pestaña se queda en la versión
+  // vieja indefinidamente aunque ya esté publicada la nueva.
+  const MINUTOS_CHEQUEO = 2;
+
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('service-worker.js');
+      // updateViaCache:'none' evita que el navegador resuelva
+      // service-worker.js desde su propio caché HTTP al chequear: sin esto
+      // el chequeo puede "encontrar" el archivo viejo y concluir que no hay
+      // nada nuevo.
+      const registration = await navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });
 
       // Forzar el chequeo de versión nueva apenas carga la página, en vez
-      // de esperar a que el navegador lo haga por su cuenta (puede tardar
-      // hasta 24h) o a que la pestaña recupere el foco.
+      // de esperar a que el navegador lo haga por su cuenta.
       registration.update();
 
-      // Respaldo: revisar version.json al recuperar el foco de la ventana,
-      // por si el navegador tardó en chequear el service worker por su cuenta.
+      // OJO: acá nunca se recarga directo aunque version.json ya anuncie
+      // otra versión. La recarga va atada a "controllerchange" (el service
+      // worker nuevo YA tomó control) a propósito: si se recargara solo por
+      // ver un número distinto, el service worker viejo seguiría sirviendo
+      // el HTML viejo desde caché, la versión no cambiaría y la pestaña
+      // quedaría recargándose en un ciclo infinito.
       let knownVersion = window.APP_CONFIG.APP_VERSION;
-      window.addEventListener('focus', async () => {
+      const chequear = async () => {
+        if (document.hidden) return;
         try {
           const res = await fetch('version.json', { cache: 'no-store' });
           const data = await res.json();
           if (data.version !== knownVersion) {
             knownVersion = data.version;
-            registration.update();
           }
-        } catch { /* sin conexión: ignorar */ }
-      });
+          // Se llama siempre, no solo cuando version.json cambió: el
+          // service worker puede tener cambios aunque el número no se haya
+          // subido todavía en el archivo servido por caché intermedio.
+          registration.update();
+        } catch { /* sin conexión: ignorar, se reintenta en el próximo ciclo */ }
+      };
+
+      setInterval(chequear, MINUTOS_CHEQUEO * 60 * 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) chequear(); });
+      window.addEventListener('focus', chequear);
+      window.addEventListener('online', chequear);
     } catch (err) {
       console.error('No se pudo registrar el service worker', err);
     }
