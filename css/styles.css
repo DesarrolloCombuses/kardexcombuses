@@ -1538,3 +1538,14 @@ tr.fila-total td { background: var(--slate-50); border-top: 2px solid var(--slat
 tr.fila-apagada td { color: var(--slate-400); }
 tr.fila-apagada td strong { color: var(--slate-500); }
 td.num.negativo { color: var(--danger-text); font-weight: 600; }
+
+/* Aviso propio de una vista (ej. el descuadre del fondo contra su cuadro de
+   resumen). Se ve igual que .view-error pero NO usa esa clase a propósito:
+   Router._quitarError() borra todo `[data-view] > .view-error` antes de
+   montar la vista, para limpiar el banner de una carga fallida anterior, y
+   se llevaba por delante este aviso -- que al ser hijo directo de la
+   sección entraba en esa misma regla. */
+.alerta-inline {
+  background: var(--danger-bg); color: var(--danger-text); border: 1px solid #f5c2bc;
+  border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.88rem;
+}

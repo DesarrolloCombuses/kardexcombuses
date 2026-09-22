@@ -231,6 +231,11 @@ Router.register('fondo-siniestros', {
   // aportes -- no todos los fondos la tienen.
   _renderAviso() {
     const el = document.getElementById('fs-aviso');
+    // Es un aviso informativo: si por lo que sea no está en el DOM, no debe
+    // tumbar el resto de la vista (que es lo que pasaba cuando el Router lo
+    // borraba por compartir la clase .view-error -- ver el CSS de
+    // .alerta-inline).
+    if (!el) return;
     const fila = (this._resumen || []).find((r) => /^aportes totales/i.test(r.etiqueta || ''));
     if (!fila) { el.classList.add('hidden'); return; }
     const totalCuadro = Number(fila.valor);
