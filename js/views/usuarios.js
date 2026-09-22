@@ -69,6 +69,7 @@ Router.register('usuarios', {
   async onEnter() {
     if (!this._bound) {
       document.getElementById('us-form').addEventListener('submit', (e) => this._submit(e));
+      document.getElementById('us-superadmin-form').addEventListener('submit', (e) => this._submitSuperadmin(e));
       this._setupEmpleadoCombobox();
       this._bound = true;
     }
@@ -147,21 +148,45 @@ Router.register('usuarios', {
       </div>
     `).join('');
 
+    // La propia cuenta nunca trae controles para editarse/quitarse a sí
+    // misma -- la base de datos lo rechaza igual (ver
+    // sql/cuentas_autorizadas_editable_2026-09-22.sql), esto es solo para
+    // no mostrar un botón que siempre va a fallar.
+    const miEmail = (window.APP_EMAIL || '').toLowerCase();
     const superadmins = document.getElementById('us-superadmins');
-    superadmins.innerHTML = this._cuentasAutorizadas.map((c) => `
-      <div class="person-row">
-        <div class="person-info">
-          <div class="person-name">${c.email}</div>
+    superadmins.innerHTML = this._cuentasAutorizadas.map((c) => {
+      const esUnoMismo = c.email.toLowerCase() === miEmail;
+      const etiquetaRol = c.rol === 'admin' ? 'Admin — ve y edita todo' : 'Viewer — solo consulta';
+      return `
+        <div class="person-row">
+          <div class="person-info">
+            <div class="person-name">${c.email}</div>
+          </div>
+          ${esUnoMismo ? `
+            <span class="tag ${c.rol === 'admin' ? 'activo' : 'inactivo-tag'}">Tú · ${etiquetaRol}</span>
+          ` : `
+            <select data-rol-de="${c.email}">
+              <option value="admin" ${c.rol === 'admin' ? 'selected' : ''}>Admin — ve y edita todo</option>
+              <option value="viewer" ${c.rol === 'viewer' ? 'selected' : ''}>Viewer — solo consulta</option>
+            </select>
+            <button type="button" class="btn-secondary" data-guardar-rol="${c.email}">Guardar</button>
+            <button type="button" class="btn-secondary" data-quitar-cuenta="${c.email}">Quitar acceso</button>
+          `}
         </div>
-        <span class="tag ${c.rol === 'admin' ? 'activo' : 'inactivo-tag'}">${c.rol === 'admin' ? 'Admin — ve y edita todo' : 'Viewer — solo consulta'}</span>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     lista.querySelectorAll('[data-quitar]').forEach((btn) => {
       btn.addEventListener('click', () => this._quitarGrupo(btn.dataset.quitar));
     });
     lista.querySelectorAll('[data-permisos]').forEach((btn) => {
       btn.addEventListener('click', () => this._abrirPermisos(btn.dataset.permisos));
+    });
+    superadmins.querySelectorAll('[data-guardar-rol]').forEach((btn) => {
+      btn.addEventListener('click', () => this._guardarRolCuenta(btn.dataset.guardarRol));
+    });
+    superadmins.querySelectorAll('[data-quitar-cuenta]').forEach((btn) => {
+      btn.addEventListener('click', () => this._quitarCuentaAutorizada(btn.dataset.quitarCuenta));
     });
   },
 
@@ -337,6 +362,68 @@ Router.register('usuarios', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  async _submitSuperadmin(e) {
+    e.preventDefault();
+    const msg = document.getElementById('us-superadmin-msg');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+
+    const email = document.getElementById('us-superadmin-email').value.trim();
+    const rol = document.getElementById('us-superadmin-rol').value;
+    if (!email) {
+      msg.textContent = 'Escribe un correo.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    Loading.show('Dando acceso…');
+    try {
+      await DB.guardarCuentaAutorizada(email, rol);
+      document.getElementById('us-superadmin-form').reset();
+      msg.textContent = `Listo -- ${email} ya tiene acceso total. Si todavía no tiene una cuenta de acceso, créala en Supabase (Authentication → Users).`;
+      msg.className = 'form-msg success';
+      this._cuentasAutorizadas = await DB.getCuentasAutorizadas();
+      this._render();
+    } catch (err) {
+      msg.textContent = 'No se pudo dar acceso: ' + err.message;
+      msg.className = 'form-msg error';
+    } finally {
+      submitBtn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  async _guardarRolCuenta(email) {
+    const select = document.querySelector(`[data-rol-de="${email}"]`);
+    const rol = select.value;
+    Loading.show('Guardando…');
+    try {
+      await DB.guardarCuentaAutorizada(email, rol);
+      this._cuentasAutorizadas = await DB.getCuentasAutorizadas();
+      this._render();
+    } catch (err) {
+      alert('No se pudo guardar: ' + err.message);
+    } finally {
+      Loading.hide();
+    }
+  },
+
+  async _quitarCuentaAutorizada(email) {
+    if (!confirm(`¿Quitarle el acceso total a "${email}"? Su cuenta de acceso sigue existiendo, solo deja de poder entrar a Kardex.`)) return;
+    Loading.show('Quitando…');
+    try {
+      await DB.quitarCuentaAutorizada(email);
+      this._cuentasAutorizadas = await DB.getCuentasAutorizadas();
+      this._render();
+    } catch (err) {
+      alert('No se pudo quitar: ' + err.message);
+    } finally {
       Loading.hide();
     }
   },

@@ -1,20 +1,11 @@
-// Control de acceso por cuenta. Esta lista decide qué ve cada quien dentro
-// de la app (rol admin/viewer) y se puede cambiar sin tocar la base de
-// datos. La restricción real -- que un correo fuera de esta lista no pueda
-// leer ni escribir nada de Kardex aunque tenga sesión válida en el proyecto
-// de Supabase compartido -- vive además en la base de datos: la tabla
-// kardex_authorized_users y la función kardex_is_authorized() (ver
-// sql/rls_solo_autorizados_2026-09-15.sql), usadas en las policies RLS de
-// las tablas propias de Kardex. IMPORTANTE: cuando se agregue o quite a
-// alguien acá, hay que repetir el cambio en esa tabla, o quedará
-// autorizado/bloqueado distinto en la app que en la base de datos.
-const AUTHORIZED_USERS = {
-  'kardex@combuses.com.co': 'admin',
-  'vinculaciones@combuses.com.co': 'admin',
-  'desarrollotecnologico@combuses.com.co': 'admin', // cuenta del desarrollador
-  'analistafacturacion@combuses.com.co': 'viewer',
-  'contabilidad@combuses.com.co': 'viewer',
-};
+// Control de acceso por cuenta. Quién es admin/viewer ya NO vive en una
+// lista fija acá (hasta v1.102.0 sí, ver AUTHORIZED_USERS en el historial de
+// git) -- la única fuente de verdad es la base de datos, tabla
+// kardex_authorized_users, editable desde Usuarios ("Cuentas con acceso
+// total") por cualquier cuenta admin. Se dejó de duplicar la lista a
+// propósito: un cambio hecho solo en la tabla nunca se reflejaba en la app
+// hasta el próximo despliegue de código, que es justo el problema que
+// resuelve esto (ver sql/cuentas_autorizadas_editable_2026-09-22.sql).
 
 // Vistas visibles para el rol "viewer" (solo consulta, sin firmar salidas
 // ni modificar nada). El rol "admin" ve y puede hacer todo.
@@ -41,24 +32,16 @@ const GRUPO_EXTRA_VIEWS = {
 };
 
 window.Permissions = {
-  getRole(email) {
-    return AUTHORIZED_USERS[(email || '').trim().toLowerCase()] || null;
-  },
-
-  isAuthorized(email) {
-    return this.getRole(email) !== null;
-  },
-
-  // Resuelve el rol de una cuenta: primero contra la lista fija de arriba
-  // (admin/viewer, sin ir a la base de datos), y si no está ahí, revisa si
-  // el correo coincide con el email_personal de algún empleado activo (rol
-  // "empleado", autoservicio de permisos). No escala tener a cientos de
-  // empleados en AUTHORIZED_USERS uno por uno, por eso ese segundo camino
-  // vive en la base de datos (kardex_own_employee_id(), ver
-  // sql/permisos_vacaciones_2026-09-15.sql) en vez de acá.
-  async resolveRole(email) {
-    const staticRole = this.getRole(email);
-    if (staticRole) return staticRole;
+  // Resuelve el rol de la cuenta que ya inició sesión: primero pregunta a
+  // la base de datos si es admin/viewer (kardex_authorized_users, vía
+  // DB.getMiRolAutorizado()), y si no lo es, revisa si su correo coincide
+  // con el email_personal de algún empleado activo (rol "empleado",
+  // autoservicio de permisos) -- eso sí vive en la base de datos
+  // (kardex_own_employee_id(), ver sql/permisos_vacaciones_2026-09-15.sql)
+  // porque no escala tener a cientos de empleados en una lista acá.
+  async resolveRole() {
+    const rol = await DB.getMiRolAutorizado();
+    if (rol) return rol;
     const ownId = await DB.getOwnEmployeeId();
     return ownId ? 'empleado' : null;
   },

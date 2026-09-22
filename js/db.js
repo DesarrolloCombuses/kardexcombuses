@@ -14,18 +14,39 @@ const DB = {
   },
 
   // Cuentas "superadmin" (rol admin/viewer, ven todo sin pasar por el
-  // sistema de permisos granulares) -- viven en kardex_authorized_users,
-  // una tabla sin policies propias (ver sql/rls_solo_autorizados_2026-09-15.sql),
-  // así que solo se leen a través de esta función de solo lectura. Usada en
-  // Usuarios para que el admin vea de un vistazo quién más tiene acceso
-  // total -- agregar/quitar una de estas cuentas sigue siendo un cambio de
-  // código (AUTHORIZED_USERS en js/permissions.js) + SQL, no algo editable
-  // desde acá (decisión explícita del usuario, ver
-  // sql/cuentas_autorizadas_lectura_2026-09-22.sql).
+  // sistema de permisos granulares) -- viven en kardex_authorized_users, una
+  // tabla sin policies propias (ver sql/rls_solo_autorizados_2026-09-15.sql),
+  // así que solo se leen/escriben a través de estas funciones. Es la ÚNICA
+  // fuente de verdad de quién es admin/viewer (ver Permissions.resolveRole
+  // en js/permissions.js) -- ya no hay una lista duplicada en el código.
   async getCuentasAutorizadas() {
     const { data, error } = await window.supabaseClient.rpc('kardex_cuentas_autorizadas');
     if (error) throw error;
     return data;
+  },
+
+  // Mi propio rol admin/viewer (o null si no tengo) -- autoconsulta sin
+  // permiso especial, ver sql/cuentas_autorizadas_editable_2026-09-22.sql.
+  async getMiRolAutorizado() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mi_rol_autorizado');
+    if (error) throw error;
+    return data;
+  },
+
+  // Dar o cambiar el rol admin/viewer de OTRA cuenta -- exige que quien
+  // llama ya sea admin, y rechaza que alguien se cambie a sí mismo (ver la
+  // migración de arriba).
+  async guardarCuentaAutorizada(email, rol) {
+    const { error } = await window.supabaseClient.rpc('kardex_guardar_cuenta_autorizada', { p_email: email, p_rol: rol });
+    if (error) throw error;
+  },
+
+  // Quitarle el acceso total a OTRA cuenta -- no borra su login de Supabase
+  // Auth, solo deja de estar en esta lista (ver el comentario de la función
+  // en SQL).
+  async quitarCuentaAutorizada(email) {
+    const { error } = await window.supabaseClient.rpc('kardex_quitar_cuenta_autorizada', { p_email: email });
+    if (error) throw error;
   },
 
   // ---- Catálogo / inventario ----------------------------------------------

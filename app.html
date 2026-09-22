@@ -1206,7 +1206,22 @@
           <div class="person-list" id="us-lista"></div>
 
           <div class="section-heading" style="margin-top:1.6rem"><h2>Cuentas con acceso total</h2></div>
-          <p class="view-intro">Admin ve y edita todo, incluida esta pantalla; viewer solo consulta. Viven en el código de la app, no en la tabla de arriba -- agregar o quitar una requiere un cambio del desarrollador.</p>
+          <p class="view-intro">Admin ve y edita todo, incluida esta pantalla; viewer solo consulta. No puedes cambiar tu propia cuenta desde acá -- pídele a otro admin que lo haga. Esto solo da o quita el acceso a Kardex; si la cuenta de acceso (Supabase Auth) todavía no existe, créala aparte en Authentication → Users.</p>
+
+          <form id="us-superadmin-form" class="form panel-card">
+            <div class="fieldset-grid">
+              <label>Correo<input type="email" id="us-superadmin-email" placeholder="correo@combuses.com.co" required /></label>
+              <label>Rol<select id="us-superadmin-rol" required>
+                <option value="admin">Admin — ve y edita todo</option>
+                <option value="viewer">Viewer — solo consulta</option>
+              </select></label>
+            </div>
+            <div>
+              <button type="submit">Dar acceso</button>
+              <p id="us-superadmin-msg" class="form-msg"></p>
+            </div>
+          </form>
+
           <div class="person-list" id="us-superadmins"></div>
         </section>
 

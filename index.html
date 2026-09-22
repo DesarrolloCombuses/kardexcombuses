@@ -112,7 +112,7 @@
       submitBtn.disabled = true;
       try {
         const { session } = await Auth.signIn(email, password);
-        if (!(await Permissions.resolveRole(session.user.email))) {
+        if (!(await Permissions.resolveRole())) {
           await Auth.signOutSilently();
           msg.textContent = 'No está permitido el ingreso con una cuenta distinta a las autorizadas.';
           msg.className = 'form-msg error';

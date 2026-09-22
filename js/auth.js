@@ -30,7 +30,7 @@ const Auth = {
   async redirectIfAuthenticated() {
     const session = await this.getSession();
     if (!session) return;
-    if (!(await Permissions.resolveRole(session.user.email))) {
+    if (!(await Permissions.resolveRole())) {
       await this.signOutSilently();
       return;
     }
@@ -46,7 +46,7 @@ const Auth = {
       window.location.href = 'index.html';
       return null;
     }
-    if (!(await Permissions.resolveRole(session.user.email))) {
+    if (!(await Permissions.resolveRole())) {
       await this.signOutSilently();
       sessionStorage.setItem('kardex_auth_error', 'No está permitido el ingreso con una cuenta distinta a las autorizadas.');
       window.location.href = 'index.html';

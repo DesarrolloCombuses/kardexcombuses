@@ -2,7 +2,8 @@
   const session = await Auth.requireAuth();
   if (!session) return;
 
-  window.APP_ROLE = await Permissions.resolveRole(session.user.email);
+  window.APP_ROLE = await Permissions.resolveRole();
+  window.APP_EMAIL = (session.user.email || '').toLowerCase();
   window.APP_GRUPO = window.APP_ROLE === 'empleado' ? await DB.getMiGrupo() : null;
   window.APP_PERMISOS_MODULOS = window.APP_ROLE === 'empleado' ? await DB.getMisPermisosModulos() : null;
 
