@@ -3,26 +3,47 @@
 // El service worker llama a skipWaiting()/clients.claim() apenas se instala,
 // así que una versión nueva se activa sola en segundo plano sin esperar a
 // que se cierren todas las pestañas abiertas. Cuando eso pasa, el navegador
-// dispara "controllerchange" en cada pestaña — ahí mostramos el banner en
-// vez de recargar solos, para no perder una firma/foto a medio capturar.
+// dispara "controllerchange" en cada pestaña -- ahí mostramos el banner con
+// una cuenta regresiva y recargamos solos si nadie hace nada: da un chance
+// corto de terminar algo en curso (firmar, tomar una foto) sin quedar
+// esperando indefinidamente a que alguien note el aviso y le dé clic.
 (function () {
   if (!('serviceWorker' in navigator)) return;
 
+  const SEGUNDOS_AUTO_RECARGA = 10;
+
   const banner = document.getElementById('update-banner');
+  const bannerTexto = document.getElementById('update-banner-texto');
   const reloadBtn = document.getElementById('update-reload-btn');
   let hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
+  let cuentaRegresiva = null;
+
+  function recargar() {
+    if (reloading) return;
+    reloading = true;
+    clearInterval(cuentaRegresiva);
+    window.location.reload();
+  }
 
   function showBanner() {
     if (!banner) return;
     banner.classList.remove('hidden');
+    let restantes = SEGUNDOS_AUTO_RECARGA;
+    const actualizarTexto = () => {
+      if (bannerTexto) bannerTexto.textContent = `Hay una nueva versión disponible. Se actualiza sola en ${restantes}s…`;
+    };
+    actualizarTexto();
+    clearInterval(cuentaRegresiva);
+    cuentaRegresiva = setInterval(() => {
+      restantes--;
+      if (restantes <= 0) { recargar(); return; }
+      actualizarTexto();
+    }, 1000);
   }
 
   if (reloadBtn) {
-    reloadBtn.addEventListener('click', () => {
-      reloading = true;
-      window.location.reload();
-    });
+    reloadBtn.addEventListener('click', recargar);
   }
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
