@@ -13,6 +13,21 @@ const DB = {
     return data;
   },
 
+  // Cuentas "superadmin" (rol admin/viewer, ven todo sin pasar por el
+  // sistema de permisos granulares) -- viven en kardex_authorized_users,
+  // una tabla sin policies propias (ver sql/rls_solo_autorizados_2026-09-15.sql),
+  // así que solo se leen a través de esta función de solo lectura. Usada en
+  // Usuarios para que el admin vea de un vistazo quién más tiene acceso
+  // total -- agregar/quitar una de estas cuentas sigue siendo un cambio de
+  // código (AUTHORIZED_USERS en js/permissions.js) + SQL, no algo editable
+  // desde acá (decisión explícita del usuario, ver
+  // sql/cuentas_autorizadas_lectura_2026-09-22.sql).
+  async getCuentasAutorizadas() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_cuentas_autorizadas');
+    if (error) throw error;
+    return data;
+  },
+
   // ---- Catálogo / inventario ----------------------------------------------
 
   async getStockActual() {

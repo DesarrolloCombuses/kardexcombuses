@@ -76,12 +76,14 @@ Router.register('usuarios', {
   },
 
   async _load() {
-    const [empleados, usuarios] = await Promise.all([
+    const [empleados, usuarios, cuentasAutorizadas] = await Promise.all([
       DB.getEmployees({ onlyActive: true }),
       DB.getUsuariosGrupos(),
+      DB.getCuentasAutorizadas(),
     ]);
     this._empleados = empleados;
     this._usuarios = usuarios;
+    this._cuentasAutorizadas = cuentasAutorizadas;
     this._render();
   },
 
@@ -142,6 +144,16 @@ Router.register('usuarios', {
         <span class="tag activo">${u.grupo}</span>
         <button type="button" class="btn-secondary" data-permisos="${u.employee_id}">Editar permisos</button>
         <button type="button" class="btn-secondary" data-quitar="${u.employee_id}">Quitar grupo</button>
+      </div>
+    `).join('');
+
+    const superadmins = document.getElementById('us-superadmins');
+    superadmins.innerHTML = this._cuentasAutorizadas.map((c) => `
+      <div class="person-row">
+        <div class="person-info">
+          <div class="person-name">${c.email}</div>
+        </div>
+        <span class="tag ${c.rol === 'admin' ? 'activo' : 'inactivo-tag'}">${c.rol === 'admin' ? 'Admin — ve y edita todo' : 'Viewer — solo consulta'}</span>
       </div>
     `).join('');
 
