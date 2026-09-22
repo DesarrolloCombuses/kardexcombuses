@@ -103,6 +103,19 @@
 
         <details class="nav-group" open>
           <summary>
+            <span>Actividades</span>
+            <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <div class="nav-group-items">
+            <a href="#/actividades" data-nav="actividades">
+              <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 10.3l2.2 2.2 4.8-4.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Registro y creación
+            </a>
+          </div>
+        </details>
+
+        <details class="nav-group" open>
+          <summary>
             <span>Personal</span>
             <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </summary>
@@ -1648,6 +1661,26 @@
           </div>
         </section>
 
+        <!-- ================= ACTIVIDADES ================= -->
+        <section data-view="actividades" class="view">
+          <p class="view-intro">Crea una actividad (ej. "Entrega de entradas Comfama") y registra, por cada empleado, quién la recibió -- con firma y foto de quien recibe, igual que en una Entrega normal.</p>
+
+          <form id="ac-form" class="form panel-card">
+            <div class="fieldset-grid">
+              <label>Nombre de la actividad<input type="text" id="ac-nombre" placeholder="Ej. Entrega de entradas Comfama - Diciembre" required /></label>
+              <label>Fecha<input type="date" id="ac-fecha" required /></label>
+            </div>
+            <label>Descripción (opcional)<input type="text" id="ac-descripcion" placeholder="Detalle general de la actividad" /></label>
+            <div>
+              <button type="submit">Crear actividad</button>
+              <p id="ac-msg" class="form-msg"></p>
+            </div>
+          </form>
+
+          <p class="empty-note" id="ac-contador"></p>
+          <div class="person-list" id="ac-lista"></div>
+        </section>
+
         <!-- ================= AYUDA / MANUAL ================= -->
         <section data-view="ayuda" class="view">
           <p class="view-intro">Manual de uso de ERP Combuses: qué botón usar en cada caso, qué queda registrado y cómo corregir un error sin perder el rastro.</p>
@@ -1925,6 +1958,7 @@
   <script src="js/views/alertas-vencimientos.js"></script>
   <script src="js/views/historial.js"></script>
   <script src="js/views/facturas.js"></script>
+  <script src="js/views/actividades.js"></script>
   <script src="js/views/ayuda.js"></script>
   <script src="js/pwa-update.js"></script>
   <script src="js/pwa-install.js"></script>

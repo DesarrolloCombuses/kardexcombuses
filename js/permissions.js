@@ -28,6 +28,7 @@ const GRUPO_EXTRA_VIEWS = {
   'GESTION HUMANA': [
     'permisos-vacaciones', 'aspirantes', 'empleados',
     'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion',
+    'actividades',
   ],
 };
 

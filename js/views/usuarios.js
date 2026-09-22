@@ -26,6 +26,9 @@ const SECCIONES_PERMISOS = [
     { key: 'historial', label: 'Historial' },
     { key: 'facturas', label: 'Facturas' },
   ] },
+  { titulo: 'Actividades', modulos: [
+    { key: 'actividades', label: 'Registro y creación de actividades' },
+  ] },
   { titulo: 'Personal', modulos: [
     { key: 'aspirantes', label: 'Selección de personal' },
     { key: 'empleados', label: 'Empleados' },

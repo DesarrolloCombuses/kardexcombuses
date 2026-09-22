@@ -985,6 +985,72 @@ const DB = {
     return data.signedUrl;
   },
 
+  // ---- Actividades ------------------------------------------------------------
+  // Ver sql/actividades_2026-09-22.sql. Una actividad agrupa muchos
+  // registros individuales de "a quién se le dio esto" (firma + foto del
+  // receptor, mismos buckets que ya usa Salida).
+
+  async crearActividad({ nombre, descripcion, fecha }) {
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const nombreCreador = await this.getMyDisplayName();
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividades')
+      .insert({
+        nombre,
+        descripcion: descripcion || null,
+        fecha,
+        creado_por_email: sessionData.session.user.email,
+        creado_por_nombre: nombreCreador,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getActividades() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividades')
+      .select('*')
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Con permiso solo "agregar" (sin "ver"), RLS filtra todas las filas --
+  // devuelve [] en silencio, no error, consistente con el resto de la app.
+  async getRegistrosActividad(actividadId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividad_registros')
+      .select('*, employees(nombre, cedula, cargo, area)')
+      .eq('actividad_id', actividadId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Sin .select() a propósito: no hace falta el registro de vuelta (no hay
+  // tabla hija que dependa de su id, a diferencia de createMovement), y así
+  // una cuenta con solo "agregar" (sin "ver") puede registrar igual --
+  // pedir el registro de vuelta exigiría además el permiso "ver".
+  async registrarActividadPersona({ actividadId, employeeId, detalle, firmaUrl, fotoUrl }) {
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const nombreRegistrador = await this.getMyDisplayName();
+    const { error } = await window.supabaseClient
+      .from('kardex_actividad_registros')
+      .insert({
+        actividad_id: actividadId,
+        employee_id: employeeId,
+        detalle: detalle || null,
+        firma_url: firmaUrl,
+        foto_url: fotoUrl,
+        registrado_por_email: sessionData.session.user.email,
+        registrado_por_nombre: nombreRegistrador,
+      });
+    if (error) throw error;
+  },
+
   // ---- Permisos y vacaciones ---------------------------------------------
 
   // Id del empleado propio del usuario autenticado, o null si es una cuenta
