@@ -46,6 +46,10 @@ const SECCIONES_PERMISOS = [
     { key: 'parque-automotor', label: 'Vencimiento de documentos' },
     { key: 'alertas-vencimientos', label: 'Alertas de vencimientos' },
   ] },
+  { titulo: 'Contabilidad', modulos: [
+    { key: 'fondo-siniestros', label: 'Fondo de reposición' },
+    { key: 'fondo-rendimientos', label: 'Rendimientos del fondo' },
+  ] },
 ];
 
 // Columnas de Empleados que se pueden ocultar por cuenta (ver

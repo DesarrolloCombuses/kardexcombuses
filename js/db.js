@@ -1258,6 +1258,50 @@ const DB = {
   unsubscribe(channel) {
     if (channel) window.supabaseClient.removeChannel(channel);
   },
+
+  // ===================================================================
+  // Contabilidad > Fondo de reposición de siniestros
+  //
+  // Los aportes viven por interno de vehículo; la placa y la ruta se leen
+  // de flota_vehiculos (el "Portal de Documentos", mismo Supabase) al
+  // consultar, en vez de duplicarlas acá -- ver el comentario del esquema
+  // en sql/contabilidad_fondo_2026-09-22.sql.
+  // ===================================================================
+  async getFondoVehiculos() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_fondo_vehiculos')
+      .select('*')
+      .order('interno');
+    if (error) throw error;
+    return data;
+  },
+
+  async getFondoAportes() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_fondo_aportes')
+      .select('interno, periodo, valor, es_saldo_inicial')
+      .order('periodo');
+    if (error) throw error;
+    return data;
+  },
+
+  async getFondoResumen() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_fondo_resumen')
+      .select('*')
+      .order('orden');
+    if (error) throw error;
+    return data;
+  },
+
+  async getFondoRendimientos() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_fondo_rendimientos_vehiculo')
+      .select('*')
+      .order('interno');
+    if (error) throw error;
+    return data;
+  },
 };
 
 // Todas las funciones async de esta capa pasan por acá para traducir

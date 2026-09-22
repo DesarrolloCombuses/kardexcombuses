@@ -50,7 +50,10 @@
     // pueden ver (Router también las bloquea si alguien escribe el hash a
     // mano, esto es solo para que ni aparezcan como opción).
     if (window.APP_ROLE === 'viewer') {
-      ['nueva-prenda', 'entrada', 'salida', 'actividades', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion', 'permisos-vacaciones', 'usuarios'].forEach((name) => {
+      // Esta lista tiene que cubrir todo lo que NO está en
+      // VIEWER_ALLOWED_VIEWS (js/permissions.js); si algo falta acá, el
+      // viewer ve el enlace en el menú y al entrar le sale "No autorizado".
+      ['nueva-prenda', 'entrada', 'salida', 'actividades', 'aspirantes', 'empleados', 'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion', 'permisos-vacaciones', 'usuarios', 'siniestros-transito', 'parque-automotor', 'alertas-vencimientos', 'fondo-siniestros', 'fondo-rendimientos'].forEach((name) => {
         document.querySelector(`[data-nav="${name}"]`)?.remove();
       });
       // Si al quitar los ítems de arriba un submenú (Inventario/Movimientos/

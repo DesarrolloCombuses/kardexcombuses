@@ -1495,3 +1495,40 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
    no volver la página interminable, con el encabezado fijo arriba. */
 .pr-detalle .table-wrap { max-height: 420px; overflow-y: auto; }
 .pr-detalle .table-wrap th { position: sticky; top: 0; z-index: 1; }
+
+/* =====================================================================
+   Contabilidad -- fondo de siniestros
+   ===================================================================== */
+
+/* Una cifra en pesos es mucho más larga que un conteo: al tamaño normal de
+   .card-value se sale de la tarjeta o la parte en dos líneas. */
+.card-value--money { font-size: 1.22rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+/* Columnas de plata alineadas a la derecha: así los miles quedan uno sobre
+   otro y se comparan de un vistazo. */
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.fila-total td { background: var(--slate-50); border-top: 2px solid var(--slate-200); }
+
+/* Cuadro de movimientos del fondo: etiqueta a la izquierda (con su detalle
+   debajo cuando lo hay, p.ej. de qué siniestro salió una conciliación) y la
+   cifra a la derecha. Las salidas van en rojo y los totales resaltados,
+   para que no se lean como un movimiento más. */
+.fondo-mov-list { display: flex; flex-direction: column; margin-top: 0.6rem; }
+.fondo-mov {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--slate-100);
+}
+.fondo-mov:last-child { border-bottom: none; }
+.fondo-mov-texto { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.fondo-mov-etiqueta { font-size: 0.86rem; font-weight: 600; color: var(--slate-900); }
+.fondo-mov-detalle { font-size: 0.76rem; color: var(--slate-500); }
+.fondo-mov-valor {
+  flex: none; font-size: 0.9rem; font-weight: 700; color: var(--slate-900);
+  font-variant-numeric: tabular-nums;
+}
+.fondo-mov-valor.negativo { color: var(--danger-text); }
+.fondo-mov.es-total { background: var(--slate-50); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; margin: 0.25rem 0; border-bottom: none; }
+.fondo-mov.es-total .fondo-mov-etiqueta { font-weight: 800; }
+.fondo-mov.es-total .fondo-mov-valor { font-size: 1rem; font-weight: 800; }
+
+.btn-sm { padding: 0.3rem 0.75rem; font-size: 0.78rem; }
