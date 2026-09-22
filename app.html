@@ -51,6 +51,11 @@
           Mis permisos
         </a>
 
+        <a href="#/mi-perfil" data-nav="mi-perfil">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6.8" r="3.3" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 17c0-3.1 2.8-5.2 6.2-5.2s6.2 2.1 6.2 5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Mi perfil
+        </a>
+
         <details class="nav-group" open>
           <summary>
             <span>Inventario</span>
@@ -350,6 +355,15 @@
           <div class="section-heading"><h2>Mis solicitudes</h2></div>
           <p class="empty-note" id="mp-contador"></p>
           <div class="person-list" id="mp-lista"></div>
+        </section>
+
+        <!-- ================= MI PERFIL (autoservicio empleado) ================= -->
+        <!-- Todo el contenido lo pinta js/views/mi-perfil.js: el formulario
+             se arma desde js/perfil-campos.js, el mismo que usa el link
+             público, para que no haya dos listas de campos que mantener. -->
+        <section data-view="mi-perfil" class="view">
+          <p class="view-intro">Revisa y actualiza tus propios datos, y sube tu foto. Lo que guardes lo revisa Gestión Humana.</p>
+          <div id="mi-perfil-contenido"></div>
         </section>
 
         <!-- ================= INVENTARIO ================= -->
@@ -2146,8 +2160,13 @@
   <script src="js/catalogos-colombia.js"></script>
   <script src="js/signature-pad.js"></script>
   <script src="js/camera.js"></script>
+  <!-- Campos del perfil autodiligenciado, compartidos con perfil-publico.html.
+       Va después de catalogos-colombia.js, de donde saca las listas de EPS/ARL. -->
+  <script src="js/perfil-campos.js"></script>
+  <script src="js/cumpleanos-saludo.js"></script>
   <script src="js/views/dashboard.js"></script>
   <script src="js/views/mis-permisos.js"></script>
+  <script src="js/views/mi-perfil.js"></script>
   <script src="js/views/permisos-vacaciones.js"></script>
   <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>

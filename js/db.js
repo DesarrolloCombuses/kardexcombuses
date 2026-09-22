@@ -574,6 +574,40 @@ const DB = {
     return data.path;
   },
 
+  // ---- Mi perfil (autoservicio DENTRO de la app, con sesión) ----------------
+
+  // Mismo perfil que el link público, pero el servidor resuelve de quién es
+  // por el correo del JWT en vez de pedir la cédula (ver
+  // sql/mi_perfil_2026-09-22.sql). Devuelve también employee_id, que hace
+  // falta para subir la foto.
+  async getMiPerfil() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mi_perfil_obtener');
+    if (error) throw error;
+    return data;
+  },
+
+  // fotoNueva es un booleano, no la ruta: la arma el servidor con el id que
+  // él mismo resolvió, para que una cuenta no pueda dejar su foto_url
+  // apuntando al archivo de otra persona.
+  async guardarMiPerfil(perfil, contactos, hijos, fotoNueva) {
+    const { error } = await window.supabaseClient.rpc('kardex_mi_perfil_guardar', {
+      p_perfil: perfil,
+      p_contactos: contactos || [],
+      p_hijos: hijos || [],
+      p_foto_nueva: !!fotoNueva,
+    });
+    if (error) throw error;
+  },
+
+  // Solo nombre + fecha de nacimiento: corre en cada carga de la app para
+  // decidir si toca saludar. Devuelve null si la cuenta no es de un empleado
+  // activo (las administrativas no lo son).
+  async getMiCumpleanos() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_mi_cumpleanos');
+    if (error) throw error;
+    return data;
+  },
+
   // ---- Perfil del usuario logueado ------------------------------------------
 
   async getMyProfile() {

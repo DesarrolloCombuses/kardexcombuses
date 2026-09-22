@@ -33,16 +33,22 @@
     Object.keys(window.APP_PERMISOS_MODULOS || {}).forEach((modulo) => {
       if (window.APP_PERMISOS_MODULOS[modulo].ver && !extra.includes(modulo)) extra.push(modulo);
     });
+    // "Mis permisos" y "Mi perfil" son el autoservicio base: los ve todo
+    // empleado con cuenta, sin que haya que darle ningún permiso.
+    const PROPIAS = ['mis-permisos', 'mi-perfil'];
     document.querySelectorAll('[data-nav]').forEach((el) => {
-      if (el.dataset.nav !== 'mis-permisos' && !extra.includes(el.dataset.nav)) el.remove();
+      if (!PROPIAS.includes(el.dataset.nav) && !extra.includes(el.dataset.nav)) el.remove();
     });
     document.querySelectorAll('.nav-group').forEach((group) => {
       if (!group.querySelector('[data-nav]')) group.remove();
     });
   } else {
     // admin/viewer son cuentas administrativas, no fichas de empleado -- no
-    // les corresponde el autoservicio de "Mis permisos".
+    // les corresponde el autoservicio ("Mis permisos" / "Mi perfil"), que
+    // además no tendría de dónde sacar los datos: kardex_own_employee_id()
+    // devuelve null para un correo que no es el email_personal de nadie.
     document.querySelector('[data-nav="mis-permisos"]')?.remove();
+    document.querySelector('[data-nav="mi-perfil"]')?.remove();
     // "Usuarios" (crear cuentas) es exclusivo del admin.
     if (window.APP_ROLE !== 'admin') document.querySelector('[data-nav="usuarios"]')?.remove();
 
@@ -95,4 +101,9 @@
   });
 
   Router.init(window.APP_ROLE === 'empleado' ? 'mis-permisos' : 'dashboard');
+
+  // Al final y sin await: el saludo de cumpleaños no debe retrasar el
+  // arranque de la app ni romperlo si falla (ver js/cumpleanos-saludo.js,
+  // que se traga sus propios errores).
+  cumpleSaludarSiCorresponde();
 })();

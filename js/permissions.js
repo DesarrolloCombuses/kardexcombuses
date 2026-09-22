@@ -14,8 +14,11 @@ const VIEWER_ALLOWED_VIEWS = [
 ];
 
 // Vistas visibles para el rol "empleado" (autoservicio: un colaborador que
-// solo pide/consulta sus propios permisos, sin nada más del ERP).
-const EMPLEADO_ALLOWED_VIEWS = ['mis-permisos'];
+// solo pide/consulta sus propios permisos y mantiene sus propios datos, sin
+// nada más del ERP). No hace falta darle ningún permiso desde Usuarios: las
+// dos vistas solo muestran lo suyo, y el servidor lo resuelve por el correo
+// de la sesión (kardex_own_employee_id()), no por lo que diga el cliente.
+const EMPLEADO_ALLOWED_VIEWS = ['mis-permisos', 'mi-perfil'];
 
 // Vistas extra que desbloquea cada grupo (ver sql/usuarios_grupos_2026-09-16.sql
 // y js/views/usuarios.js) por encima de EMPLEADO_ALLOWED_VIEWS. Por ahora
