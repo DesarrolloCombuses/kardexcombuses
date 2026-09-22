@@ -1532,3 +1532,9 @@ tr.fila-total td { background: var(--slate-50); border-top: 2px solid var(--slat
 .fondo-mov.es-total .fondo-mov-valor { font-size: 1rem; font-weight: 800; }
 
 .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.78rem; }
+
+/* Un vehículo retirado del fondo queda en cero (su saldo se devolvió): se
+   atenúa para que no compita con los que sí están aportando. */
+tr.fila-apagada td { color: var(--slate-400); }
+tr.fila-apagada td strong { color: var(--slate-500); }
+td.num.negativo { color: var(--danger-text); font-weight: 600; }

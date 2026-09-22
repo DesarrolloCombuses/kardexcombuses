@@ -1732,8 +1732,15 @@
 
         <!-- ================= CONTABILIDAD: FONDO DE REPOSICIÓN ================= -->
         <section data-view="fondo-siniestros" class="view">
-          <p class="view-intro">Fondo de reposición de siniestros: los aportes de cada vehículo mes a mes y el estado del fondo completo. La placa y la ruta se toman del parque automotor cruzando por el número interno.</p>
+          <p class="view-intro">Fondos de reposición que lleva contabilidad. Elige cuál ver arriba: cada uno tiene sus propios vehículos y su cuadro de resumen. La ruta se toma del parque automotor cruzando por el número interno.</p>
           <div class="view-error hidden" id="fs-aviso"></div>
+
+          <div class="toolbar">
+            <label class="filtro-inline">
+              Fondo
+              <select id="fs-fondo"></select>
+            </label>
+          </div>
 
           <div class="cards cards--compact">
             <div class="card">
@@ -1742,7 +1749,7 @@
               </span>
               <div>
                 <div class="card-value card-value--money" id="fs-kpi-total">—</div>
-                <div class="card-label">Total del fondo</div>
+                <div class="card-label">Total aportado al fondo</div>
               </div>
             </div>
             <div class="card">
@@ -1750,8 +1757,8 @@
                 <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M10 4l-3.5 3.5M10 4l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </span>
               <div>
-                <div class="card-value card-value--money" id="fs-kpi-aportes">—</div>
-                <div class="card-label">Aportes totales</div>
+                <div class="card-value card-value--money" id="fs-kpi-anio">—</div>
+                <div class="card-label" id="fs-kpi-anio-label">Recaudado en el año</div>
               </div>
             </div>
             <div class="card">
@@ -1760,28 +1767,34 @@
               </span>
               <div>
                 <div class="card-value card-value--money" id="fs-kpi-rendimientos">—</div>
-                <div class="card-label">Rendimientos</div>
+                <div class="card-label">Rendimientos del año</div>
               </div>
             </div>
             <div class="card">
-              <span class="card-icon" data-tone="green">
-                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5v7M7.5 9h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5.5" width="15" height="8" rx="1.6" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="15.5" r="1.6" stroke="currentColor" stroke-width="1.4"/><circle cx="14" cy="15.5" r="1.6" stroke="currentColor" stroke-width="1.4"/></svg>
               </span>
               <div>
-                <div class="card-value card-value--money" id="fs-kpi-disponible">—</div>
-                <div class="card-label">Disponible</div>
+                <div class="card-value" id="fs-kpi-vehiculos">0</div>
+                <div class="card-label">Vehículos que aportan</div>
               </div>
             </div>
           </div>
 
           <div class="panel-card chart-card" style="margin-bottom:1.25rem">
-            <div class="section-heading"><h2>Aportes recaudados por mes</h2></div>
+            <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+              <h2 id="fs-chart-titulo">Aportes recaudados</h2>
+              <label class="filtro-inline" style="margin-left:auto">
+                Ver
+                <select id="fs-periodo"></select>
+              </label>
+            </div>
             <div id="fs-col-chart" class="col-chart"></div>
             <p class="empty-note hidden" id="fs-chart-pie" style="margin-top:0.85rem; text-align:left"></p>
           </div>
 
           <div class="panel-card chart-card" style="margin-bottom:1.25rem">
-            <div class="section-heading"><h2>Movimientos del fondo</h2></div>
+            <div class="section-heading"><h2>Resumen de contabilidad</h2></div>
             <div id="fs-movimientos" class="fondo-mov-list"></div>
           </div>
 
@@ -1802,7 +1815,14 @@
 
         <!-- ================= CONTABILIDAD: RENDIMIENTOS DEL FONDO ================= -->
         <section data-view="fondo-rendimientos" class="view">
-          <p class="view-intro">Lo que produce el fondo: los rendimientos mes a mes del año en curso, de dónde salen, y el corte histórico acumulado por vehículo entre 2023 y 2025.</p>
+          <p class="view-intro">Lo que produce el fondo: los rendimientos mes a mes del año en curso y de dónde salen. El corte histórico por vehículo solo existe en el fondo de siniestros.</p>
+
+          <div class="toolbar">
+            <label class="filtro-inline">
+              Fondo
+              <select id="fr-fondo"></select>
+            </label>
+          </div>
 
           <div class="cards cards--compact">
             <div class="card">
@@ -1854,6 +1874,7 @@
             </div>
           </div>
 
+          <div id="fr-historico">
           <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
             <h2>Histórico por vehículo</h2>
             <span class="muted" id="fr-contador" style="margin-left:auto"></span>
@@ -1866,6 +1887,7 @@
               <thead><tr><th>Interno</th><th>Placa</th><th>Propietario</th><th class="num">Rend. 2023</th><th class="num">Rend. 2024</th><th class="num">Rend. 2025</th><th class="num">Total</th></tr></thead>
               <tbody></tbody>
             </table>
+          </div>
           </div>
         </section>
 

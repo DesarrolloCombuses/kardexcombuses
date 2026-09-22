@@ -1,14 +1,16 @@
-// Contabilidad > Fondo de reposición de siniestros.
+// Contabilidad > Fondos de reposición.
 //
-// Muestra el fondo tal como lo lleva contabilidad: el cuadro de movimientos
-// del fondo completo (saldos por año, conciliaciones pagadas, inversión) y
-// el aporte de cada vehículo mes a mes.
-//
-// Los aportes se guardan por interno de vehículo; la placa y la ruta salen
-// de flota_vehiculos (parque automotor) cruzando por ese interno. OJO: hay
-// internos con más de un registro en la flota (el mismo número reasignado a
-// otra placa), así que el cruce se queda con el vehículo vinculado -- ver
-// _indexarFlota.
+// Sirve para los dos fondos que lleva contabilidad (siniestros y urbano) con
+// el mismo código: se eligen desde el selector de arriba. Tienen la misma
+// forma -- aportes mensuales por vehículo más un cuadro de resumen -- pero
+// difieren en el detalle:
+//   * el urbano trae placa propia y 10 años de historia (103 meses); el de
+//     siniestros, 9 meses y sin placa (se toma del parque automotor);
+//   * cada uno nombra sus cifras de resumen distinto ("TOTAL FONDO" vs
+//     "TOTAL", "Aportes totales" vs "INGRESOS ENERO A DICIEMBRE").
+// Por eso los KPIs de arriba se calculan de los aportes reales en vez de
+// leerse del cuadro: así significan lo mismo en cualquier fondo. El cuadro
+// de contabilidad se muestra completo más abajo, tal como viene.
 
 function fsEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,36 +25,45 @@ function fsPesos(valor, decimales = 0) {
 
 const FS_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+function fsAnio(periodo) { return String(periodo).slice(0, 4); }
+
 function fsEtiquetaPeriodo(periodo) {
   const m = String(periodo).match(/^(\d{4})-(\d{2})/);
-  if (!m) return periodo;
-  return `${FS_MESES[Number(m[2]) - 1]} ${m[1].slice(2)}`;
+  return m ? `${FS_MESES[Number(m[2]) - 1]} ${m[1].slice(2)}` : periodo;
 }
 
 function fsEtiquetaPeriodoLarga(periodo) {
   const m = String(periodo).match(/^(\d{4})-(\d{2})/);
   if (!m) return periodo;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
-  const s = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+  const s = new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// Columnas verticales de una sola serie. Usa el mismo markup y CSS que la
-// gráfica de Rotación de personal (.col-chart), solo que con una barra por
-// período en vez de dos.
+// Millones con un decimal: la cifra completa no cabe encima de una columna
+// de 34px y el tooltip ya lleva el valor exacto.
+function fsMillones(valor) {
+  if (!valor) return '';
+  const abs = Math.abs(valor);
+  if (abs >= 1e9) return (valor / 1e9).toFixed(1) + 'MM';
+  if (abs >= 1e6) return (valor / 1e6).toFixed(abs >= 1e7 ? 0 : 1) + 'M';
+  return Math.round(valor / 1e3) + 'K';
+}
+
 function fsRenderColumnas(elId, filas) {
   const el = document.getElementById(elId);
   if (!filas.length) {
-    el.innerHTML = '<p class="empty-note">Sin aportes cargados.</p>';
+    el.innerHTML = '<p class="empty-note">Sin aportes en este período.</p>';
     return;
   }
-  const max = Math.max(1, ...filas.map((f) => f.valor));
+  // Con devoluciones el total de un mes puede ser negativo: la escala se
+  // toma del valor absoluto y las barras negativas se pintan en rojo.
+  const max = Math.max(1, ...filas.map((f) => Math.abs(f.valor)));
   el.innerHTML = `
     <div class="col-chart-inner">
       <div class="col-chart-plot">
         ${filas.map((f) => `
           <div class="col-bars" title="${fsEscapeHtml(f.titulo)}: ${fsPesos(f.valor)}">
-            <span class="col-bar in" data-pct="${(f.valor / max) * 100}"><span class="col-bar-value">${f.corto}</span></span>
+            <span class="col-bar ${f.valor < 0 ? 'out' : 'in'}" data-pct="${(Math.abs(f.valor) / max) * 100}"><span class="col-bar-value">${fsMillones(f.valor)}</span></span>
           </div>
         `).join('')}
       </div>
@@ -67,36 +78,39 @@ function fsRenderColumnas(elId, filas) {
   });
 }
 
-// Millones con un decimal: el valor completo en pesos no cabe encima de una
-// columna de 34px y el tooltip ya lleva la cifra exacta.
-function fsMillones(valor) {
-  if (!valor) return '';
-  return (valor / 1e6).toFixed(valor >= 1e7 ? 0 : 1) + 'M';
-}
-
 Router.register('fondo-siniestros', {
-  title: 'Fondo de reposición',
+  title: 'Fondos de reposición',
 
   async onEnter() {
     if (!this._bound) {
       document.getElementById('fs-buscar').addEventListener('input', () => this._renderTabla());
+      document.getElementById('fs-fondo').addEventListener('change', () => this._cambiarFondo());
+      document.getElementById('fs-periodo').addEventListener('change', () => this._renderGrafica());
       this._bound = true;
     }
     await this._load();
   },
 
   async _load() {
-    const [vehiculos, aportes, resumen, flota] = await Promise.all([
+    const [fondos, vehiculos, aportes, resumen, flota] = await Promise.all([
+      DB.getFondos(),
       DB.getFondoVehiculos(),
       DB.getFondoAportes(),
       DB.getFondoResumen(),
       DB.getFlotaVehiculos().catch(() => []),
     ]);
-    this._vehiculos = vehiculos;
-    this._aportes = aportes;
-    this._resumen = resumen;
+    this._fondos = fondos.length ? fondos : [{ clave: 'siniestros', nombre: 'Fondo de reposición' }];
+    this._todoVehiculos = vehiculos;
+    this._todoAportes = aportes;
+    this._todoResumen = resumen;
     this._flota = this._indexarFlota(flota);
-    this._render();
+
+    const sel = document.getElementById('fs-fondo');
+    const previo = sel.value;
+    sel.innerHTML = this._fondos.map((f) => `<option value="${fsEscapeHtml(f.clave)}">${fsEscapeHtml(f.nombre)}</option>`).join('');
+    sel.value = this._fondos.some((f) => f.clave === previo) ? previo : this._fondos[0].clave;
+
+    this._cambiarFondo();
   },
 
   // Un interno puede aparecer más de una vez en la flota (número reasignado
@@ -112,6 +126,19 @@ Router.register('fondo-siniestros', {
     return porInterno;
   },
 
+  _cambiarFondo() {
+    this._fondo = document.getElementById('fs-fondo').value;
+    this._vehiculos = this._todoVehiculos.filter((v) => v.fondo === this._fondo);
+    this._aportes = this._todoAportes.filter((a) => a.fondo === this._fondo);
+    this._resumen = this._todoResumen.filter((r) => r.fondo === this._fondo);
+    // El período elegido no se hereda entre fondos: un año que existe en los
+    // dos (2026) se daba por bueno y el fondo urbano abría en ese año suelto
+    // en vez de en su vista por años, que es la que tiene sentido con diez
+    // años de historia.
+    document.getElementById('fs-periodo').value = '';
+    this._render();
+  },
+
   _valorResumen(etiqueta) {
     const fila = (this._resumen || []).find((r) => r.etiqueta === etiqueta);
     return fila ? Number(fila.valor) : null;
@@ -119,9 +146,8 @@ Router.register('fondo-siniestros', {
 
   _render() {
     // Totales por vehículo y por período, en una sola pasada. El saldo
-    // inicial se separa de los aportes del año: es el acumulado con que
-    // arranca cada vehículo, no plata recaudada este año (ver la columna
-    // es_saldo_inicial en sql/contabilidad_fondo_2026-09-22.sql).
+    // inicial se separa: es el acumulado con que arranca cada vehículo, no
+    // plata recaudada en un mes (ver es_saldo_inicial en el esquema).
     this._porVehiculo = new Map();
     this._porPeriodo = new Map();
     this._saldoInicial = 0;
@@ -136,78 +162,117 @@ Router.register('fondo-siniestros', {
       }
       this._porPeriodo.set(a.periodo, (this._porPeriodo.get(a.periodo) || 0) + valor);
     });
-    this._aportadoEsteAnio = [...this._porPeriodo.values()].reduce((s, v) => s + v, 0);
 
-    document.getElementById('fs-kpi-total').textContent = fsPesos(this._valorResumen('TOTAL FONDO'));
-    document.getElementById('fs-kpi-aportes').textContent = fsPesos(this._valorResumen('Aportes totales'));
-    document.getElementById('fs-kpi-rendimientos').textContent = fsPesos(this._valorResumen('Rendimientos'));
-    document.getElementById('fs-kpi-disponible').textContent = fsPesos(this._valorResumen('Disponible'));
+    this._periodos = [...this._porPeriodo.keys()].sort();
+    this._anios = [...new Set(this._periodos.map(fsAnio))].sort();
+    const anioActual = this._anios[this._anios.length - 1];
+    const recaudadoAnio = this._periodos
+      .filter((p) => fsAnio(p) === anioActual)
+      .reduce((s, p) => s + this._porPeriodo.get(p), 0);
+    const totalAportado = this._saldoInicial + [...this._porPeriodo.values()].reduce((s, v) => s + v, 0);
+    const rendAnio = this._resumen
+      .filter((r) => r.grupo === 'rendimiento_mes')
+      .reduce((s, r) => s + (Number(r.valor) || 0), 0);
 
-    const periodos = [...this._porPeriodo.keys()].sort();
-    fsRenderColumnas('fs-col-chart', periodos.map((p) => ({
-      label: fsEtiquetaPeriodo(p),
-      titulo: fsEtiquetaPeriodoLarga(p),
-      corto: fsMillones(this._porPeriodo.get(p)),
-      valor: this._porPeriodo.get(p),
-    })));
+    document.getElementById('fs-kpi-total').textContent = fsPesos(totalAportado);
+    document.getElementById('fs-kpi-anio').textContent = fsPesos(recaudadoAnio);
+    document.getElementById('fs-kpi-anio-label').textContent = `Recaudado en ${anioActual || 'el año'}`;
+    document.getElementById('fs-kpi-vehiculos').textContent = this._vehiculos.length;
+    document.getElementById('fs-kpi-rendimientos').textContent = rendAnio ? fsPesos(rendAnio) : '—';
 
-    const pie = document.getElementById('fs-chart-pie');
-    pie.textContent = this._saldoInicial
-      ? `No incluye el saldo con que arrancó el año (${fsPesos(this._saldoInicial)}, columna ${fsEtiquetaPeriodoLarga(this._periodoSaldoInicial)} del archivo), que es acumulado de años anteriores y no un recaudo del mes. Recaudado en lo corrido del año: ${fsPesos(this._aportadoEsteAnio)}.`
-      : '';
-    pie.classList.toggle('hidden', !this._saldoInicial);
+    // Con 10 años de historia (el fondo urbano) una columna por mes es
+    // ilegible, así que por defecto se agrupa por año y se puede abrir un
+    // año concreto. Con pocos meses se muestran los meses directamente.
+    const sel = document.getElementById('fs-periodo');
+    const previo = sel.value;
+    const muchos = this._periodos.length > 18;
+    sel.innerHTML = (muchos ? '<option value="anios">Todos los años</option>' : '')
+      + this._anios.map((a) => `<option value="${a}">${a}</option>`).join('');
+    const opciones = [...sel.options].map((o) => o.value);
+    sel.value = opciones.includes(previo) ? previo : (muchos ? 'anios' : this._anios[this._anios.length - 1]);
+    sel.parentElement.classList.toggle('hidden', this._anios.length < 2);
 
+    this._renderGrafica();
     this._renderAviso();
     this._renderMovimientos();
     this._renderTabla();
   },
 
+  _renderGrafica() {
+    const modo = document.getElementById('fs-periodo').value;
+    let filas;
+    if (modo === 'anios') {
+      const porAnio = new Map();
+      this._periodos.forEach((p) => {
+        porAnio.set(fsAnio(p), (porAnio.get(fsAnio(p)) || 0) + this._porPeriodo.get(p));
+      });
+      filas = [...porAnio.entries()].map(([anio, valor]) => ({ label: anio, titulo: `Año ${anio}`, valor }));
+    } else {
+      filas = this._periodos
+        .filter((p) => fsAnio(p) === modo)
+        .map((p) => ({ label: fsEtiquetaPeriodo(p), titulo: fsEtiquetaPeriodoLarga(p), valor: this._porPeriodo.get(p) }));
+    }
+    fsRenderColumnas('fs-col-chart', filas);
+
+    document.getElementById('fs-chart-titulo').textContent = modo === 'anios'
+      ? 'Aportes recaudados por año' : `Aportes recaudados en ${modo}`;
+
+    const pie = document.getElementById('fs-chart-pie');
+    pie.textContent = this._saldoInicial
+      ? `No incluye el saldo con que arrancó el fondo (${fsPesos(this._saldoInicial)}, columna ${fsEtiquetaPeriodoLarga(this._periodoSaldoInicial)} del archivo), que es acumulado y no un recaudo del mes.`
+      : '';
+    pie.classList.toggle('hidden', !this._saldoInicial);
+  },
+
   // Control de consistencia: el cuadro de resumen lo escribe contabilidad a
-  // mano, así que puede quedar atrasado respecto a las columnas de aportes
-  // (pasó con el corte de agosto 2026). Si no cuadran, se dice en pantalla
-  // en vez de mostrar dos cifras distintas sin explicación.
+  // mano y puede quedar atrasado respecto a las columnas de aportes (pasó
+  // con el corte de agosto 2026 en el fondo de siniestros). Solo se compara
+  // cuando el cuadro declara una cifra que sea equivalente a la suma de
+  // aportes -- no todos los fondos la tienen.
   _renderAviso() {
     const el = document.getElementById('fs-aviso');
-    const totalCuadro = this._valorResumen('Aportes totales');
-    const totalReal = this._saldoInicial + this._aportadoEsteAnio;
-    const diferencia = totalCuadro === null ? 0 : totalReal - totalCuadro;
-    if (Math.abs(diferencia) < 1) {
-      el.classList.add('hidden');
-      return;
-    }
+    const fila = (this._resumen || []).find((r) => /^aportes totales/i.test(r.etiqueta || ''));
+    if (!fila) { el.classList.add('hidden'); return; }
+    const totalCuadro = Number(fila.valor);
+    const totalReal = this._saldoInicial + [...this._porPeriodo.values()].reduce((s, v) => s + v, 0);
+    const diferencia = totalReal - totalCuadro;
+    if (Math.abs(diferencia) < 1) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
     el.innerHTML = `
       <strong>Los aportes cargados no cuadran con el cuadro de resumen.</strong>
       La suma real de los aportes por vehículo da ${fsPesos(totalReal)}, mientras que el
-      cuadro declara ${fsPesos(totalCuadro)} en "Aportes totales" — una diferencia de
+      cuadro declara ${fsPesos(totalCuadro)} en "${fsEscapeHtml(fila.etiqueta)}" — una diferencia de
       ${fsPesos(Math.abs(diferencia))}. Suele pasar porque el cuadro se actualiza a mano y quedó
-      un corte atrasado. Las cifras de las tarjetas de arriba vienen del cuadro.
+      un corte atrasado.
     `;
   },
 
   _renderMovimientos() {
-    const movimientos = (this._resumen || []).filter((r) => r.grupo === 'movimiento');
+    const movimientos = (this._resumen || []).filter((r) => r.grupo === 'movimiento' || r.grupo === 'ingreso');
     const el = document.getElementById('fs-movimientos');
     if (!movimientos.length) {
-      el.innerHTML = '<p class="empty-note">Sin movimientos cargados.</p>';
+      el.innerHTML = '<p class="empty-note">Este fondo no trae cuadro de resumen.</p>';
       return;
     }
-    // Las cifras que son un total (no un movimiento más) se marcan para que
-    // no se lean como una entrada/salida cualquiera del fondo.
-    const esTotal = (e) => /^(Aportes totales|TOTAL FONDO|Disponible|Total rendimientos)/i.test(e);
+    const esTotal = (e) => /^(aportes totales|total|saldo en cuenta|disponible)/i.test(e);
     el.innerHTML = movimientos.map((m) => {
       const valor = Number(m.valor);
-      const negativo = valor < 0;
       return `
         <div class="fondo-mov ${esTotal(m.etiqueta) ? 'es-total' : ''}">
           <div class="fondo-mov-texto">
             <span class="fondo-mov-etiqueta">${fsEscapeHtml(m.etiqueta)}</span>
             ${m.detalle ? `<span class="fondo-mov-detalle">${fsEscapeHtml(m.detalle)}</span>` : ''}
           </div>
-          <span class="fondo-mov-valor ${negativo ? 'negativo' : ''}">${fsPesos(valor)}</span>
+          <span class="fondo-mov-valor ${valor < 0 ? 'negativo' : ''}">${fsPesos(valor)}</span>
         </div>
       `;
     }).join('');
+  },
+
+  _placaDe(v) {
+    if (v.placa) return v.placa;
+    const flota = this._flota.get(v.interno);
+    return flota ? flota.placa : null;
   },
 
   _renderTabla() {
@@ -219,7 +284,7 @@ Router.register('fondo-siniestros', {
           interno: v.interno,
           propietario: v.propietario || '',
           nit: v.nit || '',
-          placa: flota ? flota.placa : null,
+          placa: this._placaDe(v),
           ruta: flota ? (flota.nombre_ruta || flota.ruta) : null,
           total: this._porVehiculo.get(v.interno) || 0,
         };
@@ -240,7 +305,7 @@ Router.register('fondo-siniestros', {
       return;
     }
     tbody.innerHTML = filas.map((f) => `
-      <tr>
+      <tr${f.total === 0 ? ' class="fila-apagada"' : ''}>
         <td data-label="Interno"><strong>${fsEscapeHtml(f.interno)}</strong></td>
         <td data-label="Placa">${fsEscapeHtml(f.placa || '—')}</td>
         <td data-label="Ruta">${fsEscapeHtml(f.ruta || '—')}</td>
@@ -257,31 +322,40 @@ Router.register('fondo-siniestros', {
   _verVehiculo(interno) {
     const vehiculo = this._vehiculos.find((v) => v.interno === interno);
     const flota = this._flota.get(interno);
+    const placa = vehiculo ? this._placaDe(vehiculo) : null;
     const meses = this._aportes
       .filter((a) => a.interno === interno)
       .sort((a, b) => String(a.periodo).localeCompare(String(b.periodo)));
     const total = meses.reduce((s, m) => s + Number(m.valor || 0), 0);
 
+    document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-body').innerHTML = `
-      <h3 style="margin:0 0 0.35rem">Interno ${fsEscapeHtml(interno)}${flota && flota.placa ? ' · ' + fsEscapeHtml(flota.placa) : ''}</h3>
+      <h3 style="margin:0 0 0.35rem">Interno ${fsEscapeHtml(interno)}${placa ? ' · ' + fsEscapeHtml(placa) : ''}</h3>
       <p class="muted" style="margin:0 0 1.2rem">
         ${fsEscapeHtml(vehiculo ? (vehiculo.propietario || 'Sin propietario') : 'Sin propietario')}
         ${vehiculo && vehiculo.nit ? ' · NIT ' + fsEscapeHtml(vehiculo.nit) : ''}
         ${flota && (flota.nombre_ruta || flota.ruta) ? ' · Ruta ' + fsEscapeHtml(flota.nombre_ruta || flota.ruta) : ''}
+        · ${meses.length} movimiento(s)
       </p>
-      <div class="table-wrap">
+      <div class="table-wrap" style="max-height:420px; overflow-y:auto">
         <table>
-          <thead><tr><th>Mes</th><th class="num">Aporte</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Concepto</th><th class="num">Valor</th></tr></thead>
           <tbody>
-            ${meses.map((m) => `
-              <tr>
-                <td data-label="Mes">${fsEscapeHtml(fsEtiquetaPeriodoLarga(m.periodo))}</td>
-                <td data-label="Aporte" class="num">${fsPesos(m.valor)}</td>
-              </tr>
-            `).join('')}
+            ${meses.map((m) => {
+              const valor = Number(m.valor);
+              const etiqueta = m.es_saldo_inicial ? 'Saldo inicial' : (m.concepto || '');
+              return `
+                <tr>
+                  <td data-label="Mes">${fsEscapeHtml(fsEtiquetaPeriodoLarga(m.periodo))}</td>
+                  <td data-label="Concepto">${etiqueta ? `<span class="tag">${fsEscapeHtml(etiqueta)}</span>` : ''}</td>
+                  <td data-label="Valor" class="num${valor < 0 ? ' negativo' : ''}">${fsPesos(valor)}</td>
+                </tr>
+              `;
+            }).join('')}
             <tr class="fila-total">
-              <td data-label="Mes"><strong>Total aportado</strong></td>
-              <td data-label="Aporte" class="num"><strong>${fsPesos(total)}</strong></td>
+              <td data-label="Mes"><strong>Total</strong></td>
+              <td></td>
+              <td data-label="Valor" class="num"><strong>${fsPesos(total)}</strong></td>
             </tr>
           </tbody>
         </table>

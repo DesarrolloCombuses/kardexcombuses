@@ -48,27 +48,44 @@ Router.register('fondo-rendimientos', {
   async onEnter() {
     if (!this._bound) {
       document.getElementById('fr-buscar').addEventListener('input', () => this._renderTabla());
+      document.getElementById('fr-fondo').addEventListener('change', () => this._cambiarFondo());
       this._bound = true;
     }
     await this._load();
   },
 
   async _load() {
-    const [rendimientos, vehiculos, resumen, flota] = await Promise.all([
+    const [fondos, rendimientos, vehiculos, resumen, flota] = await Promise.all([
+      DB.getFondos(),
       DB.getFondoRendimientos(),
       DB.getFondoVehiculos(),
       DB.getFondoResumen(),
       DB.getFlotaVehiculos().catch(() => []),
     ]);
-    this._rendimientos = rendimientos;
-    this._vehiculos = new Map(vehiculos.map((v) => [v.interno, v]));
-    this._resumen = resumen;
+    this._fondos = fondos.length ? fondos : [{ clave: 'siniestros', nombre: 'Fondo de reposición' }];
+    this._todoRendimientos = rendimientos;
+    this._todoVehiculos = vehiculos;
+    this._todoResumen = resumen;
     this._flota = new Map();
     (flota || []).forEach((v) => {
       if (!v.interno) return;
       const previo = this._flota.get(v.interno);
       if (!previo || (v.vinculado && !previo.vinculado)) this._flota.set(v.interno, v);
     });
+
+    const sel = document.getElementById('fr-fondo');
+    const previo = sel.value;
+    sel.innerHTML = this._fondos.map((f) => `<option value="${frEscapeHtml(f.clave)}">${frEscapeHtml(f.nombre)}</option>`).join('');
+    sel.value = this._fondos.some((f) => f.clave === previo) ? previo : this._fondos[0].clave;
+
+    this._cambiarFondo();
+  },
+
+  _cambiarFondo() {
+    this._fondo = document.getElementById('fr-fondo').value;
+    this._rendimientos = this._todoRendimientos.filter((r) => r.fondo === this._fondo);
+    this._vehiculos = new Map(this._todoVehiculos.filter((v) => v.fondo === this._fondo).map((v) => [v.interno, v]));
+    this._resumen = this._todoResumen.filter((r) => r.fondo === this._fondo);
     this._render();
   },
 
@@ -82,7 +99,11 @@ Router.register('fondo-rendimientos', {
     const totalAnio = meses.reduce((s, m) => s + (Number(m.valor) || 0), 0);
     const conDato = meses.filter((m) => m.valor);
 
-    document.getElementById('fr-kpi-acumulado').textContent = frPesos(this._valorResumen('Rendimientos'));
+    // Cada fondo nombra distinto su acumulado de rendimientos, así que se
+    // toma la primera etiqueta del cuadro que hable de rendimientos y no sea
+    // uno de los meses del año en curso.
+    const acumulado = (this._resumen || []).find((r) => r.grupo !== 'rendimiento_mes' && /rendimiento/i.test(r.etiqueta || ''));
+    document.getElementById('fr-kpi-acumulado').textContent = acumulado ? frPesos(acumulado.valor) : '—';
     document.getElementById('fr-kpi-anio').textContent = frPesos(totalAnio);
     document.getElementById('fr-kpi-promedio').textContent =
       conDato.length ? frPesos(totalAnio / conDato.length) : '—';
@@ -104,10 +125,12 @@ Router.register('fondo-rendimientos', {
         `).join('')
       : '<p class="empty-note">Sin detalle de ingresos cargado.</p>';
 
+    document.getElementById('fr-historico').classList.toggle('hidden', !this._rendimientos.length);
     this._renderTabla();
   },
 
   _renderTabla() {
+    if (!this._rendimientos.length) return;
     const filtro = (document.getElementById('fr-buscar').value || '').trim().toLowerCase();
     const filas = this._rendimientos
       .map((r) => {

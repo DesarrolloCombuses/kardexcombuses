@@ -1267,6 +1267,15 @@ const DB = {
   // consultar, en vez de duplicarlas acá -- ver el comentario del esquema
   // en sql/contabilidad_fondo_2026-09-22.sql.
   // ===================================================================
+  async getFondos() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_fondos')
+      .select('*')
+      .order('orden');
+    if (error) throw error;
+    return data;
+  },
+
   async getFondoVehiculos() {
     const { data, error } = await window.supabaseClient
       .from('kardex_fondo_vehiculos')
@@ -1276,13 +1285,24 @@ const DB = {
     return data;
   },
 
+  // Sin filtro por fondo a propósito: son ~7.700 filas entre los dos fondos,
+  // se traen de una y la vista cambia de fondo sin volver a consultar.
   async getFondoAportes() {
-    const { data, error } = await window.supabaseClient
-      .from('kardex_fondo_aportes')
-      .select('interno, periodo, valor, es_saldo_inicial')
-      .order('periodo');
-    if (error) throw error;
-    return data;
+    const PAGE_SIZE = 1000;
+    let filas = [];
+    let desde = 0;
+    for (;;) {
+      const { data, error } = await window.supabaseClient
+        .from('kardex_fondo_aportes')
+        .select('fondo, interno, periodo, valor, concepto, es_saldo_inicial')
+        .order('periodo')
+        .range(desde, desde + PAGE_SIZE - 1);
+      if (error) throw error;
+      filas = filas.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      desde += PAGE_SIZE;
+    }
+    return filas;
   },
 
   async getFondoResumen() {
