@@ -1085,26 +1085,60 @@
             </div>
           </div>
 
-          <div class="stat-grid">
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Ingresos por mes</h2></div>
-              <div id="pr-bars-ingresos" class="bar-chart"></div>
+          <div class="panel-card chart-card" style="margin-bottom:1.25rem">
+            <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+              <h2>Ingresos vs. egresos por mes</h2>
+              <span class="chart-legend" style="margin-left:auto">
+                <span><i class="legend-in"></i>Ingresaron</span>
+                <span><i class="legend-out"></i>Salieron</span>
+              </span>
             </div>
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Egresos por mes</h2></div>
-              <div id="pr-bars-egresos" class="bar-chart"></div>
-            </div>
+            <div id="pr-col-chart" class="col-chart"></div>
           </div>
 
           <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
-            <h2>Detalle del mes</h2>
+            <h2>Desglose</h2>
             <label class="filtro-inline" style="margin-left:auto">
-              Ver mes
+              Ver
               <select id="pr-mes-select"></select>
             </label>
           </div>
+
           <div class="stat-grid">
             <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Motivos de salida</h2></div>
+              <div id="pr-bars-motivos" class="ranked-bars"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Cuánto duraron los que salieron</h2></div>
+              <div id="pr-bars-antiguedad" class="bar-chart"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Por área</h2>
+                <span class="chart-legend"><span><i class="legend-in"></i>Entraron</span><span><i class="legend-out"></i>Salieron</span></span>
+              </div>
+              <div id="pr-bars-area" class="cmp-list"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Por cargo</h2>
+                <span class="chart-legend"><span><i class="legend-in"></i>Entraron</span><span><i class="legend-out"></i>Salieron</span></span>
+              </div>
+              <div id="pr-bars-cargo" class="cmp-list"></div>
+            </div>
+          </div>
+
+          <details class="pr-detalle">
+            <summary>
+              <svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Ver el detalle de quiénes fueron
+              <span class="muted" id="pr-detalle-resumen" style="margin-left:auto"></span>
+            </summary>
+            <div class="pr-detalle-body">
               <div class="section-heading"><h2>Ingresaron</h2><span class="muted" id="pr-contador-ingresos"></span></div>
               <div class="table-wrap">
                 <table id="pr-tabla-ingresos">
@@ -1112,9 +1146,7 @@
                   <tbody></tbody>
                 </table>
               </div>
-            </div>
-            <div class="panel-card chart-card">
-              <div class="section-heading"><h2>Salieron</h2><span class="muted" id="pr-contador-egresos"></span></div>
+              <div class="section-heading" style="margin-top:1.5rem"><h2>Salieron</h2><span class="muted" id="pr-contador-egresos"></span></div>
               <div class="table-wrap">
                 <table id="pr-tabla-egresos">
                   <thead><tr><th>Fecha</th><th>Nombre</th><th>Cédula</th><th>Cargo</th><th>Área</th><th>Motivo</th></tr></thead>
@@ -1122,7 +1154,7 @@
                 </table>
               </div>
             </div>
-          </div>
+          </details>
         </section>
 
         <!-- ================= PERMISOS Y VACACIONES (bandeja admin) ================= -->

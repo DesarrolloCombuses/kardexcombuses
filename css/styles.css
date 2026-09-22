@@ -1391,3 +1391,107 @@ tr.anulado-row td:first-child { text-decoration: line-through; }
 }
 .siniestro-detalle-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--slate-500); }
 .siniestro-detalle-valor { font-size: 0.8rem; color: var(--slate-900); margin-top: 0.15rem; overflow-wrap: break-word; }
+
+/* =====================================================================
+   Rotación de personal -- gráficas de ingresos vs. egresos
+   ===================================================================== */
+
+/* Los ítems de un grid tienen min-width:auto, así que un hijo que no se
+   puede encoger (una tabla con celdas nowrap) estira su columna por encima
+   del reparto 1.3fr/1fr y desborda toda la rejilla hacia la derecha, hasta
+   salirse de la pantalla. Con min-width:0 la columna manda y el hijo hace
+   su propio scroll interno (.table-wrap ya tiene overflow-x:auto). */
+.stat-grid > * { min-width: 0; }
+
+.chart-legend {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+  font-size: 0.75rem; font-weight: 600; color: var(--slate-600);
+}
+.chart-legend > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.chart-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.legend-in { background: var(--blue-600); }
+.legend-out { background: var(--danger); }
+
+/* Columnas verticales agrupadas. El eje de etiquetas va en su propia fila
+   (misma estructura flex que el área de barras) en vez de dentro de cada
+   columna: así la línea base queda pegada a las barras y no debajo del
+   texto, y ambas filas se desplazan juntas cuando hay scroll horizontal. */
+.col-chart { overflow-x: auto; margin-top: 0.9rem; padding-bottom: 0.25rem; }
+.col-chart-inner { min-width: 620px; }
+.col-chart-plot {
+  display: flex; align-items: flex-end; gap: 0.5rem;
+  height: 240px; padding-top: 1.3rem;
+  border-bottom: 2px solid var(--slate-200);
+  /* Cuatro líneas guía horizontales: sin ellas las columnas quedan
+     flotando sobre un fondo vacío y no se alcanza a estimar la altura de
+     una barra contra otra que está al otro extremo de los 12 meses. */
+  background-image: repeating-linear-gradient(
+    to top, var(--slate-100) 0 1px, transparent 1px 25%
+  );
+}
+.col-chart-axis { display: flex; gap: 0.5rem; padding-top: 0.5rem; }
+.col-bars {
+  flex: 1 1 0; min-width: 34px; height: 100%;
+  display: flex; align-items: flex-end; justify-content: center; gap: 3px;
+}
+.col-bar {
+  position: relative; flex: 1 1 0; max-width: 17px; height: 0;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.col-bar.in { background: linear-gradient(180deg, #34c47c, var(--blue-600)); }
+.col-bar.out { background: linear-gradient(180deg, #f0806f, var(--danger)); }
+.col-bar-value {
+  position: absolute; top: -1.15rem; left: 50%; transform: translateX(-50%);
+  font-size: 0.67rem; font-weight: 700; color: var(--slate-600);
+  font-variant-numeric: tabular-nums;
+}
+.col-label {
+  flex: 1 1 0; min-width: 34px; text-align: center;
+  font-size: 0.7rem; font-weight: 600; color: var(--slate-500); white-space: nowrap;
+}
+
+/* Barras comparadas (por área / por cargo): horizontales, no columnas,
+   porque acá las etiquetas son largas -- "CONDUCTORES AEROPUERTO" no cabe
+   debajo de una columna de 34px. */
+.cmp-list {
+  display: flex; flex-direction: column; gap: 0.9rem; margin-top: 0.8rem;
+  max-height: 420px; overflow-y: auto; padding-right: 0.25rem;
+}
+.cmp-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.cmp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; }
+.cmp-label {
+  font-size: 0.82rem; font-weight: 700; color: var(--slate-900);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cmp-nums { flex: none; display: flex; gap: 0.6rem; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.cmp-nums .in { color: var(--blue-700); }
+.cmp-nums .out { color: var(--danger-text); }
+.cmp-track { display: block; background: var(--slate-100); border-radius: 999px; height: 8px; overflow: hidden; }
+.cmp-fill { display: block; height: 100%; width: 0; border-radius: 999px; transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+.cmp-fill.in { background: linear-gradient(90deg, var(--blue-600), #6be3a0); }
+.cmp-fill.out { background: linear-gradient(90deg, var(--danger), #f5a99e); }
+
+/* La tabla de "quiénes fueron" queda plegada: el módulo se lee en gráficas
+   y la tabla es el respaldo para cuando hace falta el dato exacto de una
+   persona (cédula, motivo). */
+.bar-fill.rojo { background: linear-gradient(90deg, var(--danger), #f5a99e); box-shadow: 0 0 10px rgba(211, 61, 43, 0.35); }
+
+.pr-detalle {
+  background: var(--white); border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: 1.25rem;
+}
+.pr-detalle > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.6rem;
+  padding: 1rem 1.25rem; font-weight: 700; font-size: 0.95rem; color: var(--slate-900);
+  border-radius: var(--radius-lg);
+}
+.pr-detalle > summary::-webkit-details-marker { display: none; }
+.pr-detalle > summary:hover { background: var(--slate-50); }
+.pr-detalle > summary svg { width: 15px; height: 15px; flex: none; color: var(--slate-500); transition: transform 0.2s; }
+.pr-detalle[open] > summary svg { transform: rotate(90deg); }
+.pr-detalle-body { padding: 0 1.25rem 1.35rem; }
+/* 12 meses completos son ~600 filas: la tabla lleva su propio scroll para
+   no volver la página interminable, con el encabezado fijo arriba. */
+.pr-detalle .table-wrap { max-height: 420px; overflow-y: auto; }
+.pr-detalle .table-wrap th { position: sticky; top: 0; z-index: 1; }
