@@ -27,28 +27,19 @@ Router.register('dashboard', {
   _UMBRAL_CRITICO: 2,
 
   async _reload() {
-    const [stock, employees, { movements: recent }] = await Promise.all([
-      DB.getStockActual(),
-      DB.getEmployees({ onlyActive: true }),
-      DB.getMovements({ page: 1, pageSize: 8 }),
-    ]);
+    const kpis = await DB.getDashboardKpis();
+    const bajoStock = kpis.bajo_stock;
 
-    const categorias = new Set(stock.map((r) => r.item_category_id)).size;
-    const stockTotal = stock.reduce((sum, r) => sum + r.stock_actual, 0);
-    const bajoStock = stock
-      .filter((r) => r.stock_actual <= this._UMBRAL_BAJO)
-      .sort((a, b) => a.stock_actual - b.stock_actual);
-
-    document.getElementById('kpi-categorias').textContent = categorias;
-    document.getElementById('kpi-stock-total').textContent = stockTotal;
-    document.getElementById('kpi-empleados').textContent = employees.length;
+    document.getElementById('kpi-categorias').textContent = kpis.categorias;
+    document.getElementById('kpi-stock-total').textContent = kpis.stock_total;
+    document.getElementById('kpi-empleados').textContent = kpis.empleados_activos;
     document.getElementById('kpi-bajo-stock').textContent = bajoStock.length;
     document.getElementById('kpi-bajo-stock-icon').dataset.tone = bajoStock.length > 0 ? 'red' : 'green';
 
     this._renderStockAlert(bajoStock);
 
     const container = document.getElementById('dashboard-recent');
-    const items = recent;
+    const items = kpis.movimientos_recientes;
     if (items.length === 0) {
       container.innerHTML = '<p class="muted" style="padding:1rem">Sin movimientos todavía.</p>';
       return;
@@ -64,8 +55,8 @@ Router.register('dashboard', {
                 <span class="tag ${m.tipo}">${m.tipo}</span>
                 ${m.anulado ? '<span class="tag anulado-tag">Anulado</span>' : ''}
               </td>
-              <td data-label="Empleado">${m.employees ? m.employees.nombre : '—'}</td>
-              <td data-label="Líneas">${m.kardex_movement_items.length}</td>
+              <td data-label="Empleado">${m.empleado_nombre || '—'}</td>
+              <td data-label="Líneas">${m.lineas}</td>
             </tr>
           `).join('')}
         </tbody>

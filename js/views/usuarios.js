@@ -11,6 +11,9 @@
 // Mismos módulos que sql/permisos_granulares_2026-09-16.sql, agrupados como
 // en el sidebar para que la matriz se lea igual de organizada.
 const SECCIONES_PERMISOS = [
+  { titulo: 'General', modulos: [
+    { key: 'dashboard', label: 'Panel' },
+  ] },
   { titulo: 'Inventario', modulos: [
     { key: 'inventario', label: 'Inventario' },
     { key: 'inventario-historico', label: 'Historial de inventario' },

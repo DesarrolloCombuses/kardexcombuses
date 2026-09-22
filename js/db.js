@@ -1,5 +1,18 @@
 // Capa de acceso a datos: Postgres (via supabase-js) + Storage.
 const DB = {
+  // Cifras del Panel/Dashboard (categorías, stock total, empleados activos,
+  // stock bajo, últimos movimientos) ya agregadas en el servidor -- a
+  // diferencia del resto de este archivo, acá no se consultan las tablas
+  // directo: kardex_dashboard_kpis() (ver sql/dashboard_permiso_2026-09-21.sql)
+  // filtra por permiso y devuelve solo los campos que pinta la pantalla, para
+  // que dar "ver" en 'dashboard' no abra por REST la tabla completa de
+  // employees (con cédula/salario/etc.) solo para mostrar un conteo.
+  async getDashboardKpis() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_dashboard_kpis');
+    if (error) throw error;
+    return data;
+  },
+
   // ---- Catálogo / inventario ----------------------------------------------
 
   async getStockActual() {
