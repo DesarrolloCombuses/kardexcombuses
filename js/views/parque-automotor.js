@@ -93,6 +93,60 @@ const PA_SECCIONES_FICHA = [
   ] },
 ];
 
+// Las fechas van al Excel como número de serie (no como texto) para que allá
+// se puedan ordenar y filtrar como fecha de verdad. El cálculo es manual y no
+// con new Date(...): construir la fecha desde el ISO y restar la época de
+// Excel arrastra el desfase de zona horaria y deja "6/9 23:59" en vez de 7/9.
+// Mismo criterio y mismo motivo que en js/views/empleados.js.
+function paFechaCeldaExcel(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const [, y, mes, d] = m.map(Number);
+  return Math.round((Date.UTC(y, mes - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
+}
+
+// Días que faltan (o que ya pasaron, en negativo) para un vencimiento. La
+// tabla muestra esto como frase; en el Excel va como número para poder
+// ordenar por "lo más vencido" o filtrar "menos de 15 días".
+function paDiasParaVencer(iso) {
+  const fecha = paParseFechaIso(iso);
+  if (!fecha) return '';
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  return Math.round((fecha.getTime() - hoy.getTime()) / 86400000);
+}
+
+// Hoja "Vehículos": TODAS las columnas de flota_vehiculos. La tabla en
+// pantalla solo muestra placa/interno/clase/ruta y cuatro documentos; el
+// resto (motor, chasis, propietario, contrato) vivía únicamente dentro de la
+// ficha, de a un vehículo por vez -- que es justo lo que hacía imposible
+// cruzar el parque completo en una hoja de cálculo.
+const PA_COLUMNAS_VEHICULO = [
+  { label: 'Placa', get: (v) => v.raw.placa || '' },
+  { label: 'Interno', get: (v) => v.raw.interno || '' },
+  { label: 'Vinculado', get: (v) => (v.raw.vinculado ? 'Sí' : 'No') },
+  { label: 'Operante', get: (v) => (v.raw.operante ? 'Sí' : 'No') },
+  { label: 'Estado de documentos', get: (v) => PA_ESTADO_LABEL[v.peorEstado] || v.peorEstado },
+  { label: 'Marca', get: (v) => v.raw.marca || '' },
+  { label: 'Modelo', get: (v) => v.raw.modelo || '' },
+  { label: 'Clase', get: (v) => v.raw.clase || '' },
+  { label: 'N.º de motor', get: (v) => v.raw.motor || '' },
+  { label: 'Chasis', get: (v) => v.raw.chasis || '' },
+  { label: 'Ruta', get: (v) => v.raw.ruta || '' },
+  { label: 'Nombre de ruta', get: (v) => v.raw.nombre_ruta || '' },
+  { label: 'NIT propietario', get: (v) => v.raw.propietario_nit || '' },
+  { label: 'Propietario', get: (v) => v.raw.propietario_nombre || '' },
+  { label: 'N.º de contrato', get: (v) => v.raw.contrato || '' },
+  { label: 'Fecha de contrato', get: (v) => paFechaCeldaExcel(v.raw.fecha_contrato), fecha: true },
+  { label: 'Fecha de ingreso', get: (v) => paFechaCeldaExcel(v.raw.fecha_ingreso), fecha: true },
+  { label: 'Fecha de retiro', get: (v) => paFechaCeldaExcel(v.raw.fecha_retiro), fecha: true },
+];
+
+// Los 6 tipos del enum, no los 4 de la tabla: certificación de amparo y
+// licencia de tránsito los tiene poco más de la mitad de la flota, y saber
+// exactamente a quién le faltan es media razón para bajar el archivo.
+const PA_TIPOS_EXPORT = Object.keys(PA_TIPO_LABELS);
+
 Router.register('parque-automotor', {
   title: 'Parque automotor',
 
@@ -102,6 +156,7 @@ Router.register('parque-automotor', {
       document.getElementById('pa-filtro-estado-doc').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-filtro-ruta').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-mostrar-desvinculados').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('pa-export-btn').addEventListener('click', () => this._exportExcel());
       document.getElementById('pa-tbody').addEventListener('click', (e) => {
         const btnFicha = e.target.closest('.pa-ver-ficha');
         if (btnFicha) { this._verDetalle(this._filasRenderizadas[Number(btnFicha.dataset.idx)]); return; }
@@ -139,6 +194,13 @@ Router.register('parque-automotor', {
           fechaTexto: paFormatFecha(d.fecha_vencimiento),
           storagePath: d.storage_path,
           nombreArchivo: d.nombre_archivo_original,
+          // Solo los usa el Excel: en pantalla no se muestran, pero son
+          // justo lo que contabilidad/operaciones pide cuando audita quién
+          // cargó un documento y si alguien ya lo revisó.
+          fechaIso: d.fecha_vencimiento,
+          subidoPorConductor: !!d.subido_por_conductor,
+          revisado: !!d.revisado,
+          cargadoAt: d.created_at,
         }));
         const docsTabla = PA_TIPOS_TABLA.map((tipo) =>
           docs.find((d) => d.tipo === tipo) || { tipo, label: PA_TIPO_LABELS[tipo], estado: 'SIN_FECHA', tag: 'inactivo-tag', corto: 'Sin registrar', peso: 0, texto: 'Sin registrar en el Portal de Documentos', fechaTexto: null, storagePath: null }
@@ -268,6 +330,130 @@ Router.register('parque-automotor', {
         <td data-label="Ficha"><button type="button" class="btn-secondary pa-ver-ficha" data-idx="${i}">Ver ficha</button></td>
       </tr>
     `).join('');
+  },
+
+  // Baja lo que el usuario está viendo (los mismos filtros de la pantalla),
+  // no siempre la flota entera: si filtró "con algún vencido" y le bajara
+  // igual los 135 vehículos, el archivo no respondería a lo que pidió.
+  // Mismo criterio que el export de Empleados.
+  async _exportExcel() {
+    const btn = document.getElementById('pa-export-btn');
+    const vehiculos = this._filasRenderizadas || [];
+    if (!vehiculos.length) {
+      alert('No hay vehículos para exportar con estos filtros.');
+      return;
+    }
+    btn.disabled = true;
+    Loading.show('Preparando Excel…');
+    try {
+      this._buildExcel(vehiculos);
+    } catch (err) {
+      alert('No se pudo generar el Excel: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  // Dos hojas, porque son dos preguntas distintas:
+  //  - "Vehículos": una fila por bus, con toda su ficha y el estado de cada
+  //    uno de los 6 documentos al lado. Sirve para cruzar el parque.
+  //  - "Documentos": una fila por documento. Sirve para ordenar por días
+  //    vencidos o filtrar por tipo sin pelear con columnas repetidas.
+  _buildExcel(vehiculos) {
+    const libro = XLSX.utils.book_new();
+    const fechaArchivo = new Date().toISOString().slice(0, 10);
+
+    // ---------- Hoja 1: un renglón por vehículo ----------
+    const colsDoc = [];
+    PA_TIPOS_EXPORT.forEach((tipo) => {
+      const label = PA_TIPO_LABELS[tipo];
+      colsDoc.push({ label: `${label} — estado`, tipo, campo: 'estado' });
+      colsDoc.push({ label: `${label} — vence`, tipo, campo: 'vence', fecha: true });
+      colsDoc.push({ label: `${label} — días`, tipo, campo: 'dias' });
+      colsDoc.push({ label: `${label} — archivo`, tipo, campo: 'archivo' });
+    });
+
+    const headerV = [...PA_COLUMNAS_VEHICULO.map((c) => c.label), ...colsDoc.map((c) => c.label)];
+    const fechasV = new Set([
+      ...PA_COLUMNAS_VEHICULO.filter((c) => c.fecha).map((c) => c.label),
+      ...colsDoc.filter((c) => c.fecha).map((c) => c.label),
+    ]);
+
+    const filasV = vehiculos.map((v) => {
+      const fila = {};
+      PA_COLUMNAS_VEHICULO.forEach((c) => { fila[c.label] = c.get(v); });
+      colsDoc.forEach((c) => {
+        const d = v.docsTodos.find((x) => x.tipo === c.tipo);
+        if (!d) {
+          // Sin fila en el Portal de Documentos: no es lo mismo que "sin
+          // fecha". Se dice explícitamente en vez de dejar la celda vacía,
+          // que se leería como un dato que se perdió al exportar.
+          fila[c.label] = c.campo === 'estado' ? 'No registrado' : '';
+          return;
+        }
+        if (c.campo === 'estado') fila[c.label] = PA_ESTADO_LABEL[d.estado] || d.estado;
+        else if (c.campo === 'vence') fila[c.label] = paFechaCeldaExcel(d.fechaIso);
+        else if (c.campo === 'dias') fila[c.label] = d.fechaIso ? paDiasParaVencer(d.fechaIso) : '';
+        else fila[c.label] = d.storagePath ? 'Sí' : 'No';
+      });
+      return fila;
+    });
+
+    XLSX.utils.book_append_sheet(libro, this._hoja(filasV, headerV, fechasV), 'Vehículos');
+
+    // ---------- Hoja 2: un renglón por documento ----------
+    const headerD = ['Placa', 'Interno', 'Vinculado', 'Ruta', 'Documento', 'Estado',
+      'Vence', 'Días', 'Archivo cargado', 'Nombre del archivo',
+      'Lo subió el conductor', 'Revisado', 'Fecha de carga'];
+    const fechasD = new Set(['Vence', 'Fecha de carga']);
+
+    const filasD = [];
+    vehiculos.forEach((v) => {
+      PA_TIPOS_EXPORT.forEach((tipo) => {
+        const d = v.docsTodos.find((x) => x.tipo === tipo);
+        filasD.push({
+          'Placa': v.raw.placa || '',
+          'Interno': v.raw.interno || '',
+          'Vinculado': v.raw.vinculado ? 'Sí' : 'No',
+          'Ruta': v.raw.nombre_ruta || v.raw.ruta || '',
+          'Documento': PA_TIPO_LABELS[tipo],
+          'Estado': d ? (PA_ESTADO_LABEL[d.estado] || d.estado) : 'No registrado',
+          'Vence': d ? paFechaCeldaExcel(d.fechaIso) : '',
+          'Días': d && d.fechaIso ? paDiasParaVencer(d.fechaIso) : '',
+          'Archivo cargado': d && d.storagePath ? 'Sí' : 'No',
+          'Nombre del archivo': (d && d.nombreArchivo) || '',
+          'Lo subió el conductor': d ? (d.subidoPorConductor ? 'Sí' : 'No') : '',
+          'Revisado': d ? (d.revisado ? 'Sí' : 'No') : '',
+          'Fecha de carga': d && d.cargadoAt ? paFechaCeldaExcel(String(d.cargadoAt).slice(0, 10)) : '',
+        });
+      });
+    });
+
+    XLSX.utils.book_append_sheet(libro, this._hoja(filasD, headerD, fechasD), 'Documentos');
+
+    XLSX.writeFile(libro, `parque-automotor-combuses-${fechaArchivo}.xlsx`);
+  },
+
+  // Arma una hoja con el formato de fecha aplicado a las columnas que lo
+  // llevan (si no, el número de serie se ve como 46000 y nadie entiende qué
+  // es) y un ancho de columna proporcional al título.
+  _hoja(filas, header, columnasFecha) {
+    const hoja = XLSX.utils.json_to_sheet(filas, { header });
+    const rango = XLSX.utils.decode_range(hoja['!ref']);
+    for (let col = rango.s.c; col <= rango.e.c; col++) {
+      if (!columnasFecha.has(header[col])) continue;
+      for (let row = rango.s.r + 1; row <= rango.e.r; row++) {
+        const celda = hoja[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (celda && celda.t === 'n') celda.z = 'd/m/yyyy';
+      }
+    }
+    hoja['!cols'] = header.map((h) => ({ wch: Math.min(Math.max(h.length + 2, 10), 34) }));
+    // Sin congelar el encabezado: se probó con '!freeze' y la edición
+    // comunitaria de SheetJS lo ignora al escribir (se verificó abriendo el
+    // .xlsx generado con openpyxl -- freeze_panes llega en None). Quien lo
+    // necesite lo fija en Excel con Vista > Inmovilizar.
+    return hoja;
   },
 
   _verDetalle(v) {
