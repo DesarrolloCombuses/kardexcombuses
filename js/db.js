@@ -662,6 +662,44 @@ const DB = {
     if (error) throw error;
   },
 
+  // Crea el mes copiando el anterior (ver sql/lineas_facturas_mes_2026-09-25.sql).
+  // Devuelve el id de la factura nueva.
+  async crearFacturaLinea(contrato, periodo, fechaFactura, fechaVencimiento, copiar) {
+    const { data, error } = await window.supabaseClient.rpc('kardex_linea_factura_crear', {
+      p_contrato: contrato || null,
+      p_periodo: periodo,
+      p_fecha_factura: fechaFactura || null,
+      p_fecha_vencimiento: fechaVencimiento || null,
+      p_copiar: copiar !== false,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async agregarLineaAFactura(facturaId, numero, total) {
+    const { error } = await window.supabaseClient.rpc('kardex_linea_factura_agregar_linea', {
+      p_factura: facturaId, p_linea: numero, p_total: total ?? null,
+    });
+    if (error) throw error;
+  },
+
+  // Guarda de una sola vez los valores que contabilidad corrigio. Va por
+  // upsert y no por un update por fila: son ~40 renglones y hacerlos uno por
+  // uno deja el mes a medio guardar si se corta la conexion a la mitad.
+  async guardarDetalleFactura(filas) {
+    if (!filas.length) return;
+    const { error } = await window.supabaseClient
+      .from('kardex_lineas_factura_detalle')
+      .upsert(filas, { onConflict: 'factura_id,linea_numero' });
+    if (error) throw error;
+  },
+
+  async borrarFacturaLinea(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_lineas_facturas').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async guardarFacturaLinea(factura) {
     const { error } = await window.supabaseClient
       .from('kardex_lineas_facturas')

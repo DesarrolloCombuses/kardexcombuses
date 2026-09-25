@@ -1613,3 +1613,10 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
   display: flex; flex-direction: column; gap: 0.15rem;
   flex: 1 1 auto; min-width: 0;
 }
+
+/* Pestañas del módulo de líneas (Líneas / Facturas del mes). Se reusa
+   .btn-secondary para que se vean como el resto de botones de la app; solo
+   cambia el estado seleccionado. */
+.lc-tab.activo {
+  background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
+}

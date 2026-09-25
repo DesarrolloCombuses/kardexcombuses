@@ -86,6 +86,12 @@ Router.register('lineas-celulares', {
         else if (btn.dataset.accion === 'responsable') this._abrirAsignar(linea);
         else if (btn.dataset.accion === 'estado') this._abrirEstado(linea);
       });
+      document.querySelectorAll('.lc-tab').forEach((b) => {
+        b.addEventListener('click', () => this._cambiarTab(b.dataset.tab));
+      });
+      document.getElementById('lc-fac-periodo').addEventListener('change', () => this._renderFacturaSeleccionada());
+      document.getElementById('lc-fac-contrato').addEventListener('change', () => this._renderFacturaSeleccionada());
+      document.getElementById('lc-fac-nueva-btn').addEventListener('click', () => this._abrirNuevaFactura());
       this._bound = true;
     }
     await this._load();
@@ -122,6 +128,13 @@ Router.register('lineas-celulares', {
     this._renderKpis();
     this._renderAlertas();
     this._renderTabla();
+    this._renderFacturas();
+  },
+
+  _cambiarTab(tab) {
+    document.querySelectorAll('.lc-tab').forEach((b) => b.classList.toggle('activo', b.dataset.tab === tab));
+    document.getElementById('lc-panel-lineas').classList.toggle('hidden', tab !== 'lineas');
+    document.getElementById('lc-panel-facturas').classList.toggle('hidden', tab !== 'facturas');
   },
 
   _costoDe(numero, periodo) {
@@ -587,6 +600,290 @@ Router.register('lineas-celulares', {
         await this._load();
       } catch (err) {
         msg.textContent = 'No se pudo guardar: ' + err.message;
+        msg.className = 'form-msg error';
+      } finally {
+        btn.disabled = false;
+        Loading.hide();
+      }
+    });
+  },
+
+  // ======================= FACTURAS DEL MES =======================
+
+  _renderFacturas() {
+    const selP = document.getElementById('lc-fac-periodo');
+    const selC = document.getElementById('lc-fac-contrato');
+    const periodoPrevio = selP.value;
+    const contratoPrevio = selC.value;
+
+    const periodos = [...new Set(this._facturas.map((f) => f.periodo))].sort().reverse();
+    selP.innerHTML = periodos.length
+      ? periodos.map((p) => `<option value="${p}">${lcFormatPeriodo(p)}</option>`).join('')
+      : '<option value="">Sin meses registrados</option>';
+    if (periodos.includes(periodoPrevio)) selP.value = periodoPrevio;
+
+    const contratos = [...new Set(this._facturas.map((f) => f.contrato_numero || ''))].sort();
+    selC.innerHTML = contratos.map((c) => `<option value="${lcEscapeHtml(c)}">${lcEscapeHtml(c || 'Sin contrato')}</option>`).join('')
+      || '<option value="">—</option>';
+    if (contratos.includes(contratoPrevio)) selC.value = contratoPrevio;
+
+    this._renderFacturaSeleccionada();
+  },
+
+  _facturaSeleccionada() {
+    const periodo = document.getElementById('lc-fac-periodo').value;
+    const contrato = document.getElementById('lc-fac-contrato').value;
+    return this._facturas.find((f) => f.periodo === periodo && (f.contrato_numero || '') === contrato) || null;
+  },
+
+  _renderFacturaSeleccionada() {
+    const el = document.getElementById('lc-fac-detalle');
+    const f = this._facturaSeleccionada();
+    const contador = document.getElementById('lc-fac-contador');
+
+    if (!f) {
+      contador.textContent = '';
+      el.innerHTML = this._facturas.length
+        ? '<p class="empty-note">Ese contrato no tiene factura registrada en ese mes. Usa “Registrar un mes”.</p>'
+        : '<p class="empty-note">Todavía no hay ningún mes registrado. Empieza con “Registrar un mes”.</p>';
+      return;
+    }
+
+    const filas = (f.kardex_lineas_factura_detalle || [])
+      .slice()
+      .sort((a, b) => String(a.linea_numero).localeCompare(String(b.linea_numero)));
+    const suma = filas.reduce((s, d) => s + (Number(d.total) || 0), 0);
+    const declarado = Number(f.total) || 0;
+    // Se avisa la diferencia en vez de "corregir" en silencio: el que manda
+    // es el total de la factura del operador, pero si no cuadra con la suma
+    // de las líneas hay un renglón mal digitado o uno que falta.
+    const descuadre = Math.abs(suma - declarado) >= 1;
+
+    contador.textContent = `${filas.length} línea(s) en esta factura`;
+
+    const nombreDe = (numero) => {
+      const l = this._lineas.find((x) => x.numero === numero);
+      return l ? (l.responsable || 'Sin responsable') : 'Línea que ya no está en el inventario';
+    };
+
+    el.innerHTML = `
+      <div class="panel-card">
+        <div class="section-heading"><h2>Datos de la factura</h2></div>
+        <form id="lc-fac-form" class="form">
+          <div class="fieldset-grid">
+            <label>Fecha de la factura<input type="date" id="lc-fac-fecha" value="${f.fecha_factura || ''}" /></label>
+            <label>Fecha límite de pago<input type="date" id="lc-fac-vence" value="${f.fecha_vencimiento_pago || ''}" /></label>
+            <label>Total a pagar<input type="number" id="lc-fac-total" step="0.01" value="${f.total ?? ''}" /></label>
+            <label>Fecha de pago<input type="date" id="lc-fac-pago" value="${f.fecha_pago || ''}" /></label>
+          </div>
+          <label class="checkbox-label"><input type="checkbox" id="lc-fac-pagada" ${f.pagada ? 'checked' : ''} /> Ya está pagada</label>
+          <label>Notas<input type="text" id="lc-fac-notas" value="${lcEscapeHtml(f.notas || '')}" /></label>
+          <button type="submit" class="btn-block"><span>Guardar los datos de la factura</span></button>
+          <p id="lc-fac-msg" class="form-msg"></p>
+        </form>
+        ${descuadre ? `<div class="alerta-inline" style="margin-top:0.9rem">
+          La suma de las líneas da ${lcPesos(suma)} pero el total dice ${lcPesos(declarado)}.
+          Son ${lcPesos(Math.abs(suma - declarado))} de diferencia: revisa si falta un renglón o alguno quedó mal digitado.
+        </div>` : ''}
+      </div>
+
+      <div class="panel-card" style="margin-top:1rem">
+        <div class="section-heading">
+          <h2>Valor de cada línea</h2>
+          <button type="button" class="btn-secondary btn-sm" id="lc-fac-add-linea">+ Agregar una línea</button>
+        </div>
+        <p class="view-intro" style="margin:0 0 0.8rem">Los valores vienen copiados del mes anterior: cambia solo los que llegaron distintos y guarda.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Línea</th><th>Responsable</th><th class="num">Valor a pagar</th></tr></thead>
+            <tbody>
+              ${filas.map((d) => `
+                <tr>
+                  <td data-label="Línea"><strong>${lcEscapeHtml(d.linea_numero)}</strong></td>
+                  <td data-label="Responsable">${lcEscapeHtml(nombreDe(d.linea_numero))}</td>
+                  <td data-label="Valor a pagar" class="num">
+                    <input type="number" step="0.01" class="lc-fac-valor" style="max-width:150px"
+                           data-id="${d.id}" data-linea="${lcEscapeHtml(d.linea_numero)}" value="${d.total ?? ''}" />
+                  </td>
+                </tr>`).join('')
+              || '<tr><td colspan="3" class="empty-note">Esta factura no tiene líneas. Agrégalas con el botón de arriba.</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr class="fila-total">
+                <td colspan="2"><strong>Suma de las líneas</strong></td>
+                <td class="num"><strong id="lc-fac-suma">${lcPesos(suma)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <button type="button" class="btn-block" id="lc-fac-guardar-valores" style="margin-top:0.9rem"><span>Guardar los valores</span></button>
+        <p id="lc-fac-valores-msg" class="form-msg"></p>
+      </div>
+    `;
+
+    // La suma del pie se recalcula mientras escriben, para que vean el
+    // descuadre antes de guardar y no después.
+    el.querySelectorAll('.lc-fac-valor').forEach((inp) => {
+      inp.addEventListener('input', () => {
+        const total = [...el.querySelectorAll('.lc-fac-valor')]
+          .reduce((t, i) => t + (Number(i.value) || 0), 0);
+        document.getElementById('lc-fac-suma').textContent = lcPesos(total);
+      });
+    });
+
+    document.getElementById('lc-fac-form').addEventListener('submit', (e) => this._guardarFactura(e, f));
+    document.getElementById('lc-fac-guardar-valores').addEventListener('click', () => this._guardarValores(f));
+    document.getElementById('lc-fac-add-linea').addEventListener('click', () => this._agregarLineaAFactura(f));
+  },
+
+  async _guardarFactura(e, f) {
+    e.preventDefault();
+    const msg = document.getElementById('lc-fac-msg');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    Loading.show('Guardando…');
+    try {
+      const total = document.getElementById('lc-fac-total').value;
+      await DB.guardarFacturaLinea({
+        id: f.id,
+        fecha_factura: document.getElementById('lc-fac-fecha').value || null,
+        fecha_vencimiento_pago: document.getElementById('lc-fac-vence').value || null,
+        total: total === '' ? null : Number(total),
+        pagada: document.getElementById('lc-fac-pagada').checked,
+        fecha_pago: document.getElementById('lc-fac-pago').value || null,
+        notas: document.getElementById('lc-fac-notas').value.trim() || null,
+      });
+      await this._load();
+      this._cambiarTab('facturas');
+    } catch (err) {
+      msg.textContent = 'No se pudo guardar: ' + err.message;
+      msg.className = 'form-msg error';
+    } finally {
+      btn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  async _guardarValores(f) {
+    const msg = document.getElementById('lc-fac-valores-msg');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    const btn = document.getElementById('lc-fac-guardar-valores');
+    btn.disabled = true;
+    Loading.show('Guardando…');
+    try {
+      const filas = [...document.querySelectorAll('.lc-fac-valor')].map((inp) => ({
+        id: inp.dataset.id,
+        factura_id: f.id,
+        linea_numero: inp.dataset.linea,
+        total: inp.value === '' ? null : Number(inp.value),
+      }));
+      await DB.guardarDetalleFactura(filas);
+      await this._load();
+      this._cambiarTab('facturas');
+    } catch (err) {
+      msg.textContent = 'No se pudo guardar: ' + err.message;
+      msg.className = 'form-msg error';
+    } finally {
+      btn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  _agregarLineaAFactura(f) {
+    const yaEstan = new Set((f.kardex_lineas_factura_detalle || []).map((d) => d.linea_numero));
+    const candidatas = this._lineas.filter((l) => !yaEstan.has(l.numero) && l.estado !== 'cancelada');
+    if (!candidatas.length) {
+      alert('Todas las líneas activas ya están en esta factura.');
+      return;
+    }
+    this._abrirModal(`
+      <h3 style="margin:0 0 1rem">Agregar una línea a la factura</h3>
+      <form id="lc-addl-form" class="form">
+        <label>Línea
+          <select id="lc-addl-linea">
+            ${candidatas.map((l) => `<option value="${lcEscapeHtml(l.numero)}">${lcEscapeHtml(l.numero)} · ${lcEscapeHtml(l.responsable || 'sin responsable')}</option>`).join('')}
+          </select>
+        </label>
+        <label>Valor a pagar<input type="number" id="lc-addl-total" step="0.01" /></label>
+        <p class="view-intro" style="margin:0.2rem 0 0.8rem">Si lo dejas vacío se usa el cargo básico de la línea.</p>
+        <button type="submit" class="btn-block"><span>Agregar</span></button>
+        <p id="lc-addl-msg" class="form-msg"></p>
+      </form>
+    `);
+    document.getElementById('lc-addl-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      Loading.show('Agregando…');
+      try {
+        const v = document.getElementById('lc-addl-total').value;
+        await DB.agregarLineaAFactura(f.id, document.getElementById('lc-addl-linea').value,
+          v === '' ? null : Number(v));
+        this._cerrarModal();
+        await this._load();
+        this._cambiarTab('facturas');
+      } catch (err) {
+        const m = document.getElementById('lc-addl-msg');
+        m.textContent = 'No se pudo agregar: ' + err.message;
+        m.className = 'form-msg error';
+      } finally {
+        btn.disabled = false;
+        Loading.hide();
+      }
+    });
+  },
+
+  _abrirNuevaFactura() {
+    const hoy = new Date();
+    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    this._abrirModal(`
+      <h3 style="margin:0 0 0.4rem">Registrar un mes</h3>
+      <p class="view-intro" style="margin:0 0 1rem">Se crean los renglones copiando los valores del último mes registrado de ese contrato. Después corriges los que llegaron distintos.</p>
+      <form id="lc-nf-form" class="form">
+        <div class="fieldset-grid">
+          <label>Contrato
+            <select id="lc-nf-contrato">
+              ${this._contratos.map((c) => `<option value="${lcEscapeHtml(c.numero)}">${lcEscapeHtml(c.numero)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Mes<input type="month" id="lc-nf-periodo" value="${mesActual}" required /></label>
+          <label>Fecha de la factura<input type="date" id="lc-nf-fecha" /></label>
+          <label>Fecha límite de pago<input type="date" id="lc-nf-vence" /></label>
+        </div>
+        <label class="checkbox-label"><input type="checkbox" id="lc-nf-copiar" checked /> Copiar los valores del mes anterior</label>
+        <button type="submit" class="btn-block"><span>Crear el mes</span></button>
+        <p id="lc-nf-msg" class="form-msg"></p>
+      </form>
+    `);
+    document.getElementById('lc-nf-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('lc-nf-msg');
+      msg.textContent = '';
+      msg.className = 'form-msg';
+      const btn = e.target.querySelector('button[type="submit"]');
+      const contrato = document.getElementById('lc-nf-contrato').value;
+      btn.disabled = true;
+      Loading.show('Creando…');
+      try {
+        const mes = document.getElementById('lc-nf-periodo').value;
+        await DB.crearFacturaLinea(
+          contrato,
+          `${mes}-01`,
+          document.getElementById('lc-nf-fecha').value,
+          document.getElementById('lc-nf-vence').value,
+          document.getElementById('lc-nf-copiar').checked,
+        );
+        this._cerrarModal();
+        await this._load();
+        document.getElementById('lc-fac-periodo').value = `${mes}-01`;
+        document.getElementById('lc-fac-contrato').value = contrato;
+        this._renderFacturaSeleccionada();
+        this._cambiarTab('facturas');
+      } catch (err) {
+        msg.textContent = 'No se pudo crear: ' + err.message;
         msg.className = 'form-msg error';
       } finally {
         btn.disabled = false;

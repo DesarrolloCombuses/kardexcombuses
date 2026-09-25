@@ -402,6 +402,12 @@
           </div>
 
           <div class="toolbar" style="margin-top:1rem">
+            <button type="button" class="btn-secondary lc-tab activo" data-tab="lineas">Líneas</button>
+            <button type="button" class="btn-secondary lc-tab" data-tab="facturas">Facturas del mes</button>
+          </div>
+
+          <div id="lc-panel-lineas">
+          <div class="toolbar">
             <div class="search-input">
               <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               <input type="search" id="lc-buscar" placeholder="Buscar por número, responsable o cargo…" />
@@ -430,6 +436,26 @@
               </thead>
               <tbody id="lc-tbody"></tbody>
             </table>
+          </div>
+          </div><!-- /lc-panel-lineas -->
+
+          <div id="lc-panel-facturas" class="hidden">
+            <div class="toolbar">
+              <label class="filtro-inline">
+                Mes
+                <select id="lc-fac-periodo"></select>
+              </label>
+              <label class="filtro-inline">
+                Contrato
+                <select id="lc-fac-contrato"></select>
+              </label>
+              <button type="button" id="lc-fac-nueva-btn">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                Registrar un mes
+              </button>
+              <span class="muted" id="lc-fac-contador"></span>
+            </div>
+            <div id="lc-fac-detalle"></div>
           </div>
         </section>
 
