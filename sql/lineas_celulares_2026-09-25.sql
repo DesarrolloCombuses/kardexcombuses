@@ -204,10 +204,25 @@ begin
       using (kardex_is_authorized() or kardex_tiene_permiso('lineas-celulares', 'ver'))
     $f$, t || '_sel', t);
 
-    execute format($f$
-      create policy %I on %I for insert to authenticated
-      with check (kardex_is_authorized() or kardex_tiene_permiso('lineas-celulares', 'agregar'))
-    $f$, t || '_ins', t);
+    -- Las dos tablas de historico se escriben SIEMPRE como consecuencia de
+    -- editar una linea (cambiarle el responsable o el estado), nunca por si
+    -- solas. Si su insert exigiera 'agregar', una cuenta con permiso de
+    -- editar podria cambiar el estado de la linea pero no dejar el renglon
+    -- del historico -- o sea, la operacion entera fallaria. Se comprobo
+    -- impersonando una cuenta con solo 'ver'+'editar': fallaba justo asi.
+    if t in ('kardex_lineas_asignaciones', 'kardex_lineas_estados') then
+      execute format($f$
+        create policy %I on %I for insert to authenticated
+        with check (kardex_is_authorized()
+                    or kardex_tiene_permiso('lineas-celulares', 'agregar')
+                    or kardex_tiene_permiso('lineas-celulares', 'editar'))
+      $f$, t || '_ins', t);
+    else
+      execute format($f$
+        create policy %I on %I for insert to authenticated
+        with check (kardex_is_authorized() or kardex_tiene_permiso('lineas-celulares', 'agregar'))
+      $f$, t || '_ins', t);
+    end if;
 
     execute format($f$
       create policy %I on %I for update to authenticated
