@@ -574,6 +574,102 @@ const DB = {
     return data.path;
   },
 
+  // ---- Lineas celulares -----------------------------------------------------
+
+  // Todo el inventario de una: son ~40 lineas, no vale la pena paginar ni
+  // filtrar en el servidor. Trae la asignacion vigente embebida para no
+  // pedir el historico completo solo para pintar el listado.
+  async getLineas() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_lineas')
+      .select('*, kardex_lineas_contratos ( numero, operador, fecha_fin_permanencia )')
+      .order('numero');
+    if (error) throw error;
+    return data;
+  },
+
+  async getLineasContratos() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_lineas_contratos')
+      .select('*')
+      .order('numero');
+    if (error) throw error;
+    return data;
+  },
+
+  // Facturas con su detalle: alimenta el costo por linea y la alerta de
+  // fecha de pago. Sin paginar por el mismo motivo que arriba (5 contratos
+  // x 12 meses = 60 filas al ano).
+  async getLineasFacturas() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_lineas_facturas')
+      .select('*, kardex_lineas_factura_detalle ( * )')
+      .order('periodo', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async getLineaHistorial(numero) {
+    const [asignaciones, estados] = await Promise.all([
+      window.supabaseClient.from('kardex_lineas_asignaciones')
+        .select('*').eq('linea_numero', numero).order('desde', { ascending: false }),
+      window.supabaseClient.from('kardex_lineas_estados')
+        .select('*').eq('linea_numero', numero).order('fecha', { ascending: false }),
+    ]);
+    if (asignaciones.error) throw asignaciones.error;
+    if (estados.error) throw estados.error;
+    return { asignaciones: asignaciones.data, estados: estados.data };
+  },
+
+  async guardarLinea(linea, esNueva) {
+    const fila = { ...linea, updated_at: new Date().toISOString(), actualizado_por: window.APP_EMAIL || null };
+    const q = esNueva
+      ? window.supabaseClient.from('kardex_lineas').insert(fila)
+      : window.supabaseClient.from('kardex_lineas').update(fila).eq('numero', linea.numero);
+    const { error } = await q;
+    if (error) throw error;
+  },
+
+  // Las dos de abajo van por RPC y no por update directo: cada una son varias
+  // escrituras que tienen que pasar juntas (cerrar la asignacion anterior y
+  // abrir la nueva; dejar el renglon de historico y mover el estado). Ver
+  // sql/lineas_celulares_2026-09-25.sql.
+  async asignarLinea(numero, responsable, cargo, employeeId, desde, motivo) {
+    const { error } = await window.supabaseClient.rpc('kardex_linea_asignar', {
+      p_linea: numero,
+      p_responsable: responsable,
+      p_cargo: cargo || null,
+      p_employee_id: employeeId || null,
+      p_desde: desde,
+      p_motivo: motivo || null,
+    });
+    if (error) throw error;
+  },
+
+  async cambiarEstadoLinea(numero, estado, fecha, motivo) {
+    const { error } = await window.supabaseClient.rpc('kardex_linea_cambiar_estado', {
+      p_linea: numero, p_estado: estado, p_fecha: fecha, p_motivo: motivo || null,
+    });
+    if (error) throw error;
+  },
+
+  async guardarContratoLinea(contrato, esNuevo) {
+    const q = esNuevo
+      ? window.supabaseClient.from('kardex_lineas_contratos').insert(contrato)
+      : window.supabaseClient.from('kardex_lineas_contratos')
+          .update({ ...contrato, updated_at: new Date().toISOString() }).eq('numero', contrato.numero);
+    const { error } = await q;
+    if (error) throw error;
+  },
+
+  async guardarFacturaLinea(factura) {
+    const { error } = await window.supabaseClient
+      .from('kardex_lineas_facturas')
+      .update({ ...factura, updated_at: new Date().toISOString() })
+      .eq('id', factura.id);
+    if (error) throw error;
+  },
+
   // ---- Mi perfil (autoservicio DENTRO de la app, con sesión) ----------------
 
   // Mismo perfil que el link público, pero el servidor resuelve de quién es

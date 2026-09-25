@@ -49,6 +49,7 @@ const SECCIONES_PERMISOS = [
   { titulo: 'Contabilidad', modulos: [
     { key: 'fondo-siniestros', label: 'Fondo de reposición' },
     { key: 'fondo-rendimientos', label: 'Rendimientos del fondo' },
+    { key: 'lineas-celulares', label: 'Líneas celulares' },
   ] },
 ];
 

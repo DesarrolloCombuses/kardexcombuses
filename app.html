@@ -208,6 +208,10 @@
               <svg viewBox="0 0 20 20" fill="none"><path d="M3 15l4.5-5 3.2 3L17 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 6h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Rendimientos
             </a>
+            <a href="#/lineas-celulares" data-nav="lineas-celulares">
+              <svg viewBox="0 0 20 20" fill="none"><rect x="6" y="2.5" width="8" height="15" rx="1.8" stroke="currentColor" stroke-width="1.5"/><path d="M8.8 15.2h2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Líneas celulares
+            </a>
           </div>
         </details>
 
@@ -364,6 +368,69 @@
         <section data-view="mi-perfil" class="view">
           <p class="view-intro">Revisa y actualiza tus propios datos, y sube tu foto. Lo que guardes lo revisa Gestión Humana.</p>
           <div id="mi-perfil-contenido"></div>
+        </section>
+
+        <!-- ================= LINEAS CELULARES ================= -->
+        <!-- El detalle (ficha, histórico, formularios) lo pinta el modal
+             compartido desde js/views/lineas-celulares.js; acá solo va el
+             armazón fijo: indicadores, alertas, filtros y tabla. -->
+        <section data-view="lineas-celulares" class="view">
+          <p class="view-intro">Inventario de las líneas móviles de la empresa: quién tiene cada una, desde cuándo, su estado y lo que factura mes a mes.</p>
+
+          <div class="cards cards--compact">
+            <div class="card">
+              <div class="card-icon"><svg viewBox="0 0 20 20" fill="none"><rect x="6" y="2.5" width="8" height="15" rx="1.8" stroke="currentColor" stroke-width="1.5"/><path d="M8.8 15.2h2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div><div class="card-value" id="lc-kpi-activas">0</div><div class="card-label">Líneas activas</div></div>
+            </div>
+            <div class="card">
+              <div class="card-icon"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 6.5l7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div><div class="card-value" id="lc-kpi-inactivas">0</div><div class="card-label">Suspendidas o canceladas</div></div>
+            </div>
+            <div class="card">
+              <div class="card-icon"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="11" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 8.5h14" stroke="currentColor" stroke-width="1.5"/></svg></div>
+              <div><div class="card-value card-value--money" id="lc-kpi-costo">—</div><div class="card-label" id="lc-kpi-costo-label">Facturado</div></div>
+            </div>
+            <div class="card">
+              <div class="card-icon"><svg viewBox="0 0 20 20" fill="none"><path d="M10 3.5l6.5 12h-13l6.5-12z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.2v3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.4" r="0.8" fill="currentColor"/></svg></div>
+              <div><div class="card-value" id="lc-kpi-alertas">0</div><div class="card-label">Alertas</div></div>
+            </div>
+          </div>
+
+          <div class="panel-card" style="margin-top:1rem">
+            <div class="section-heading"><h2>Alertas</h2></div>
+            <div class="detalle-list" id="lc-alertas"></div>
+          </div>
+
+          <div class="toolbar" style="margin-top:1rem">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="lc-buscar" placeholder="Buscar por número, responsable o cargo…" />
+            </div>
+            <select id="lc-filtro-estado">
+              <option value="">Todos los estados</option>
+              <option value="activa">Activas</option>
+              <option value="suspendida">Suspendidas</option>
+              <option value="cancelada">Canceladas</option>
+            </select>
+            <select id="lc-filtro-contrato"><option value="">Todos los contratos</option></select>
+            <button type="button" id="lc-nueva-btn">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Nueva línea
+            </button>
+            <span class="muted" id="lc-contador"></span>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Línea</th><th>Responsable</th><th>Contrato</th>
+                  <th>Estado</th><th class="num">Costo del mes</th><th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lc-tbody"></tbody>
+            </table>
+          </div>
         </section>
 
         <!-- ================= INVENTARIO ================= -->
@@ -2194,6 +2261,7 @@
   <script src="js/views/actividades.js"></script>
   <script src="js/views/fondo-siniestros.js"></script>
   <script src="js/views/fondo-rendimientos.js"></script>
+  <script src="js/views/lineas-celulares.js"></script>
   <script src="js/views/ayuda.js"></script>
   <script src="js/pwa-update.js"></script>
   <script src="js/pwa-install.js"></script>

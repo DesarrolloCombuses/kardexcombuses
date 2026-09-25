@@ -1602,3 +1602,14 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
     to   { transform: scale(1); opacity: 1; }
   }
 }
+
+/* ---- Líneas celulares (js/views/lineas-celulares.js) ----------------------
+   .detalle-list-item es un flex de dos hijos (main y sub) con
+   justify-content: space-between. Las alertas de este módulo llevan además
+   un tag al principio y un botón al final, así que el texto necesita su
+   propio contenedor: sin esto, main y sub se separan a lado y lado de la
+   fila en vez de quedar uno debajo del otro. */
+.lc-item-texto {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  flex: 1 1 auto; min-width: 0;
+}
