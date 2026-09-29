@@ -154,6 +154,7 @@ Router.register('parque-automotor', {
     if (!this._bound) {
       document.getElementById('pa-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('pa-filtro-estado-doc').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('pa-filtro-tipo-doc').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-filtro-ruta').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-mostrar-desvinculados').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('pa-export-btn').addEventListener('click', () => this._exportExcel());
@@ -265,17 +266,48 @@ Router.register('parque-automotor', {
     if (opciones.includes(actual)) sel.value = actual;
   },
 
+  // Estado de UN tipo de documento en un vehiculo. Si el Portal no tiene ese
+  // documento registrado para esa placa, cuenta como SIN_FECHA: para quien
+  // filtra, "no lo tiene" y "lo tiene sin fecha" son el mismo problema --
+  // falta el dato.
+  _estadoDeTipo(v, tipo) {
+    const d = v.docsTodos.find((x) => x.tipo === tipo);
+    return d ? d.estado : 'SIN_FECHA';
+  },
+
   _aplicarFiltro() {
     const q = document.getElementById('pa-search').value.trim().toLowerCase();
     const estadoDoc = document.getElementById('pa-filtro-estado-doc').value;
+    const tipoDoc = document.getElementById('pa-filtro-tipo-doc').value;
     const ruta = document.getElementById('pa-filtro-ruta').value;
     const mostrarDesvinculados = document.getElementById('pa-mostrar-desvinculados').checked;
 
+    // Con un tipo elegido, "vencido" ya no es "alguno de los cuatro": es ese
+    // documento y solo ese. Se cambia el texto de la opcion para que la
+    // pantalla no siga diciendo "algún" cuando ya no aplica.
+    const opcionVencido = document.querySelector('#pa-filtro-estado-doc option[value="vencido"]');
+    if (opcionVencido) opcionVencido.textContent = tipoDoc ? 'Vencido' : 'Con algún vencido';
+
     let filtrados = this._vehiculos;
     if (!mostrarDesvinculados) filtrados = filtrados.filter((v) => v.vinculado);
-    if (estadoDoc === 'vencido') filtrados = filtrados.filter((v) => v.tieneVencido);
+
+    if (tipoDoc) {
+      if (estadoDoc === 'vencido') filtrados = filtrados.filter((v) => this._estadoDeTipo(v, tipoDoc) === 'VENCIDO');
+      else if (estadoDoc === 'por_vencer') filtrados = filtrados.filter((v) => this._estadoDeTipo(v, tipoDoc) === 'POR_VENCER');
+      else if (estadoDoc === 'al_dia') filtrados = filtrados.filter((v) => this._estadoDeTipo(v, tipoDoc) === 'VIGENTE');
+      else if (estadoDoc === 'sin_registrar') filtrados = filtrados.filter((v) => this._estadoDeTipo(v, tipoDoc) === 'SIN_FECHA');
+    } else if (estadoDoc === 'vencido') filtrados = filtrados.filter((v) => v.tieneVencido);
     else if (estadoDoc === 'por_vencer') filtrados = filtrados.filter((v) => !v.tieneVencido && v.tienePorVencer);
-    else if (estadoDoc === 'al_dia') filtrados = filtrados.filter((v) => !v.tieneVencido && !v.tienePorVencer);
+    else if (estadoDoc === 'al_dia') {
+      // Sin tipo elegido, "al dia" exige que los cuatro esten vigentes. Antes
+      // bastaba con no tener ninguno vencido ni por vencer, asi que un
+      // vehiculo al que le faltara el dato entero salia como si estuviera al
+      // dia -- justo el que hay que revisar.
+      filtrados = filtrados.filter((v) => v.docsTabla.every((d) => d.estado === 'VIGENTE'));
+    } else if (estadoDoc === 'sin_registrar') {
+      filtrados = filtrados.filter((v) => v.docsTabla.some((d) => d.estado === 'SIN_FECHA'));
+    }
+
     if (ruta) filtrados = filtrados.filter((v) => v.ruta === ruta);
     if (q) {
       filtrados = filtrados.filter((v) =>
@@ -309,11 +341,28 @@ Router.register('parque-automotor', {
     `;
   },
 
+  // Columnas de documento que toca pintar: las cuatro de siempre, o solo la
+  // del tipo elegido. Asi el filtro por "certificacion de amparo" no deja al
+  // usuario viendo cuatro columnas que no son la que pregunto.
+  _tiposVisibles() {
+    const tipo = document.getElementById('pa-filtro-tipo-doc').value;
+    return tipo ? [tipo] : PA_TIPOS_TABLA;
+  },
+
   _renderTabla(vehiculos) {
     const tbody = document.getElementById('pa-tbody');
+    const tipos = this._tiposVisibles();
     this._filasRenderizadas = vehiculos;
+
+    const encabezado = document.getElementById('pa-thead-row');
+    if (encabezado) {
+      encabezado.innerHTML = '<th>Vehículo</th><th>Estado</th>'
+        + tipos.map((t) => `<th>${paEscapeHtml(PA_TIPO_LABELS[t] || t)}</th>`).join('')
+        + '<th></th>';
+    }
+
     if (!vehiculos.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty-note">Sin resultados con estos filtros.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${tipos.length + 3}" class="empty-note">Sin resultados con estos filtros.</td></tr>`;
       return;
     }
     tbody.innerHTML = vehiculos.map((v, i) => `
@@ -326,7 +375,13 @@ Router.register('parque-automotor', {
           <span class="tag ${v.vinculado ? 'activo' : 'inactivo-tag'}">${v.vinculado ? 'Vinculado' : 'Desvinculado'}</span>
           ${!v.operante ? '<div style="margin-top:0.3rem"><span class="tag pendiente">No operante</span></div>' : ''}
         </td>
-        ${v.docsTabla.map((d) => `<td data-label="${paEscapeHtml(d.label)}">${this._tagDocumentoHtml(d)}</td>`).join('')}
+        ${tipos.map((t) => {
+          const d = v.docsTodos.find((x) => x.tipo === t)
+            || { tipo: t, label: PA_TIPO_LABELS[t], estado: 'SIN_FECHA', tag: 'inactivo-tag',
+                 corto: 'Sin registrar', texto: 'Sin registrar en el Portal de Documentos',
+                 fechaTexto: null, storagePath: null };
+          return `<td data-label="${paEscapeHtml(d.label)}">${this._tagDocumentoHtml(d)}</td>`;
+        }).join('')}
         <td data-label="Ficha"><button type="button" class="btn-secondary pa-ver-ficha" data-idx="${i}">Ver ficha</button></td>
       </tr>
     `).join('');

@@ -1675,11 +1675,24 @@
               <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               <input type="search" id="pa-search" placeholder="Buscar por placa o interno…" />
             </div>
+            <label class="filtro-inline">
+              Documento
+              <select id="pa-filtro-tipo-doc">
+                <option value="">Cualquiera</option>
+                <option value="SOAT">SOAT</option>
+                <option value="TECNOMECANICA">Tecnomecánica</option>
+                <option value="TARJETA_OPERACION">Tarjeta de operación</option>
+                <option value="MANTENIMIENTO_PREVENTIVO">Mantenimiento preventivo</option>
+                <option value="CERTIFICACION_AMPARO">Certificación de amparo</option>
+                <option value="LICENCIA_TRANSITO">Licencia de tránsito</option>
+              </select>
+            </label>
             <select id="pa-filtro-estado-doc">
-              <option value="">Todos los documentos</option>
+              <option value="">Todos los estados</option>
               <option value="vencido">Con algún vencido</option>
               <option value="por_vencer">Por vencer en 30 días</option>
               <option value="al_dia">Al día</option>
+              <option value="sin_registrar">Sin registrar</option>
             </select>
             <label class="filtro-inline">
               Ver por ruta
@@ -1698,7 +1711,11 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr>
+                <!-- Las columnas de documento las pinta js/views/parque-automotor.js:
+                     con "Documento: cualquiera" van las cuatro de siempre, y al
+                     elegir un tipo queda solo ese (incluidos los dos que no
+                     caben como columna fija). -->
+                <tr id="pa-thead-row">
                   <th>Vehículo</th><th>Estado</th>
                   <th>SOAT</th><th>Tecnomecánica</th><th>Tarjeta de operación</th><th>Mant. preventivo</th><th></th>
                 </tr>
