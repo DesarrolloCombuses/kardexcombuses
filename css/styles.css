@@ -1620,3 +1620,12 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 .lc-tab.activo {
   background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
 }
+
+/* ---- Informes disciplinarios (js/views/informes-disciplinarios.js) --------
+   Al editar un informe el buscador de empleado queda readOnly: el informe es
+   de esa persona y cambiárselo no es una corrección de redacción. Se marca
+   visualmente para que se entienda que está bloqueado a propósito y no que
+   el campo dejó de funcionar. */
+.input-bloqueado {
+  background: var(--slate-100); color: var(--slate-500); cursor: not-allowed;
+}

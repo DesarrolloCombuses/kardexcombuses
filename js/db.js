@@ -1490,6 +1490,64 @@ const DB = {
     if (error) throw error;
     return data;
   },
+
+  // ---- Informes disciplinarios (formato FO-GH-06) -----------------------------
+  // Ver sql/informes_disciplinarios_2026-09-29.sql.
+
+  // Los datos del empleado vienen de la copia guardada en el informe, no de
+  // un join con employees -- ver el comentario de esas columnas en el SQL.
+  async getInformesDisciplinarios() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_informes_disciplinarios')
+      .select('*, archivos:kardex_informes_disciplinarios_archivos(id, archivo_url, archivo_nombre)')
+      .order('fecha_hechos', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Sube primero las evidencias al bucket y después guarda todo de una sola
+  // llamada -- el storage no se puede escribir desde plpgsql, así que las
+  // rutas ya subidas se le pasan a la función como jsonb.
+  //
+  // La carpeta es el employee_id y no el id del informe: al crear, el id
+  // todavía no existe (lo genera la función), y agrupar por persona sirve
+  // igual -- la fila de archivos es la que dice a qué informe pertenece cada
+  // archivo, la carpeta solo ordena el bucket.
+  async guardarInformeDisciplinario({ informe, archivos = [], id = null }) {
+    const nuevos = [];
+    for (const file of archivos) {
+      const extension = (file.name.split('.').pop() || 'bin').toLowerCase();
+      const url = await this.uploadToBucket('informes-disciplinarios', file, extension, informe.employee_id);
+      nuevos.push({ url, nombre: file.name });
+    }
+    const { data, error } = await window.supabaseClient.rpc('kardex_informe_disciplinario_guardar', {
+      p_informe: informe,
+      p_archivos: nuevos,
+      p_id: id,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  // Solo la fila -- el archivo en el bucket se queda. Es a propósito: si el
+  // borrado del objeto falla (permiso, red), no queremos quedarnos con la
+  // fila borrada y el archivo huérfano igual; el archivo suelto sin fila que
+  // lo referencie no se muestra en ninguna parte.
+  async borrarArchivoInformeDisciplinario(archivoId) {
+    const { error } = await window.supabaseClient
+      .from('kardex_informes_disciplinarios_archivos')
+      .delete()
+      .eq('id', archivoId);
+    if (error) throw error;
+  },
+
+  async borrarInformeDisciplinario(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_informes_disciplinarios')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
 };
 
 // Todas las funciones async de esta capa pasan por acá para traducir

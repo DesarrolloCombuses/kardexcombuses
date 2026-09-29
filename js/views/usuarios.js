@@ -38,6 +38,7 @@ const SECCIONES_PERMISOS = [
     { key: 'personal-perfil', label: 'Perfil sociodemográfico' },
     { key: 'personal-rotacion', label: 'Rotación de personal' },
     { key: 'permisos-vacaciones', label: 'Permisos y vacaciones' },
+    { key: 'informes-disciplinarios', label: 'Informes disciplinarios' },
   ] },
   { titulo: 'Siniestros', modulos: [
     { key: 'siniestros-transito', label: 'Comparendos, accidentes y siniestros' },
