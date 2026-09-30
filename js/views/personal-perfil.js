@@ -71,36 +71,147 @@ Router.register('personal-perfil', {
 
   _palette: ['#2f6fed', '#20b2aa', '#a970ff', '#ff9f43', '#26c6da', '#ef5da8', '#5ec26a', '#7b8cff'],
 
+  // Filtros de la barra superior. Todos son AND entre sí y todos repintan
+  // KPIs y gráficas: no hay nada en esta pantalla que quede con el total
+  // completo mientras el resto muestra un subconjunto.
+  _IDS_FILTRO: ['pf-filtro-estado', 'pf-filtro-cargo', 'pf-filtro-campo-fecha', 'pf-filtro-anio', 'pf-filtro-mes'],
+  _IDS_FECHA: ['pf-filtro-desde', 'pf-filtro-hasta'],
+
   async onEnter() {
     if (!this._bound) {
-      document.getElementById('pf-filtro-cargo').addEventListener('change', () => this._aplicarFiltro());
+      this._IDS_FILTRO.forEach((id) => {
+        document.getElementById(id).addEventListener('change', () => this._aplicarFiltro());
+      });
+      this._IDS_FECHA.forEach((id) => {
+        document.getElementById(id).addEventListener('change', () => this._aplicarFiltro());
+      });
+      document.getElementById('pf-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       this._bound = true;
     }
-    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: true });
-    this._llenarFiltroCargo(this._empleadosAll);
+    // Se traen activos Y retirados de una vez: cambiar el filtro de estado
+    // repinta al instante en vez de ir al servidor por cada clic. A una
+    // cuenta marcada como "solo activos" el servidor le sigue devolviendo
+    // solo activos, ignore lo que pida el cliente (ver
+    // sql/solo_activos_empleados_2026-09-18.sql) -- para esa cuenta el
+    // filtro "Retirados" simplemente no trae a nadie.
+    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: false });
     this._aplicarFiltro();
   },
 
-  // Cargo se llena con los valores que realmente existen en los datos (no
-  // una lista fija), igual que el filtro de cargo de Empleados -- así se
-  // puede ver cualquier gráfica de esta página "por cargo" (ej. solo
-  // Conductores) o volver a "Todos los cargos" sin perder el resto de la
-  // vista.
-  _llenarFiltroCargo(empleados) {
-    const sel = document.getElementById('pf-filtro-cargo');
+  // La fecha sobre la que trabaja el filtro de periodo. Ingreso vive en el
+  // perfil sociodemográfico (puede faltar si ese perfil no se ha llenado);
+  // salida, en la ficha de Empleados.
+  _fechaDe(empleado) {
+    const campo = document.getElementById('pf-filtro-campo-fecha').value;
+    const valor = campo === 'salida'
+      ? empleado.fecha_salida
+      : (empleado.perfil_sociodemografico || {}).fecha_ingreso;
+    return valor ? String(valor).slice(0, 10) : null;
+  },
+
+  _porEstado(empleados) {
+    const estado = document.getElementById('pf-filtro-estado').value;
+    if (estado === 'activos') return empleados.filter((e) => e.activo);
+    if (estado === 'inactivos') return empleados.filter((e) => !e.activo);
+    return empleados;
+  },
+
+  // Cargos y años salen de los datos que hay dentro del estado elegido, no
+  // de una lista fija: si se está mirando solo retirados, no tiene sentido
+  // ofrecer un cargo o un año en el que no se retiró nadie. La selección
+  // actual se conserva si sigue existiendo.
+  _llenarFiltros(empleadosEstado) {
+    const cargos = [...new Set(empleadosEstado.map((e) => e.cargo).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'es'));
+    this._llenarSelect('pf-filtro-cargo', cargos);
+
+    const anios = [...new Set(empleadosEstado.map((e) => this._fechaDe(e)).filter(Boolean).map((f) => f.slice(0, 4)))]
+      .sort((a, b) => b.localeCompare(a));
+    this._llenarSelect('pf-filtro-anio', anios);
+  },
+
+  _llenarSelect(id, valores) {
+    const sel = document.getElementById(id);
     const actual = sel.value;
-    const opciones = [...new Set(empleados.map((e) => e.cargo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-    sel.innerHTML = `<option value="">${sel.dataset.todos}</option>` + opciones.map((v) => `<option value="${v}">${v}</option>`).join('');
-    if (opciones.includes(actual)) sel.value = actual;
+    sel.innerHTML = `<option value="">${sel.dataset.todos}</option>`
+      + valores.map((v) => `<option value="${v}">${v}</option>`).join('');
+    sel.value = valores.includes(actual) ? actual : '';
+  },
+
+  _limpiarFiltros() {
+    document.getElementById('pf-filtro-estado').value = 'activos';
+    document.getElementById('pf-filtro-campo-fecha').value = 'ingreso';
+    document.getElementById('pf-filtro-cargo').value = '';
+    document.getElementById('pf-filtro-anio').value = '';
+    document.getElementById('pf-filtro-mes').value = '';
+    document.getElementById('pf-filtro-desde').value = '';
+    document.getElementById('pf-filtro-hasta').value = '';
+    this._aplicarFiltro();
   },
 
   _aplicarFiltro() {
+    const enEstado = this._porEstado(this._empleadosAll || []);
+    this._llenarFiltros(enEstado);
+
     const cargo = document.getElementById('pf-filtro-cargo').value;
-    const filtrados = cargo ? this._empleadosAll.filter((e) => e.cargo === cargo) : this._empleadosAll;
-    document.getElementById('pf-filtro-resultado').textContent = cargo
-      ? `Mostrando ${filtrados.length} de ${this._empleadosAll.length} empleado(s) — cargo "${cargo}"`
-      : `${this._empleadosAll.length} empleado(s)`;
+    const anio = document.getElementById('pf-filtro-anio').value;
+    const mes = document.getElementById('pf-filtro-mes').value;
+    const desde = document.getElementById('pf-filtro-desde').value;
+    const hasta = document.getElementById('pf-filtro-hasta').value;
+    const hayFiltroFecha = !!(anio || mes || desde || hasta);
+
+    let filtrados = cargo ? enEstado.filter((e) => e.cargo === cargo) : enEstado;
+
+    // Quienes no tienen esa fecha cargada no pueden cumplir ni incumplir un
+    // rango: quedan por fuera, y más abajo se dice cuántos son.
+    const sinFecha = hayFiltroFecha ? filtrados.filter((e) => !this._fechaDe(e)).length : 0;
+    if (hayFiltroFecha) {
+      filtrados = filtrados.filter((e) => {
+        const f = this._fechaDe(e);
+        if (!f) return false;
+        if (anio && f.slice(0, 4) !== anio) return false;
+        if (mes && f.slice(5, 7) !== mes) return false;
+        if (desde && f < desde) return false;
+        if (hasta && f > hasta) return false;
+        return true;
+      });
+    }
+
+    this._pintarResumen(filtrados, enEstado, { cargo, anio, mes, desde, hasta, hayFiltroFecha, sinFecha });
     this._render(filtrados);
+  },
+
+  _pintarResumen(filtrados, enEstado, f) {
+    const estado = document.getElementById('pf-filtro-estado').value;
+    const etiquetaEstado = estado === 'activos' ? 'Empleados activos'
+      : estado === 'inactivos' ? 'Empleados retirados'
+      : 'Empleados (activos y retirados)';
+    document.getElementById('pf-kpi-total-label').textContent = etiquetaEstado;
+
+    const partes = [];
+    if (f.cargo) partes.push(`cargo "${f.cargo}"`);
+    const campo = document.getElementById('pf-filtro-campo-fecha').value === 'salida' ? 'salida' : 'ingreso';
+    if (f.anio) partes.push(`${campo} en ${f.anio}`);
+    if (f.mes) {
+      const nombreMes = document.querySelector(`#pf-filtro-mes option[value="${f.mes}"]`).textContent;
+      partes.push(`${campo} en ${nombreMes.toLowerCase()}`);
+    }
+    if (f.desde) partes.push(`${campo} desde ${f.desde}`);
+    if (f.hasta) partes.push(`${campo} hasta ${f.hasta}`);
+
+    const resultado = document.getElementById('pf-filtro-resultado');
+    resultado.textContent = partes.length
+      ? `Mostrando ${filtrados.length} de ${enEstado.length} empleado(s) — ${partes.join(', ')}`
+      : `${filtrados.length} empleado(s)`;
+
+    const aviso = document.getElementById('pf-filtro-aviso');
+    if (f.sinFecha > 0) {
+      aviso.textContent = `${f.sinFecha} empleado(s) quedaron por fuera porque no tienen fecha de ${campo} cargada.`;
+      aviso.classList.remove('hidden');
+    } else {
+      aviso.classList.add('hidden');
+      aviso.textContent = '';
+    }
   },
 
   _render(empleados) {

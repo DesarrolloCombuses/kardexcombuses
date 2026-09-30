@@ -1060,15 +1060,67 @@
 
         <!-- ================= PERSONAL: PERFIL SOCIODEMOGRÁFICO ================= -->
         <section data-view="personal-perfil" class="view">
-          <p class="view-intro">Composición de la planta activa (perfil sociodemográfico), para el diagnóstico y seguimiento del SG-SST.</p>
+          <p class="view-intro">Composición de la planta (perfil sociodemográfico), para el diagnóstico y seguimiento del SG-SST. Todo lo de abajo —KPIs y gráficas— se recalcula con los filtros.</p>
 
           <div class="toolbar">
+            <label class="filtro-inline">
+              Estado
+              <select id="pf-filtro-estado">
+                <option value="activos">Activos</option>
+                <option value="inactivos">Retirados</option>
+                <option value="todos">Activos y retirados</option>
+              </select>
+            </label>
             <label class="filtro-inline">
               Ver por cargo
               <select id="pf-filtro-cargo" data-todos="Todos los cargos"><option value="">Todos los cargos</option></select>
             </label>
-            <span class="muted" id="pf-filtro-resultado"></span>
           </div>
+
+          <div class="toolbar">
+            <!-- El rango se aplica a la fecha que se elija acá: ingreso para
+                 ver cohortes de entrada, salida para analizar quiénes se
+                 fueron en un periodo. -->
+            <label class="filtro-inline">
+              Filtrar por
+              <select id="pf-filtro-campo-fecha">
+                <option value="ingreso">Fecha de ingreso</option>
+                <option value="salida">Fecha de salida</option>
+              </select>
+            </label>
+            <!-- Los años los llena _llenarFiltros() con los que existan en los datos. -->
+            <label class="filtro-inline">
+              Año
+              <select id="pf-filtro-anio" data-todos="Todos los años"><option value="">Todos los años</option></select>
+            </label>
+            <label class="filtro-inline">
+              Mes
+              <select id="pf-filtro-mes">
+                <option value="">Todos los meses</option>
+                <option value="01">Enero</option>
+                <option value="02">Febrero</option>
+                <option value="03">Marzo</option>
+                <option value="04">Abril</option>
+                <option value="05">Mayo</option>
+                <option value="06">Junio</option>
+                <option value="07">Julio</option>
+                <option value="08">Agosto</option>
+                <option value="09">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+            </label>
+            <label class="filtro-inline">Desde<input type="date" id="pf-filtro-desde" /></label>
+            <label class="filtro-inline">Hasta<input type="date" id="pf-filtro-hasta" /></label>
+            <button type="button" id="pf-filtros-limpiar" class="btn-secondary">Limpiar filtros</button>
+          </div>
+
+          <p class="muted" id="pf-filtro-resultado"></p>
+          <!-- Aviso de a cuántos dejó por fuera el filtro de fecha por no
+               tener esa fecha cargada -- si no se dice, una gráfica con la
+               mitad de la gente se lee como si fuera toda. -->
+          <p class="form-msg hidden" id="pf-filtro-aviso"></p>
 
           <div class="cards">
             <div class="card">
@@ -1077,7 +1129,7 @@
               </span>
               <div>
                 <div class="card-value" id="pf-kpi-total">0</div>
-                <div class="card-label">Empleados activos</div>
+                <div class="card-label" id="pf-kpi-total-label">Empleados activos</div>
               </div>
             </div>
             <div class="card">
