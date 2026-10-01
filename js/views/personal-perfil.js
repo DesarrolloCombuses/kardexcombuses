@@ -162,7 +162,23 @@ Router.register('personal-perfil', {
     this._aplicarFiltro();
   },
 
+  // Un empleado activo no tiene fecha de salida -- sigue trabajando. Pedir
+  // "activos" + "filtrar por fecha de salida" no es un filtro que da cero:
+  // es una pregunta que no existe, y el resultado se leia como si faltara
+  // cargar un dato. Se deshabilita la opcion y, si estaba elegida, el filtro
+  // se devuelve a la fecha de ingreso.
+  _sincronizarCampoFecha() {
+    const estado = document.getElementById('pf-filtro-estado').value;
+    const campo = document.getElementById('pf-filtro-campo-fecha');
+    const opcionSalida = campo.querySelector('option[value="salida"]');
+    const noAplica = estado === 'activos';
+    opcionSalida.disabled = noAplica;
+    opcionSalida.textContent = noAplica ? 'Fecha de salida (solo retirados)' : 'Fecha de salida';
+    if (noAplica && campo.value === 'salida') campo.value = 'ingreso';
+  },
+
   _aplicarFiltro() {
+    this._sincronizarCampoFecha();
     const enEstado = this._porEstado(this._empleadosAll || []);
     this._llenarFiltros(enEstado);
 
@@ -175,9 +191,15 @@ Router.register('personal-perfil', {
 
     let filtrados = cargo ? enEstado.filter((e) => e.cargo === cargo) : enEstado;
 
-    // Quienes no tienen esa fecha cargada no pueden cumplir ni incumplir un
-    // rango: quedan por fuera, y más abajo se dice cuántos son.
-    const sinFecha = hayFiltroFecha ? filtrados.filter((e) => !this._fechaDe(e)).length : 0;
+    // Quienes no tienen esa fecha no pueden cumplir ni incumplir un rango:
+    // quedan por fuera. Pero no es lo mismo que FALTE el dato a que no
+    // aplique -- un activo no tiene fecha de salida porque sigue trabajando,
+    // no porque nadie la haya cargado. Se cuentan aparte para poder decirlo
+    // con esas palabras.
+    const porSalida = document.getElementById('pf-filtro-campo-fecha').value === 'salida';
+    const excluidos = hayFiltroFecha ? filtrados.filter((e) => !this._fechaDe(e)) : [];
+    const sinFecha = excluidos.filter((e) => !(porSalida && e.activo)).length;
+    const noAplica = excluidos.length - sinFecha;
     if (hayFiltroFecha) {
       filtrados = filtrados.filter((e) => {
         const f = this._fechaDe(e);
@@ -190,7 +212,7 @@ Router.register('personal-perfil', {
       });
     }
 
-    this._pintarResumen(filtrados, enEstado, { cargo, anio, mes, desde, hasta, hayFiltroFecha, sinFecha });
+    this._pintarResumen(filtrados, enEstado, { cargo, anio, mes, desde, hasta, hayFiltroFecha, sinFecha, noAplica });
     this._render(filtrados);
   },
 
@@ -218,8 +240,15 @@ Router.register('personal-perfil', {
       : `${filtrados.length} empleado(s)`;
 
     const aviso = document.getElementById('pf-filtro-aviso');
+    const motivos = [];
+    if (f.noAplica > 0) {
+      motivos.push(`${f.noAplica} siguen activos, así que no tienen fecha de salida`);
+    }
     if (f.sinFecha > 0) {
-      aviso.textContent = `${f.sinFecha} empleado(s) quedaron por fuera porque no tienen fecha de ${campo} cargada.`;
+      motivos.push(`${f.sinFecha} no tienen la fecha de ${campo} cargada`);
+    }
+    if (motivos.length) {
+      aviso.textContent = `Fuera de este filtro: ${motivos.join('; ')}.`;
       aviso.classList.remove('hidden');
     } else {
       aviso.classList.add('hidden');
