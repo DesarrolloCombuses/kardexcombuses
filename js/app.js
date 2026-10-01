@@ -71,6 +71,22 @@
     }
   }
 
+  // Módulos en marcha blanca (ver VISTAS_EN_MARCHA_BLANCA en
+  // js/permissions.js). Va después del if/else de arriba a propósito: aplica
+  // a todos los roles, incluido el admin, que no pasa por ningún filtro de
+  // menú. Router igual bloquea la entrada por hash, y la base de datos es la
+  // que de verdad no deja ver nada.
+  Object.keys(Permissions.VISTAS_EN_MARCHA_BLANCA).forEach((name) => {
+    if (Permissions.canAccessView(window.APP_ROLE, name, window.APP_GRUPO, window.APP_PERMISOS_MODULOS)) return;
+    // querySelectorAll, no querySelector: hoy el módulo aparece una sola vez
+    // en el menú, pero dejar fuera un segundo enlace sería dejar la puerta
+    // entreabierta justo en lo que se está cerrando.
+    document.querySelectorAll(`[data-nav="${name}"]`).forEach((el) => el.remove());
+  });
+  document.querySelectorAll('.nav-group').forEach((group) => {
+    if (!group.querySelector('[data-nav]')) group.remove();
+  });
+
   const sidebarToggle = document.getElementById('sidebar-toggle');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
   const closeSidebar = () => {

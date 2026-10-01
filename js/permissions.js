@@ -36,7 +36,25 @@ const GRUPO_EXTRA_VIEWS = {
   ],
 };
 
+// Módulos en marcha blanca: todavía no se abren a nadie mientras se termina
+// de cargar y revisar la información. La cuenta de la lista es la única que
+// los ve, por encima de cualquier rol -- ni siquiera un admin del ERP entra.
+//
+// Esto SOLO esconde el enlace y bloquea el Router. El control de verdad está
+// en la base de datos (kardex_pd_autorizado, ver
+// sql/procesos_disciplinarios_marcha_blanca_2026-10-01.sql): quien escriba la
+// URL a mano o llame a la API igual se topa con un listado vacío.
+//
+// Para abrir un módulo: quitarlo de acá Y cambiar el correo por null en
+// kardex_pd_marcha_blanca(). Si solo se quita acá, el enlace aparece pero la
+// pantalla sale vacía.
+const VISTAS_EN_MARCHA_BLANCA = {
+  'procesos-disciplinarios': ['desarrollotecnologico@combuses.com.co'],
+};
+
 window.Permissions = {
+  VISTAS_EN_MARCHA_BLANCA,
+
   // Resuelve el rol de la cuenta que ya inició sesión: primero pregunta a
   // la base de datos si es admin/viewer (kardex_authorized_users, vía
   // DB.getMiRolAutorizado()), y si no lo es, revisa si su correo coincide
@@ -57,6 +75,10 @@ window.Permissions = {
   // admin le dio a esta cuenta puntual, por encima de lo que ya da el
   // grupo.
   canAccessView(role, view, grupo, permisosModulos) {
+    // Va antes que todo lo demás, incluido el admin: durante la marcha
+    // blanca no hay rol que valga.
+    const soloEstas = VISTAS_EN_MARCHA_BLANCA[view];
+    if (soloEstas && !soloEstas.includes((window.APP_EMAIL || '').toLowerCase())) return false;
     if (role === 'admin') return true;
     if (role === 'viewer') return VIEWER_ALLOWED_VIEWS.includes(view);
     if (role === 'empleado') {
