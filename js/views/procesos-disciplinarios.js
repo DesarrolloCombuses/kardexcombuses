@@ -363,6 +363,11 @@ Router.register('procesos-disciplinarios', {
         </div>
       </div>
 
+      <!-- Es la sección misma, no un envoltorio: el margen entre secciones
+           sale de '.modal-section + .modal-section' y un div de por medio
+           rompe esa adyacencia. -->
+      <div id="pd-anexos-origen" class="modal-section hidden"></div>
+
       ${this._bloquePasos(p)}
 
       ${previos.length ? `
@@ -405,6 +410,55 @@ Router.register('procesos-disciplinarios', {
     document.getElementById('pd-paso-decision').addEventListener('submit', (e) => this._guardarDecision(e, p));
     document.getElementById('pd-decision-tipo').addEventListener('change', () => this._toggleSuspension());
     this._toggleSuspension();
+    this._cargarAnexosOrigen(p);
+  },
+
+  // Archivos que la hoja menciona pero que no se pudieron traer: viven en el
+  // Drive del programa anterior y el CSV solo da el nombre, no un enlace. Se
+  // muestran igual, porque saber que existe un video de la prueba (y cómo se
+  // llama) es lo que permite ir a buscarlo. Cuando se suba al ERP queda como
+  // prueba normal, acá arriba.
+  _ANEXOS_ORIGEN: [
+    ['firma_citacion', 'Firma de la citación'],
+    ['firma_sancion', 'Firma de la sanción'],
+    ['pruebas', 'Prueba'],
+    ['pruebas_videos', 'Prueba en video'],
+    ['archivos_finales', 'Documento final firmado'],
+  ],
+
+  // La fila cruda no viaja con la lista (pesa), así que se pide al abrir la
+  // ficha y el bloque se pinta después. Si falla, no se dice nada: es
+  // información de apoyo, no vale romper la ficha por ella.
+  async _cargarAnexosOrigen(p) {
+    const caja = document.getElementById('pd-anexos-origen');
+    if (!caja || !p.origen_key) return;
+    let origen = p.origen_fila;
+    if (!origen) {
+      try {
+        origen = await DB.getOrigenProceso(p.id);
+      } catch (err) {
+        return;
+      }
+      p.origen_fila = origen;
+    }
+    if (!origen) return;
+    const items = this._ANEXOS_ORIGEN
+      .map(([clave, etiqueta]) => [etiqueta, String(origen[clave] || '').trim()])
+      .filter(([, valor]) => valor);
+    if (!items.length) return;
+    // La ficha pudo cerrarse mientras llegaba la respuesta.
+    if (!document.body.contains(caja)) return;
+    caja.innerHTML = `
+      <h3 class="modal-section-title">Archivos del programa anterior (${items.length})</h3>
+      <p class="muted">Están en el Drive del programa anterior; la hoja solo trae el nombre. Para tenerlos acá, súbelos como prueba.</p>
+      <div class="detalle-list">${items.map(([etiqueta, valor]) => `
+        <div class="detalle-list-item">
+          <span class="lc-item-texto">
+            <span class="detalle-list-item-main">${pdEsc(etiqueta)}</span>
+            <span class="detalle-list-item-sub">${pdEsc(valor.split('/').pop())}</span>
+          </span>
+        </div>`).join('')}</div>`;
+    caja.classList.remove('hidden');
   },
 
   // Los dos pasos que siguen a la citación, como formularios dentro del
@@ -805,17 +859,89 @@ Router.register('procesos-disciplinarios', {
 
   // ---- Importación del programa anterior ---------------------------------
 
+  // La URL de la hoja publicada no vive en el código: el repo es público y la
+  // hoja trae cédulas, celulares y las actas completas. Se pega una vez y
+  // queda en este navegador.
+  _CLAVE_URL_HOJA: 'pd_url_hoja',
+
+  // Se pide en el modal del ERP y no con un prompt del navegador: así se ve
+  // igual que el resto, cabe un enlace largo y se puede explicar qué es.
+  _pedirUrlHoja() {
+    const guardada = localStorage.getItem(this._CLAVE_URL_HOJA) || '';
+    return new Promise((resolve) => {
+      const backdrop = document.getElementById('modal-backdrop');
+      document.getElementById('modal-body').innerHTML = `
+        <div class="modal-section">
+          <h3 class="modal-section-title">Traer los procesos anteriores</h3>
+          <p class="muted">Se traen los del programa anterior y los de la hoja que lleva Gestión Humana. No se borra nada allá, lo ya traído se completa en vez de duplicarse, y lo que se haya editado acá no se pisa.</p>
+          <form id="pd-hoja-form" class="form">
+            <label>Enlace CSV de la hoja
+              <input type="url" id="pd-hoja-url" required placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=0&amp;single=true&amp;output=csv" value="${pdEsc(guardada)}" />
+            </label>
+            <p class="muted">En el Sheet: Archivo → Compartir → Publicar en la Web → CSV.</p>
+            <div>
+              <button type="submit">Traer los procesos</button>
+              <button type="button" class="btn-secondary" id="pd-hoja-cancelar">Cancelar</button>
+              <p id="pd-hoja-msg" class="form-msg"></p>
+            </div>
+          </form>
+        </div>`;
+      backdrop.classList.remove('hidden');
+
+      const cerrar = (valor) => { backdrop.classList.add('hidden'); resolve(valor); };
+      document.getElementById('pd-hoja-cancelar').addEventListener('click', () => cerrar(null));
+      document.getElementById('pd-hoja-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const limpia = document.getElementById('pd-hoja-url').value.trim();
+        if (!/^https:\/\/docs\.google\.com\/spreadsheets\//.test(limpia)) {
+          document.getElementById('pd-hoja-msg').textContent = 'Ese no parece el enlace publicado de un Google Sheet.';
+          return;
+        }
+        localStorage.setItem(this._CLAVE_URL_HOJA, limpia);
+        cerrar(limpia);
+      });
+    });
+  },
+
   async _importar() {
-    if (!confirm('Trae al ERP los procesos del programa anterior. No borra nada allá, y los que ya se trajeron se actualizan en vez de duplicarse. ¿Continuar?')) return;
+    const url = await this._pedirUrlHoja();
+    if (!url) return;
+
     Loading.show('Trayendo procesos…');
+    const partes = [];
     try {
-      const r = await DB.importarProcesosDisciplinarios();
+      // 1) La tabla del programa anterior. Si falla (por ejemplo, si ya la
+      //    apagaron) no se detiene la importación: la hoja es la fuente buena.
+      try {
+        const r = await DB.importarProcesosDisciplinarios();
+        partes.push(`Del programa anterior: ${r.copiados} proceso(s).`);
+      } catch (err) {
+        partes.push('Del programa anterior: no se pudo leer (' + pdMensajeError(err) + ').');
+      }
+
+      // 2) La hoja.
+      Loading.show('Descargando la hoja…');
+      const { filas, descartadas } = await window.HOJA_PROCESOS.traer(url);
+      const r = await DB.importarProcesosDeHoja(filas, (hechas, total) => {
+        Loading.show(`Subiendo procesos… ${hechas} de ${total}`);
+      });
+      partes.push(
+        `De la hoja: ${r.insertados} nuevo(s) y ${r.actualizados} completado(s).`
+        + (r.respetados ? `\n${r.respetados} no se tocaron porque ya se editaron acá en el ERP.` : '')
+        + (descartadas ? `\n${descartadas} fila(s) de la hoja se saltaron por no tener cédula o identificador.` : '')
+      );
+
       await this._load();
-      alert(`Listo: ${r.copiados} proceso(s) traídos.\n`
-        + `${r.con_empleado} quedaron enlazados a una ficha de Empleados y ${r.sin_empleado} no `
-        + '(esos son de gente que ya no está en la tabla de empleados; el proceso se guarda igual).');
+      const resumen = await DB.getResumenProcesos();
+      partes.push(
+        `\nEn total quedan ${resumen.total} procesos de ${resumen.personas} personas.\n`
+        + `${resumen.con_empleado} están enlazados a una ficha de Empleados y ${resumen.sin_empleado} no `
+        + '(gente que ya no está en la tabla; el proceso se guarda igual).'
+      );
+      alert(partes.join('\n'));
     } catch (err) {
-      alert('No se pudo importar: ' + pdMensajeError(err));
+      alert([...partes, '', 'No se pudo terminar: ' + pdMensajeError(err)].join('\n'));
+      await this._load();
     } finally {
       Loading.hide();
     }

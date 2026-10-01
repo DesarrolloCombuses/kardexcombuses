@@ -1731,9 +1731,11 @@
             <label class="filtro-inline">Citación desde<input type="date" id="pd-filtro-desde" /></label>
             <label class="filtro-inline">Hasta<input type="date" id="pd-filtro-hasta" /></label>
             <button type="button" id="pd-filtros-limpiar" class="btn-secondary">Limpiar filtros</button>
-            <!-- Trae los procesos del programa aparte que se está reemplazando.
-                 Es repetible: lo ya traído se actualiza, no se duplica. -->
-            <button type="button" id="pd-importar" class="btn-secondary" title="Copia al ERP los procesos del programa anterior, sin borrar nada allá">Traer los procesos del programa anterior</button>
+            <!-- Trae los procesos del programa aparte que se está reemplazando:
+                 su tabla y, sobre todo, la hoja publicada que es la que
+                 Gestión Humana mantiene al día. Es repetible: lo ya traído se
+                 completa, y lo editado acá no se pisa. -->
+            <button type="button" id="pd-importar" class="btn-secondary" title="Copia al ERP los procesos del programa anterior y los de la hoja publicada, sin borrar nada allá">Traer los procesos anteriores</button>
           </div>
 
           <p class="empty-note" id="pd-contador"></p>
@@ -2604,6 +2606,7 @@
   <script src="js/catalogo-faltas.js"></script>
   <script src="js/catalogo-rit.js"></script>
   <script src="js/documentos-disciplinarios.js"></script>
+  <script src="js/hoja-procesos.js"></script>
   <script src="js/views/procesos-disciplinarios.js"></script>
   <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>

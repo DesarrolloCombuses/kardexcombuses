@@ -1554,13 +1554,45 @@ const DB = {
   // aparte "Procesos Disciplinarios", que guardaba el proceso entero en una
   // columna jsonb y leía los empleados de un Google Sheet publicado.
 
+  // Las columnas se enumeran en vez de pedir '*' para dejar por fuera
+  // origen_fila, que es la fila cruda de la hoja y repite el acta completa.
+  // Con 418 procesos eso es más de un megabyte que la lista no usa: solo se
+  // mira dentro de una ficha, y para eso está getOrigenProceso().
+  _COLS_PROCESO: [
+    'id', 'origen_key', 'employee_id', 'empleado_cedula', 'empleado_nombre',
+    'empleado_cargo', 'empleado_area', 'empleado_interno', 'empleado_ruta',
+    'empleado_fecha_ingreso', 'vehiculo_propietario', 'celular', 'correo',
+    'fecha_hechos', 'fecha_registro', 'motivo', 'normas', 'pruebas_texto',
+    'falta', 'falta_numero', 'sancion_primera', 'sancion_segunda',
+    'sancion_tercera', 'sancion_cuarta', 'fecha_citacion', 'hora_citacion',
+    'asistencia', 'fecha_descargos', 'hora_descargos_inicio',
+    'hora_descargos_fin', 'acta_descargos', 'dirige_descargos',
+    'tipo_decision', 'antecedentes', 'resumen_descargos', 'consideraciones',
+    'compromisos', 'numerales_sancion', 'dias_suspension',
+    'fecha_inicio_sancion', 'fecha_fin_sancion', 'fecha_reintegro',
+    'recurso_ante', 'recurso_dias', 'firma_citacion', 'firma_descargos',
+    'firma_decision', 'estado', 'responsable', 'asunto', 'creado_por_email',
+    'created_at', 'updated_at',
+  ].join(', '),
+
   async getProcesosDisciplinarios() {
     const { data, error } = await window.supabaseClient
       .from('kardex_procesos_disciplinarios')
-      .select('*, pruebas:kardex_procesos_disc_pruebas(id, archivo_url, archivo_nombre), firmas:kardex_procesos_disc_firmas(id, documento, estado, firmado_en, operador_email)')
+      .select(`${this._COLS_PROCESO}, pruebas:kardex_procesos_disc_pruebas(id, archivo_url, archivo_nombre), firmas:kardex_procesos_disc_firmas(id, documento, estado, firmado_en, operador_email)`)
       .order('fecha_citacion', { ascending: false, nullsFirst: false });
     if (error) throw error;
     return data;
+  },
+
+  // La fila cruda de la hoja, solo cuando se abre una ficha.
+  async getOrigenProceso(id) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_procesos_disciplinarios')
+      .select('origen_fila')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data?.origen_fila || null;
   },
 
   // `proceso` lleva los nombres de columna tal cual. Sin id = alta; con id =
@@ -1628,6 +1660,30 @@ const DB = {
   // actualiza, no se duplica (unique en origen_key).
   async importarProcesosDisciplinarios() {
     const { data, error } = await window.supabaseClient.rpc('kardex_pd_importar');
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  // Sube las filas de la hoja publicada. Va por lotes porque las actas de
+  // descargos son textos largos: las 417 filas juntas pesan unos 3,5 MB y una
+  // sola petición de ese tamaño se cae en conexiones flojas (y si se cae, se
+  // pierde todo). Por lotes, lo que ya entró queda.
+  async importarProcesosDeHoja(filas, onProgreso) {
+    const TAMANO = 40;
+    const total = { recibidos: 0, insertados: 0, actualizados: 0, respetados: 0, sin_cedula: 0 };
+    for (let i = 0; i < filas.length; i += TAMANO) {
+      const lote = filas.slice(i, i + TAMANO);
+      const { data, error } = await window.supabaseClient.rpc('kardex_pd_importar_hoja', { p_filas: lote });
+      if (error) throw error;
+      const r = Array.isArray(data) ? data[0] : data;
+      Object.keys(total).forEach((k) => { total[k] += Number(r?.[k] || 0); });
+      if (onProgreso) onProgreso(Math.min(i + TAMANO, filas.length), filas.length);
+    }
+    return total;
+  },
+
+  async getResumenProcesos() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_pd_resumen');
     if (error) throw error;
     return Array.isArray(data) ? data[0] : data;
   },
