@@ -1161,6 +1161,28 @@
             </div>
           </div>
 
+          <!-- Quiénes son los que están detrás de los números de arriba. Va
+               acá y no al final porque la pregunta aparece justo después de
+               filtrar, y rebuscarla debajo de ocho gráficas la haría inútil.
+               La altura va tope con scroll para no empujar las gráficas. -->
+          <div class="panel-card">
+            <div class="section-heading">
+              <h2>Empleados en este filtro</h2>
+              <span class="muted" id="pf-tabla-contador"></span>
+            </div>
+            <div class="table-wrap pf-tabla-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre</th><th>Cédula</th><th>Cargo</th><th>Estado</th>
+                    <th>Edad</th><th>Ingreso</th><th>Salida</th>
+                  </tr>
+                </thead>
+                <tbody id="pf-tabla-body"></tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="stat-grid">
             <div class="panel-card chart-card">
               <div class="section-heading"><h2>Sexo</h2></div>

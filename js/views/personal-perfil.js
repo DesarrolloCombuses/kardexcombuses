@@ -18,6 +18,19 @@ function rangoEdad(edad) {
   return '55 o más';
 }
 
+// Por componentes y no new Date(iso): Colombia es UTC-5 y una fecha ISO
+// suelta se interpreta como medianoche UTC, o sea el dia anterior.
+function pfFecha(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return '—';
+  return new Date(y, m - 1, d).toLocaleDateString('es-CO');
+}
+
+function pfEscapar(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 const ORDEN_RANGO_EDAD = ['Menos de 25', '25 a 34', '35 a 44', '45 a 54', '55 o más', 'Sin dato'];
 const ORDEN_ESCOLARIDAD = ['Primaria', 'Secundaria incompleta', 'Secundaria completa', 'Técnico', 'Tecnólogo', 'Universitario', 'Posgrado', 'Sin dato'];
 const ORDEN_ESTRATO = ['1', '2', '3', '4', '5', '6', 'Sin dato'];
@@ -231,6 +244,8 @@ Router.register('personal-perfil', {
       ? `${Math.round((conducen / empleados.length) * 100)}%`
       : '0%';
 
+    this._renderTabla(empleados);
+
     this._renderDonut('pf-donut-sexo', 'pf-legend-sexo', 'pf-donut-sexo-total', distribucion(perfiles, (p) => p.sexo));
     renderBarChart('pf-bars-edad', distribucion(perfiles, (p) => rangoEdad(edadDeFecha(p.fecha_nacimiento)), ORDEN_RANGO_EDAD));
     renderBarChart('pf-bars-estado-civil', distribucion(perfiles, (p) => p.estado_civil));
@@ -239,6 +254,40 @@ Router.register('personal-perfil', {
     this._renderDonut('pf-donut-medio', 'pf-legend-medio', 'pf-donut-medio-total', distribucion(perfiles, (p) => p.medio_desplazamiento));
     this._renderDonut('pf-donut-turno', 'pf-legend-turno', 'pf-donut-turno-total', distribucion(perfiles, (p) => p.turno_trabajo));
     renderBarChart('pf-bars-sangre', distribucion(perfiles, (p) => p.tipo_sangre, ORDEN_SANGRE));
+  },
+
+  // Quienes son los que estan detras de los numeros. Se pinta con los MISMOS
+  // empleados que las graficas (el argumento, no this._empleadosAll), asi no
+  // hay forma de que la tabla y los KPIs digan cosas distintas.
+  _renderTabla(empleados) {
+    const cuerpo = document.getElementById('pf-tabla-body');
+    const contador = document.getElementById('pf-tabla-contador');
+    contador.textContent = empleados.length === 1 ? '1 persona' : `${empleados.length} personas`;
+
+    if (empleados.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="7"><span class="empty-note">Ningún empleado cumple estos filtros.</span></td></tr>';
+      return;
+    }
+
+    const ordenados = [...empleados].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+    cuerpo.innerHTML = ordenados.map((e) => {
+      const perfil = e.perfil_sociodemografico;
+      const edad = perfil ? edadDeFecha(perfil.fecha_nacimiento) : null;
+      // Marcar a quien no tiene perfil es la mitad del trabajo de esta
+      // pantalla: el KPI dice cuantos faltan, la tabla dice quienes son.
+      const sinPerfil = perfil ? '' : ' <span class="tag pendiente">Sin perfil</span>';
+      return `
+        <tr>
+          <td>${pfEscapar(e.nombre)}${sinPerfil}</td>
+          <td>${pfEscapar(e.cedula)}</td>
+          <td>${pfEscapar(e.cargo || '—')}</td>
+          <td><span class="tag ${e.activo ? 'completo' : 'descartado'}">${e.activo ? 'Activo' : 'Retirado'}</span></td>
+          <td>${edad == null ? '—' : edad}</td>
+          <td>${pfFecha(perfil && perfil.fecha_ingreso)}</td>
+          <td>${pfFecha(e.fecha_salida)}</td>
+        </tr>
+      `;
+    }).join('');
   },
 
   _renderDonut(donutId, legendId, totalId, dist) {

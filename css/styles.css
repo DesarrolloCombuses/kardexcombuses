@@ -1629,3 +1629,10 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 .input-bloqueado {
   background: var(--slate-100); color: var(--slate-500); cursor: not-allowed;
 }
+
+/* ---- Perfil sociodemográfico: tabla de los empleados filtrados -----------
+   Tope de alto con scroll propio para que la tabla no empuje las ocho
+   gráficas que van debajo cuando el filtro deja cien personas. El thead
+   queda fijo: al bajar, las columnas siguen leyéndose. */
+.pf-tabla-scroll { max-height: 320px; overflow-y: auto; }
+.pf-tabla-scroll thead th { position: sticky; top: 0; z-index: 1; }
