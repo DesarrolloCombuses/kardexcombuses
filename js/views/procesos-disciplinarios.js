@@ -913,8 +913,11 @@ Router.register('procesos-disciplinarios', {
       // 1) La tabla del programa anterior. Si falla (por ejemplo, si ya la
       //    apagaron) no se detiene la importación: la hoja es la fuente buena.
       try {
-        const r = await DB.importarProcesosDisciplinarios();
-        partes.push(`Del programa anterior: ${r.copiados} proceso(s).`);
+        Loading.show('Leyendo el programa anterior…');
+        const r = await DB.importarProcesosDisciplinarios((hechas, total) => {
+          Loading.show(`Leyendo el programa anterior… ${hechas} de ${total}`);
+        });
+        partes.push(`Del programa anterior: ${r.copiados} de ${r.total} proceso(s).`);
       } catch (err) {
         partes.push('Del programa anterior: no se pudo leer (' + pdMensajeError(err) + ').');
       }

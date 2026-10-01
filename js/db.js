@@ -1658,10 +1658,38 @@ const DB = {
 
   // Trae los procesos del programa viejo. Es repetible: lo que ya se copió se
   // actualiza, no se duplica (unique en origen_key).
-  async importarProcesosDisciplinarios() {
-    const { data, error } = await window.supabaseClient.rpc('kardex_pd_importar');
-    if (error) throw error;
-    return Array.isArray(data) ? data[0] : data;
+  // Va por lotes, igual que la importación de la hoja: de un solo golpe las
+  // 303 filas se pasaban del statement_timeout y la llamada se caía entera
+  // ("canceling statement due to statement timeout").
+  async importarProcesosDisciplinarios(onProgreso) {
+    const TAMANO = 60;
+    let desde = 0;
+    let total = null;
+    let copiados = 0;
+    let ultimo = null;
+    // Tope de vueltas por si el servidor devolviera siempre 0 procesados: sin
+    // él, un dato raro dejaría el bucle corriendo para siempre.
+    for (let vuelta = 0; vuelta < 200; vuelta += 1) {
+      const { data, error } = await window.supabaseClient.rpc('kardex_pd_importar', {
+        p_desde: desde,
+        p_limite: TAMANO,
+      });
+      if (error) throw error;
+      const r = Array.isArray(data) ? data[0] : data;
+      ultimo = r;
+      copiados += Number(r?.copiados || 0);
+      total = Number(r?.total || 0);
+      const procesados = Number(r?.procesados || 0);
+      desde += procesados;
+      if (onProgreso) onProgreso(Math.min(desde, total), total);
+      if (!procesados || desde >= total) break;
+    }
+    return {
+      copiados,
+      total: total || 0,
+      con_empleado: Number(ultimo?.con_empleado || 0),
+      sin_empleado: Number(ultimo?.sin_empleado || 0),
+    };
   },
 
   // Sube las filas de la hoja publicada. Va por lotes porque las actas de
