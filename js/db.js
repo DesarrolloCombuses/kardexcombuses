@@ -1548,6 +1548,89 @@ const DB = {
       .eq('id', id);
     if (error) throw error;
   },
+
+  // ---- Procesos disciplinarios ------------------------------------------------
+  // Ver sql/procesos_disciplinarios_2026-10-01.sql. Reemplaza al programa
+  // aparte "Procesos Disciplinarios", que guardaba el proceso entero en una
+  // columna jsonb y leía los empleados de un Google Sheet publicado.
+
+  async getProcesosDisciplinarios() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_procesos_disciplinarios')
+      .select('*, pruebas:kardex_procesos_disc_pruebas(id, archivo_url, archivo_nombre), firmas:kardex_procesos_disc_firmas(id, documento, estado, firmado_en, operador_email)')
+      .order('fecha_citacion', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // `proceso` lleva los nombres de columna tal cual. Sin id = alta; con id =
+  // edición (no se reescribe employee_id ni la copia de los datos de la
+  // persona: un proceso a nombre de otro no es una corrección, es otro
+  // proceso -- mismo criterio que los informes FO-GH-06).
+  async guardarProcesoDisciplinario(proceso, id = null) {
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const email = sessionData?.session?.user?.email || null;
+    if (id) {
+      const { employee_id, empleado_cedula, empleado_nombre, ...editables } = proceso;
+      const { data, error } = await window.supabaseClient
+        .from('kardex_procesos_disciplinarios')
+        .update({ ...editables, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data.id;
+    }
+    const { data, error } = await window.supabaseClient
+      .from('kardex_procesos_disciplinarios')
+      .insert({ ...proceso, creado_por_email: email })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  },
+
+  async borrarProcesoDisciplinario(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_procesos_disciplinarios')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // La carpeta del bucket es el id del proceso: acá sí existe antes de subir
+  // (a diferencia de los informes, donde el id lo genera la función al
+  // guardar), así que agrupar por proceso es lo natural.
+  async subirPruebaProceso(procesoId, file) {
+    const extension = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const archivoUrl = await this.uploadToBucket('procesos-disciplinarios', file, extension, procesoId);
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const { error } = await window.supabaseClient
+      .from('kardex_procesos_disc_pruebas')
+      .insert({
+        proceso_id: procesoId,
+        archivo_url: archivoUrl,
+        archivo_nombre: file.name,
+        creado_por_email: sessionData?.session?.user?.email || null,
+      });
+    if (error) throw error;
+  },
+
+  async borrarPruebaProceso(pruebaId) {
+    const { error } = await window.supabaseClient
+      .from('kardex_procesos_disc_pruebas')
+      .delete()
+      .eq('id', pruebaId);
+    if (error) throw error;
+  },
+
+  // Trae los procesos del programa viejo. Es repetible: lo que ya se copió se
+  // actualiza, no se duplica (unique en origen_key).
+  async importarProcesosDisciplinarios() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_pd_importar');
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
 };
 
 // Todas las funciones async de esta capa pasan por acá para traducir

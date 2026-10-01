@@ -161,6 +161,10 @@
               <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h6.5l3.5 3.5V17a.5.5 0 01-.5.5h-9.5a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 2.5V6H15" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 8.5v3.2M10 13.7v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               Informes disciplinarios
             </a>
+            <a href="#/procesos-disciplinarios" data-nav="procesos-disciplinarios">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l6.5 3v4.2c0 3.6-2.6 6.8-6.5 7.8-3.9-1-6.5-4.2-6.5-7.8V5.5l6.5-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.5 10l1.8 1.8L13 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Procesos disciplinarios
+            </a>
             <a href="#/usuarios" data-nav="usuarios">
               <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.2" stroke="currentColor" stroke-width="1.5"/><path d="M4 17c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 4.3a3 3 0 010 5.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
               Usuarios
@@ -1621,6 +1625,121 @@
           <div class="person-list" id="dis-lista"></div>
         </section>
 
+        <!-- ========== PROCESOS DISCIPLINARIOS ========== -->
+        <section data-view="procesos-disciplinarios" class="view">
+          <p class="view-intro">Citación a descargos, diligencia de descargos y decisión, con el catálogo de faltas del Reglamento Interno (Art. 108) y sus escalas de sanción. Los datos de la persona salen de su ficha de Empleados.</p>
+
+          <div class="cards">
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h6.5l3.5 3.5V17a.5.5 0 01-.5.5h-9.5a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 2.5V6H15" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="pd-stat-total">—</div>
+                <div class="card-label">Procesos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="pd-stat-abiertos">—</div>
+                <div class="card-label">Abiertos</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="pd-stat-mes">—</div>
+                <div class="card-label">Citaciones de este mes</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2l7 12.3H3L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="pd-stat-reincidentes">—</div>
+                <div class="card-label">Personas con 2 o más</div>
+              </div>
+            </div>
+          </div>
+
+          <details class="filtros-avanzados" id="pd-registrar-detalle">
+            <summary>
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <span id="pd-form-titulo">Nuevo proceso (citación a descargos)</span>
+              <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <form id="pd-form" class="form panel-card" style="margin-top:0.75rem">
+              <label>Empleado <span class="req-star">*</span>
+                <div class="combobox" id="pd-empleado-combobox">
+                  <input type="text" id="pd-empleado-input" autocomplete="off" placeholder="Buscar por nombre o cédula…" />
+                  <input type="hidden" id="pd-empleado-id" />
+                  <ul class="combobox-list hidden" id="pd-empleado-list"></ul>
+                </div>
+              </label>
+
+              <!-- Datos de la ficha + cuántos procesos lleva ya. Lo pinta
+                   _pintarDatosEmpleado(): la reincidencia es lo que decide qué
+                   sanción corresponde según la escala del RIT. -->
+              <div id="pd-datos-empleado" class="hidden"></div>
+
+              <div class="fieldset-grid">
+                <label>Fecha de los hechos<input type="date" id="pd-fecha-hechos" /></label>
+                <label>Fecha de citación <span class="req-star">*</span><input type="date" id="pd-fecha-citacion" required /></label>
+                <label>Hora de citación<input type="time" id="pd-hora-citacion" /></label>
+              </div>
+
+              <label>Hechos reportados <span class="req-star">*</span><textarea id="pd-motivo" rows="4" required placeholder="Qué pasó, cuándo y cómo lo reportó la empresa."></textarea></label>
+
+              <!-- Las 122 faltas del Art. 108, con su escala de sanción. -->
+              <label>Falta del Reglamento Interno (Art. 108)<select id="pd-falta"></select></label>
+              <div id="pd-escala" class="hidden"></div>
+
+              <label>Artículos del RIT<select id="pd-articulo"></select></label>
+              <label>Normas presuntamente vulneradas<textarea id="pd-normas" rows="4" placeholder="Elige arriba un artículo para insertarlo, o escríbelo."></textarea></label>
+
+              <label>Pruebas con que cuenta la empresa<textarea id="pd-pruebas-texto" rows="2" placeholder="Se le ponen de presente en la citación. Los archivos se adjuntan después, en la ficha del proceso."></textarea></label>
+
+              <div>
+                <button type="submit" id="pd-submit">Guardar y generar la citación</button>
+                <button type="button" id="pd-cancelar-edicion" class="btn-secondary hidden">Cancelar edición</button>
+                <p id="pd-msg" class="form-msg"></p>
+              </div>
+            </form>
+          </details>
+
+          <div class="toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="pd-search" placeholder="Buscar por nombre, cédula o hechos…" />
+            </div>
+            <label class="filtro-inline">Estado
+              <select id="pd-filtro-estado">
+                <option value="">Todos</option>
+                <option value="citacion">Citación a descargos</option>
+                <option value="descargos">Descargos rendidos</option>
+                <option value="decision">Con decisión</option>
+                <option value="finalizado">Finalizado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </label>
+            <label class="filtro-inline">Citación desde<input type="date" id="pd-filtro-desde" /></label>
+            <label class="filtro-inline">Hasta<input type="date" id="pd-filtro-hasta" /></label>
+            <button type="button" id="pd-filtros-limpiar" class="btn-secondary">Limpiar filtros</button>
+            <!-- Trae los procesos del programa aparte que se está reemplazando.
+                 Es repetible: lo ya traído se actualiza, no se duplica. -->
+            <button type="button" id="pd-importar" class="btn-secondary" title="Copia al ERP los procesos del programa anterior, sin borrar nada allá">Traer los procesos del programa anterior</button>
+          </div>
+
+          <p class="empty-note" id="pd-contador"></p>
+          <div class="person-list" id="pd-lista"></div>
+        </section>
+
         <!-- ================= USUARIOS ================= -->
         <section data-view="usuarios" class="view">
           <p class="view-intro">Crea la cuenta de acceso de un empleado (para "Mis permisos") y asígnale un grupo. Por ahora solo GESTION HUMANA puede además aprobar permisos de cualquier empleado.</p>
@@ -2480,6 +2599,12 @@
   <script src="js/views/mi-perfil.js"></script>
   <script src="js/views/permisos-vacaciones.js"></script>
   <script src="js/views/informes-disciplinarios.js"></script>
+  <!-- Catalogos del Reglamento Interno y plantillas de los documentos
+       disciplinarios, portados del programa aparte. Van antes de la vista. -->
+  <script src="js/catalogo-faltas.js"></script>
+  <script src="js/catalogo-rit.js"></script>
+  <script src="js/documentos-disciplinarios.js"></script>
+  <script src="js/views/procesos-disciplinarios.js"></script>
   <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>
   <script src="js/views/inventario-historico.js"></script>
