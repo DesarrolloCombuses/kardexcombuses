@@ -26,6 +26,12 @@ function distribucion(items, getValor) {
     .map(([label, count]) => ({ label, count }));
 }
 
+// Marca para las listas: con el filtro de estado en "Inactivos" o "Todos",
+// una fila sin aviso hace que alguien actúe sobre quien ya no trabaja acá.
+function marcaRetirado(e) {
+  return e && e.activo === false ? ' <span class="item-retirado">retirado</span>' : '';
+}
+
 Router.register('personal-cumpleanos', {
   title: 'Cumpleaños',
 
@@ -34,12 +40,25 @@ Router.register('personal-cumpleanos', {
   async onEnter() {
     if (!this._bound) {
       document.getElementById('cu-filtro-cargo').addEventListener('change', () => this._aplicarFiltro());
+      document.getElementById('cu-filtro-estado').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('cu-pdf-btn').addEventListener('click', () => this._descargarPdf());
       this._bound = true;
     }
-    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: true });
+    // Se traen también los retirados para poder consultarlos; el filtro de
+    // estado arranca en "Activos", que es como se veía esta pantalla antes.
+    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: false });
     this._llenarFiltroCargo(this._empleadosAll);
     this._aplicarFiltro();
+  },
+
+  // Una cuenta con la restricción "solo empleados activos" (ver Usuarios)
+  // nunca recibe retirados del servidor: para ella este filtro existe pero
+  // "Inactivos" no muestra a nadie, que es justamente lo que se quiere.
+  _porEstado(empleados) {
+    const estado = document.getElementById('cu-filtro-estado').value;
+    if (estado === 'inactivos') return empleados.filter((e) => !e.activo);
+    if (estado === 'todos') return empleados;
+    return empleados.filter((e) => e.activo);
   },
 
   // Cargo se llena con los valores que realmente existen en los datos (no
@@ -53,11 +72,17 @@ Router.register('personal-cumpleanos', {
   },
 
   _aplicarFiltro() {
+    const base = this._porEstado(this._empleadosAll);
     const cargo = document.getElementById('cu-filtro-cargo').value;
-    const filtrados = cargo ? this._empleadosAll.filter((e) => e.cargo === cargo) : this._empleadosAll;
+    const filtrados = cargo ? base.filter((e) => e.cargo === cargo) : base;
+    const etiqueta = {
+      activos: 'empleado(s) activo(s)',
+      inactivos: 'persona(s) retirada(s)',
+      todos: 'empleado(s), activos y retirados',
+    }[document.getElementById('cu-filtro-estado').value];
     document.getElementById('cu-filtro-resultado').textContent = cargo
-      ? `Mostrando ${filtrados.length} de ${this._empleadosAll.length} empleado(s) — cargo "${cargo}"`
-      : `${this._empleadosAll.length} empleado(s)`;
+      ? `Mostrando ${filtrados.length} de ${base.length} ${etiqueta} — cargo "${cargo}"`
+      : `${base.length} ${etiqueta}`;
     this._render(filtrados);
   },
 
@@ -102,7 +127,7 @@ Router.register('personal-cumpleanos', {
               <span class="cumple-fecha-mes">${mesAbrev}</span>
             </div>
             <div class="cumple-item-info">
-              <span class="detalle-list-item-main">${e.nombre}</span>
+              <span class="detalle-list-item-main">${e.nombre}${marcaRetirado(e)}</span>
               <span class="detalle-list-item-sub">${e.cargo || 'Sin cargo'}</span>
             </div>
             <span class="cumple-cuando-chip ${esHoy ? 'es-hoy' : esManana ? 'es-manana' : ''}">${esHoy ? iconoPastel : ''}${cuando}</span>

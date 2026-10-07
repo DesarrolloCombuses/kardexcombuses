@@ -1636,3 +1636,15 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
    queda fijo: al bajar, las columnas siguen leyéndose. */
 .pf-tabla-scroll { max-height: 320px; overflow-y: auto; }
 .pf-tabla-scroll thead th { position: sticky; top: 0; z-index: 1; }
+
+/* Marca de "esta persona ya no trabaja acá", para las listas de Personal
+   cuando el filtro de estado deja ver activos y retirados juntos: sin ella,
+   alguien felicita un cumpleaños o gestiona una dotación de quien ya se fue. */
+.item-retirado {
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--danger-text);
+}

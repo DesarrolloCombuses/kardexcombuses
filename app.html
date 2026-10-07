@@ -927,9 +927,17 @@
 
         <!-- ================= PERSONAL: CUMPLEAÑOS ================= -->
         <section data-view="personal-cumpleanos" class="view">
-          <p class="view-intro">Próximos cumpleaños en la planta activa -- seguimiento para gestión humana.</p>
+          <p class="view-intro">Próximos cumpleaños -- seguimiento para gestión humana. Muestra la planta activa; con el filtro de estado se puede ver también a quienes ya se retiraron.</p>
 
           <div class="toolbar">
+            <label class="filtro-inline">
+              Estado
+              <select id="cu-filtro-estado">
+                <option value="activos">Activos</option>
+                <option value="inactivos">Inactivos (retirados)</option>
+                <option value="todos">Todos</option>
+              </select>
+            </label>
             <label class="filtro-inline">
               Ver por cargo
               <select id="cu-filtro-cargo" data-todos="Todos los cargos"><option value="">Todos los cargos</option></select>
@@ -958,9 +966,17 @@
 
         <!-- ================= PERSONAL: ALERTAS ================= -->
         <section data-view="personal-alertas" class="view">
-          <p class="view-intro">Personas mayores de 50 años, personas sin dotación entregada, personas con el perfil sin actualizar y conductores sin base asignada en la planta activa -- seguimiento para gestión humana, SG-SST y bodega.</p>
+          <p class="view-intro">Personas mayores de 50 años, personas sin dotación entregada, personas con el perfil sin actualizar y conductores sin base asignada -- seguimiento para gestión humana, SG-SST y bodega.</p>
 
           <div class="toolbar">
+            <label class="filtro-inline">
+              Estado
+              <select id="pa-filtro-estado">
+                <option value="activos">Activos</option>
+                <option value="inactivos">Inactivos (retirados)</option>
+                <option value="todos">Todos</option>
+              </select>
+            </label>
             <label class="filtro-inline">
               Ver por cargo
               <select id="pa-filtro-cargo" data-todos="Todos los cargos"><option value="">Todos los cargos</option></select>
@@ -1037,7 +1053,19 @@
 
         <!-- ================= PERSONAL: CONDUCTORES POR RUTA ================= -->
         <section data-view="personal-conductores" class="view">
-          <p class="view-intro">Cuántos conductores activos tiene cada ruta, a partir del vehículo/ruta asignado en su ficha de empleado.</p>
+          <p class="view-intro">Cuántos conductores tiene cada ruta, a partir del vehículo/ruta asignado en su ficha de empleado.</p>
+
+          <div class="toolbar">
+            <label class="filtro-inline">
+              Estado
+              <select id="pc-filtro-estado">
+                <option value="activos">Activos</option>
+                <option value="inactivos">Inactivos (retirados)</option>
+                <option value="todos">Todos</option>
+              </select>
+            </label>
+            <span class="muted" id="pc-filtro-resultado"></span>
+          </div>
 
           <div class="panel-card chart-card ruta-dashboard">
             <div class="section-heading">

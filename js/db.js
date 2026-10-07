@@ -1346,7 +1346,10 @@ const DB = {
   async getUsuariosGrupos() {
     const { data, error } = await window.supabaseClient
       .from('kardex_empleado_grupos')
-      .select('*, employee:employees(nombre, cedula, cargo, area, email_personal)')
+      // activo y fecha_salida: una cuenta de alguien que ya se retiró se veía
+      // igual que la de alguien que sigue trabajando, y es justo la que hay
+      // que cerrar.
+      .select('*, employee:employees(nombre, cedula, cargo, area, email_personal, activo, fecha_salida)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data;

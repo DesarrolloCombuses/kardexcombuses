@@ -74,6 +74,15 @@ const CAMPOS_EMPLEADO_RELACIONES = [
   { id: 'hijos_empleado', label: 'Hijos' },
 ];
 
+// Por componentes y no con new Date(iso): Colombia es UTC-5 y una fecha sola
+// ('2026-08-20') se interpreta como medianoche UTC, que acá es el día antes.
+function usFormatFecha(iso) {
+  if (!iso) return '';
+  const [a, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  if (!a || !m || !d) return '';
+  return new Date(a, m - 1, d).toLocaleDateString('es-CO');
+}
+
 Router.register('usuarios', {
   title: 'Usuarios',
 
@@ -89,7 +98,9 @@ Router.register('usuarios', {
 
   async _load() {
     const [empleados, usuarios, cuentasAutorizadas] = await Promise.all([
-      DB.getEmployees({ onlyActive: true }),
+      // Se traen también los retirados: hay que poder buscarlos para revisar
+      // o cerrar la cuenta de alguien que ya no está. El buscador los marca.
+      DB.getEmployees({ onlyActive: false }),
       DB.getUsuariosGrupos(),
       DB.getCuentasAutorizadas(),
     ]);
@@ -107,14 +118,18 @@ Router.register('usuarios', {
 
     const renderLista = (query) => {
       const q = query.trim().toLowerCase();
-      const matches = q
+      const sinFiltro = q
         ? this._empleados.filter((e) => e.nombre.toLowerCase().includes(q) || (e.cedula || '').includes(q))
         : this._empleados;
+      // Los activos primero: son a quienes se les crea una cuenta casi
+      // siempre, y los retirados no deben empujarlos fuera del tope de la
+      // lista (que se corta en MAX_RESULTADOS).
+      const matches = [...sinFiltro].sort((a, b) => Number(!!b.activo) - Number(!!a.activo));
       if (matches.length === 0) {
         list.innerHTML = '<li class="combobox-empty">Sin resultados.</li>';
       } else {
         const visibles = matches.slice(0, MAX_RESULTADOS);
-        list.innerHTML = visibles.map((e) => `<li data-id="${e.id}">${e.nombre} <span class="combobox-cedula">· CC ${e.cedula}</span></li>`).join('');
+        list.innerHTML = visibles.map((e) => `<li data-id="${e.id}">${e.nombre} <span class="combobox-cedula">· CC ${e.cedula}${e.activo ? '' : ' · retirado'}</span></li>`).join('');
         if (matches.length > visibles.length) list.innerHTML += `<li class="combobox-empty">Y ${matches.length - visibles.length} más… sigue escribiendo para acotar.</li>`;
       }
       list.classList.remove('hidden');
@@ -144,20 +159,34 @@ Router.register('usuarios', {
 
   _render() {
     const total = this._usuarios.length;
-    document.getElementById('us-contador').textContent = total ? `${total} usuario(s) con grupo asignado` : 'Todavía no se ha creado ningún usuario.';
+    // Una cuenta de alguien retirado sigue entrando al ERP mientras nadie la
+    // cierre, así que el número va junto al total y no escondido en la lista.
+    const retirados = this._usuarios.filter((u) => u.employee && u.employee.activo === false).length;
+    document.getElementById('us-contador').textContent = total
+      ? `${total} usuario(s) con grupo asignado`
+        + (retirados ? ` · ${retirados} de personas que ya no están en la empresa` : '')
+      : 'Todavía no se ha creado ningún usuario.';
 
     const lista = document.getElementById('us-lista');
-    lista.innerHTML = this._usuarios.map((u) => `
+    lista.innerHTML = this._usuarios.map((u) => {
+      // employee nulo = la ficha se borró; no es lo mismo que estar retirado,
+      // así que no se dice ni una cosa ni la otra.
+      const sinFicha = !u.employee;
+      const activo = u.employee?.activo !== false;
+      const salida = u.employee?.fecha_salida ? ` (${usFormatFecha(u.employee.fecha_salida)})` : '';
+      return `
       <div class="person-row">
         <div class="person-info">
           <div class="person-name">${u.alias}</div>
           <div class="person-meta"><span>${u.employee?.nombre || '—'} · CC ${u.employee?.cedula || '—'}</span></div>
         </div>
+        ${sinFicha ? '' : `<span class="tag ${activo ? 'activo' : 'inactivo-tag'}">${activo ? 'Activo' : `Retirado${salida}`}</span>`}
         <span class="tag activo">${u.grupo}</span>
         <button type="button" class="btn-secondary" data-permisos="${u.employee_id}">Editar permisos</button>
         <button type="button" class="btn-secondary" data-quitar="${u.employee_id}">Quitar grupo</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // La propia cuenta nunca trae controles para editarse/quitarse a sí
     // misma -- la base de datos lo rechaza igual (ver

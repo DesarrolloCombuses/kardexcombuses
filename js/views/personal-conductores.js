@@ -19,8 +19,34 @@ Router.register('personal-conductores', {
   _palette: ['#2f6fed', '#20b2aa', '#a970ff', '#ff9f43', '#26c6da', '#ef5da8', '#5ec26a', '#7b8cff'],
 
   async onEnter() {
-    const empleados = await DB.getEmployeesConPerfil({ onlyActive: true });
-    this._render(empleados);
+    if (!this._bound) {
+      document.getElementById('pc-filtro-estado').addEventListener('change', () => this._aplicarFiltro());
+      this._bound = true;
+    }
+    // Se traen también los retirados para poder consultarlos; el filtro de
+    // estado arranca en "Activos", que es como se veía esta pantalla antes.
+    this._empleadosAll = await DB.getEmployeesConPerfil({ onlyActive: false });
+    this._aplicarFiltro();
+  },
+
+  // Una cuenta con la restricción "solo empleados activos" (ver Usuarios)
+  // nunca recibe retirados del servidor: para ella este filtro existe pero
+  // "Inactivos" no muestra a nadie, que es justamente lo que se quiere.
+  _porEstado(empleados) {
+    const estado = document.getElementById('pc-filtro-estado').value;
+    if (estado === 'inactivos') return empleados.filter((e) => !e.activo);
+    if (estado === 'todos') return empleados;
+    return empleados.filter((e) => e.activo);
+  },
+
+  _aplicarFiltro() {
+    const base = this._porEstado(this._empleadosAll || []);
+    document.getElementById('pc-filtro-resultado').textContent = {
+      activos: `${base.length} empleado(s) activo(s)`,
+      inactivos: `${base.length} persona(s) retirada(s)`,
+      todos: `${base.length} empleado(s), activos y retirados`,
+    }[document.getElementById('pc-filtro-estado').value];
+    this._render(base);
   },
 
   _render(empleados) {
