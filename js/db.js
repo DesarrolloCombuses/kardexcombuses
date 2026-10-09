@@ -1751,6 +1751,23 @@ const DB = {
     return data;
   },
 
+  // El checklist urbano (Zamora y Aranjuez - Guadalupe). Otro sistema, otro
+  // formulario y otra escala de estado que los alistamientos SICOV; por eso
+  // va aparte y no mezclado con ellos.
+  async getPreoperacionales({ desde, hasta, placa = '' } = {}) {
+    let q = window.supabaseClient
+      .from('preoperacionales')
+      .select('*')
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (desde) q = q.gte('fecha', desde);
+    if (hasta) q = q.lte('fecha', hasta);
+    if (placa) q = q.ilike('placa', `%${placa}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data;
+  },
+
   // El catálogo trae el nombre de cada actividad. Es pequeño y no cambia, así
   // que se pide una vez por entrada a la vista y se reutiliza.
   async getCatalogoActividadesSicov() {

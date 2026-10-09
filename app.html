@@ -2270,8 +2270,9 @@
                uno debajo del otro porque se consultan por separado: quien
                revisa el alistamiento del día no está mirando el taller. -->
           <div class="toolbar" id="mt-tabs">
-            <button type="button" class="btn-secondary" data-tab="alistamientos">Alistamientos</button>
-            <button type="button" class="btn-secondary" data-tab="mantenimientos">Mantenimientos</button>
+            <button type="button" class="btn-secondary mt-tab" data-tab="alistamientos">Alistamientos</button>
+            <button type="button" class="btn-secondary mt-tab" data-tab="mantenimientos">Mantenimientos</button>
+            <button type="button" class="btn-secondary mt-tab" data-tab="preoperacionales">Preoperacionales urbanas</button>
             <span class="muted" id="mt-contador"></span>
           </div>
 
@@ -2297,6 +2298,23 @@
                   </tr>
                 </thead>
                 <tbody id="mt-tbody-mant"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Checklist urbano de Zamora y Aranjuez - Guadalupe. Es otro
+               sistema: otro formulario, otros ítems y otra escala de estado
+               (OK / Alerta / Crítico), así que va en su propia pestaña y no
+               mezclado con los alistamientos SICOV. -->
+          <div id="mt-panel-preoperacionales" class="hidden">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th><th>Ruta</th><th>Vehículo</th><th>Conductor</th><th>Km</th><th>Combustible</th><th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="mt-tbody-preop"></tbody>
               </table>
             </div>
           </div>

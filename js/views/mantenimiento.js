@@ -40,6 +40,65 @@ function mtEsc(s) {
 // como número porque es lo que viaja en el reporte.
 const MT_TIPO = { 1: 'Preventivo', 2: 'Correctivo' };
 
+// ---- Checklist urbano (preoperacionales de Zamora y Aranjuez) -------------
+// Copiado literal de supabase/functions/_shared/preop.ts del backend de las
+// apps de conductor, que es donde se valida y donde se calcula el
+// estado_general. Acá solo sirve para PINTAR: poner el ítem con su nombre
+// legible y su color según la gravedad. El original manda; si allá cambian un
+// valor, acá aparecería sin color hasta que se copie de nuevo -- por eso
+// MT_PREOP_NIVEL cae en 1 (alerta) ante un valor que no reconoce, y no en 0:
+// más vale señalar de más que dar por bueno algo que no se sabe qué es.
+const MT_PREOP_CAMPOS = {
+  conductor_apto: { 'Sí, apto': 0, 'No, no apto': 2 },
+  fluidos: { 'OK': 0, 'Alguno bajo': 1, 'Falta alguno o requiere cambio': 2 },
+  llantas: { 'OK': 0, 'Presión baja o desgaste visible': 1, 'Llanta lisa o desinflada': 2 },
+  direccion_suspension: { 'OK': 0, 'Vibra o hace ruido extraño': 1, 'Juego excesivo o no responde bien': 2 },
+  luces: { 'OK': 0, 'Alguna no sirve': 1, 'Varias no encienden': 2 },
+  visibilidad: { 'OK': 0, 'Requiere ajuste o no limpia bien': 1, 'Dañado, no funciona o parabrisas fisurado': 2 },
+  cinturones: { 'OK': 0, 'Alguno dañado': 1, 'No funcionan': 2 },
+  emergencia: { 'OK': 0, 'Algo incompleto o vencido': 1, 'Falta extintor o botiquín': 2 },
+  puertas: { 'OK': 0, 'Pasamanos flojo o puerta dura': 1, 'No cierra bien o no hay salida de emergencia': 2 },
+  documentacion: { 'OK': 0, 'Alguno por vencer': 1, 'Alguno vencido o falta': 2 },
+  frenos: { 'OK': 0, 'Se sienten suaves o flojos': 1, 'No frenan bien': 2 },
+};
+
+// El orden importa: el autorreporte del conductor va primero porque si él
+// dice que no está apto, lo del vehículo pasa a segundo plano.
+const MT_PREOP_ETIQUETAS = [
+  ['conductor_apto', '¿El conductor se reporta apto?'],
+  ['frenos', 'Frenos'],
+  ['llantas', 'Llantas'],
+  ['direccion_suspension', 'Dirección y suspensión'],
+  ['luces', 'Luces'],
+  ['fluidos', 'Fluidos'],
+  ['visibilidad', 'Visibilidad (limpiabrisas, espejos, parabrisas)'],
+  ['cinturones', 'Cinturones'],
+  ['emergencia', 'Equipo de emergencia'],
+  ['puertas', 'Puertas y pasamanos'],
+  ['documentacion', 'Documentación'],
+];
+
+function mtPreopNivel(campo, valor) {
+  const niveles = MT_PREOP_CAMPOS[campo];
+  if (!niveles) return 1;
+  const n = niveles[String(valor || '').trim()];
+  return n === undefined ? 1 : n;
+}
+
+const MT_PREOP_ESTADO = {
+  OK: { texto: 'OK', clase: 'activo' },
+  ALERTA: { texto: 'Alerta', clase: 'pendiente' },
+  CRITICO: { texto: 'Crítico', clase: 'novedad' },
+};
+
+// Cada pestaña tiene su propia escala de estado, así que el filtro se
+// repuebla: ofrecerle "Con novedad" a un preoperacional no encontraría nada.
+const MT_ESTADOS_POR_TAB = {
+  alistamientos: [['', 'Todos'], ['OK', 'Sin novedad'], ['CON_NOVEDAD', 'Con novedad']],
+  mantenimientos: [],
+  preoperacionales: [['', 'Todos'], ['OK', 'OK'], ['ALERTA', 'Alerta'], ['CRITICO', 'Crítico']],
+};
+
 function mtMensajeError(err) {
   const m = String(err?.message || err || '');
   if (/permission denied|row-level security|policy/i.test(m)) {
@@ -87,14 +146,21 @@ Router.register('mantenimiento', {
 
   _verTab(tab) {
     this._tab = tab;
-    document.getElementById('mt-panel-alistamientos').classList.toggle('hidden', tab !== 'alistamientos');
-    document.getElementById('mt-panel-mantenimientos').classList.toggle('hidden', tab !== 'mantenimientos');
+    ['alistamientos', 'mantenimientos', 'preoperacionales'].forEach((t) => {
+      document.getElementById(`mt-panel-${t}`).classList.toggle('hidden', t !== tab);
+    });
     document.querySelectorAll('#mt-tabs [data-tab]').forEach((b) => {
       b.classList.toggle('activo', b.dataset.tab === tab);
     });
-    // El filtro de estado solo existe para alistamientos: un mantenimiento no
-    // tiene "con novedad", lo que tiene es tipo preventivo o correctivo.
-    document.getElementById('mt-estado').closest('.filtro-inline').classList.toggle('hidden', tab !== 'alistamientos');
+    // Cada pestaña trae su escala. Un mantenimiento no tiene estado -- lo que
+    // tiene es tipo preventivo o correctivo --, así que ahí el filtro se
+    // esconde en vez de ofrecer opciones que no aplican.
+    const opciones = MT_ESTADOS_POR_TAB[tab] || [];
+    const sel = document.getElementById('mt-estado');
+    sel.closest('.filtro-inline').classList.toggle('hidden', !opciones.length);
+    if (opciones.length) {
+      sel.innerHTML = opciones.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+    }
     if (this._alistamientos) this._pintar();
   },
 
@@ -103,19 +169,24 @@ Router.register('mantenimiento', {
     const hasta = document.getElementById('mt-hasta').value || mtHoyISO();
     Loading.show('Cargando…');
     try {
-      const [alistamientos, mantenimientos, catalogo, vehiculos] = await Promise.all([
+      const [alistamientos, mantenimientos, catalogo, vehiculos, preoperacionales] = await Promise.all([
         DB.getAlistamientosSicov({ desde, hasta }),
         DB.getMantenimientosSicov({ desde, hasta }),
         this._catalogo ? Promise.resolve(this._catalogo) : DB.getCatalogoActividadesSicov(),
         // La flota se usa solo para saber quién falta por alistar. Si esa
         // consulta falla, el resto de la vista no tiene por qué caerse.
         DB.getFlotaVehiculos().catch(() => []),
+        // Las preoperacionales urbanas son de otro sistema: si todavía no se
+        // abrió su permiso, las otras dos pestañas tienen que seguir sirviendo.
+        DB.getPreoperacionales({ desde, hasta }).catch((e) => { this._errorPreop = e; return []; }),
       ]);
       this._alistamientos = alistamientos;
       this._mantenimientos = mantenimientos;
       this._catalogo = catalogo;
       this._catalogoPorId = Object.fromEntries(catalogo.map((a) => [a.id, a]));
       this._vehiculos = vehiculos;
+      this._preoperacionales = preoperacionales;
+      if (preoperacionales.length) this._errorPreop = null;
       this._pintar();
     } catch (err) {
       document.getElementById('mt-contador').textContent = mtMensajeError(err);
@@ -136,7 +207,8 @@ Router.register('mantenimiento', {
   _pintar() {
     this._pintarKpis();
     if (this._tab === 'alistamientos') this._pintarAlistamientos();
-    else this._pintarMantenimientos();
+    else if (this._tab === 'mantenimientos') this._pintarMantenimientos();
+    else this._pintarPreoperacionales();
     this._pintarFaltantes();
   },
 
@@ -243,6 +315,79 @@ Router.register('mantenimiento', {
       b.addEventListener('click', () => this._verMantenimiento(
         filas.find((x) => String(x.id) === b.dataset.verMant)));
     });
+  },
+
+  _pintarPreoperacionales() {
+    const estado = document.getElementById('mt-estado').value;
+    let filas = this._filtrados(this._preoperacionales || [],
+      ['placa', 'ruta', 'interno', 'conductor_nombre', 'conductor_cedula']);
+    if (estado) filas = filas.filter((p) => p.estado_general === estado);
+
+    const total = (this._preoperacionales || []).length;
+    document.getElementById('mt-contador').textContent =
+      `${filas.length} preoperacional(es)` + (filas.length !== total ? ` de ${total}` : '');
+
+    const tbody = document.getElementById('mt-tbody-preop');
+    if (!filas.length) {
+      // Si la consulta falló (permiso no abierto todavía), decirlo: una tabla
+      // vacía haría pensar que no hay checklists, que es muy distinto.
+      const msg = this._errorPreop
+        ? mtMensajeError(this._errorPreop)
+        : 'Sin preoperacionales en este período.';
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-note">${mtEsc(msg)}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filas.map((p) => {
+      const est = MT_PREOP_ESTADO[p.estado_general] || { texto: p.estado_general, clase: 'pendiente' };
+      return `
+      <tr>
+        <td>${mtFecha(p.fecha)}</td>
+        <td>${mtEsc(p.ruta || '—')}</td>
+        <td><strong>${mtEsc(p.placa)}</strong>${p.interno ? `<br><span class="muted">Interno ${mtEsc(p.interno)}</span>` : ''}</td>
+        <td>${mtEsc(p.conductor_nombre || '—')}<br><span class="muted">CC ${mtEsc(p.conductor_cedula || '—')}</span></td>
+        <td>${p.kilometraje != null ? Number(p.kilometraje).toLocaleString('es-CO') : '—'}</td>
+        <td>${mtEsc(p.combustible || '—')}</td>
+        <td><span class="tag ${est.clase}">${est.texto}</span>
+          <button type="button" class="btn-secondary" data-ver-preop="${p.id}">Ver</button></td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('[data-ver-preop]').forEach((b) => {
+      b.addEventListener('click', () => this._verPreoperacional(
+        filas.find((x) => String(x.id) === b.dataset.verPreop)));
+    });
+  },
+
+  // Todo el checklist está en columnas de la misma fila, así que no hace
+  // falta una segunda consulta: se abre al instante.
+  _verPreoperacional(p) {
+    if (!p) return;
+    const est = MT_PREOP_ESTADO[p.estado_general] || { texto: p.estado_general, clase: 'pendiente' };
+    const items = MT_PREOP_ETIQUETAS
+      .map(([campo, etiqueta]) => ({ campo, etiqueta, valor: p[campo], nivel: mtPreopNivel(campo, p[campo]) }))
+      .filter((x) => x.valor)
+      // Lo grave primero: es a lo que hay que reaccionar.
+      .sort((a, b) => b.nivel - a.nivel);
+    const clasePorNivel = ['activo', 'pendiente', 'novedad'];
+    this._abrirModal(`
+      <div class="modal-section">
+        <h3 class="modal-section-title">Preoperacional ${mtEsc(p.placa)} · ${mtFecha(p.fecha)}</h3>
+        <p class="muted">Ruta ${mtEsc(p.ruta || '—')}${p.interno ? ` · Interno ${mtEsc(p.interno)}` : ''}<br>
+        Conductor: ${mtEsc(p.conductor_nombre || '—')} (CC ${mtEsc(p.conductor_cedula || '—')})<br>
+        ${p.kilometraje != null ? `${Number(p.kilometraje).toLocaleString('es-CO')} km · ` : ''}Combustible: ${mtEsc(p.combustible || '—')}
+        ${p.created_at ? `<br>Registrado: ${new Date(p.created_at).toLocaleString('es-CO')}` : ''}</p>
+        <p><span class="tag ${est.clase}">${est.texto}</span></p>
+        ${p.observaciones ? `<p class="prose-p" style="white-space:pre-wrap">${mtEsc(p.observaciones)}</p>` : ''}
+      </div>
+      <div class="modal-section">
+        <h3 class="modal-section-title">Checklist</h3>
+        <div class="detalle-list">${items.map((x) => `
+          <div class="detalle-list-item">
+            <span class="lc-item-texto">
+              <span class="detalle-list-item-main">${mtEsc(x.etiqueta)}</span>
+            </span>
+            <span class="tag ${clasePorNivel[x.nivel]}">${mtEsc(x.valor)}</span>
+          </div>`).join('')}</div>
+      </div>`);
   },
 
   _nombreActividad(id) {
