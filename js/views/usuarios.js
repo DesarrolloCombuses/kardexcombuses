@@ -47,7 +47,7 @@ const SECCIONES_PERMISOS = [
   { titulo: 'Parque automotor', modulos: [
     { key: 'parque-automotor', label: 'Vencimiento de documentos' },
     { key: 'alertas-vencimientos', label: 'Alertas de vencimientos' },
-    { key: 'mantenimiento', label: 'Mantenimiento (alistamientos SICOV)' },
+    { key: 'mantenimiento', label: 'Seguridad vial (alistamientos y preoperacionales)' },
   ] },
   { titulo: 'Contabilidad', modulos: [
     { key: 'fondo-siniestros', label: 'Fondo de reposición' },

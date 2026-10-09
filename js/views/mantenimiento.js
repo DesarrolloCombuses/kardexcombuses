@@ -1,6 +1,13 @@
-// Mantenimiento: consulta de los alistamientos diarios y los mantenimientos
+// Seguridad vial: consulta de los alistamientos diarios y los mantenimientos
 // que captura la "Plataforma SICOV" (otra app, mismo Supabase) y que se le
-// reportan a la Superintendencia de Transporte.
+// reportan a la Superintendencia de Transporte, y de las preoperacionales de
+// las rutas urbanas.
+//
+// El módulo se llama "Seguridad vial" de cara al usuario, pero su
+// identificador sigue siendo 'mantenimiento': es el valor del permiso en
+// kardex_permisos_usuario (con su CHECK) y la ruta #/mantenimiento. Cambiarlo
+// costaría una migración y rompería los enlaces guardados, sin que nadie lo
+// note.
 //
 // Esta vista SOLO LEE. El alistamiento lo llena el conductor en su formulario
 // y el mantenimiento el taller en el suyo; ahí se valida la placa contra la
@@ -150,7 +157,7 @@ const MT_ICONOS = {
 function mtMensajeError(err) {
   const m = String(err?.message || err || '');
   if (/permission denied|row-level security|policy/i.test(m)) {
-    return 'Tu cuenta no tiene permiso para consultar mantenimiento. Pídeselo a un administrador en Usuarios.';
+    return 'Tu cuenta no tiene permiso para consultar seguridad vial. Pídeselo a un administrador en Usuarios.';
   }
   if (/relation .* does not exist|PGRST205/i.test(m)) {
     return 'Las tablas de la plataforma SICOV todavía no están creadas en esta base de datos.';
@@ -159,7 +166,7 @@ function mtMensajeError(err) {
 }
 
 Router.register('mantenimiento', {
-  title: 'Mantenimiento',
+  title: 'Seguridad vial',
 
   _tab: 'alistamientos',
 
