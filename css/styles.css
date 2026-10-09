@@ -1648,3 +1648,17 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
   text-transform: uppercase;
   color: var(--danger-text);
 }
+
+/* Pestañas hechas con botones (Mantenimiento: Alistamientos / Mantenimientos).
+   La activa tiene que leerse como la seleccionada y no como "el último que
+   toqué", que es lo que pasa si solo cambia el contenido de abajo. */
+.btn-secondary.activo,
+.btn-secondary.activo:hover {
+  background: var(--blue-600);
+  color: var(--white);
+}
+
+/* Alistamiento con novedad / actividad no conforme (Mantenimiento). Es una
+   falla de seguridad detectada antes de salir a ruta: en gris se lee como un
+   estado más, y el punto de la pantalla es que salte a la vista. */
+.tag.novedad { background: var(--danger-bg); color: var(--danger-text); }

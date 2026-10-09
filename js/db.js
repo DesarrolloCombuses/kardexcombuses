@@ -1713,6 +1713,77 @@ const DB = {
     return total;
   },
 
+  // ---- Mantenimiento: alistamientos y mantenimientos SICOV ---------------
+  // Las tablas sicov_* son de la "Plataforma SICOV" (otra app, mismo
+  // Supabase) que captura el alistamiento diario del conductor y lo entrega
+  // por API a la Supertransporte. Acá SOLO se leen -- escribir sigue pasando
+  // por sus edge functions, que son las que validan placa, cédula y
+  // actividades. Ver sql/mantenimiento_sicov_2026-10-09.sql.
+  //
+  // Siempre por rango de fechas: son registros diarios por vehículo, así que
+  // sin rango esto crece sin techo (una flota de 300 buses son ~110.000 filas
+  // al año) y la pantalla se caería sola al cabo de unos meses.
+  async getAlistamientosSicov({ desde, hasta, placa = '' } = {}) {
+    let q = window.supabaseClient
+      .from('sicov_alistamientos')
+      .select('id, placa, fecha, registrado_en, conductor_nombre, conductor_num_id, responsable_nombre, kilometraje, estado, observaciones')
+      .order('fecha', { ascending: false })
+      .order('placa');
+    if (desde) q = q.gte('fecha', desde);
+    if (hasta) q = q.lte('fecha', hasta);
+    if (placa) q = q.ilike('placa', `%${placa}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data;
+  },
+
+  async getMantenimientosSicov({ desde, hasta, placa = '' } = {}) {
+    let q = window.supabaseClient
+      .from('sicov_mantenimientos')
+      .select('id, placa, fecha, hora, tipo, responsable_nombre, responsable_num_id, detalle_libre, kilometraje, observaciones, creado_en')
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: false });
+    if (desde) q = q.gte('fecha', desde);
+    if (hasta) q = q.lte('fecha', hasta);
+    if (placa) q = q.ilike('placa', `%${placa}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data;
+  },
+
+  // El catálogo trae el nombre de cada actividad. Es pequeño y no cambia, así
+  // que se pide una vez por entrada a la vista y se reutiliza.
+  async getCatalogoActividadesSicov() {
+    const { data, error } = await window.supabaseClient
+      .from('sicov_cat_actividades')
+      .select('id, descripcion, grupo, orden, aplica_alistamiento, aplica_mantenimiento')
+      .order('orden', { nullsFirst: false })
+      .order('id');
+    if (error) throw error;
+    return data;
+  },
+
+  // Las actividades de UN registro, al abrir su ficha. No viajan con la lista
+  // porque son ~40 filas por alistamiento: en un mes de flota completa serían
+  // cientos de miles de filas para pintar una tabla de encabezados.
+  async getActividadesAlistamiento(alistamientoId) {
+    const { data, error } = await window.supabaseClient
+      .from('sicov_alistamiento_actividades')
+      .select('actividad_id, conforme, observacion')
+      .eq('alistamiento_id', alistamientoId);
+    if (error) throw error;
+    return data;
+  },
+
+  async getActividadesMantenimiento(mantenimientoId) {
+    const { data, error } = await window.supabaseClient
+      .from('sicov_mantenimiento_actividades')
+      .select('actividad_id, observacion')
+      .eq('mantenimiento_id', mantenimientoId);
+    if (error) throw error;
+    return data;
+  },
+
   async getResumenProcesos() {
     const { data, error } = await window.supabaseClient.rpc('kardex_pd_resumen');
     if (error) throw error;

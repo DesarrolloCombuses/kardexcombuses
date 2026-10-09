@@ -199,6 +199,10 @@
               <svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4 4 0 00-4 4v2.3c0 .85-.32 1.67-.9 2.3L4 13h12l-1.1-1.4a3.3 3.3 0 01-.9-2.3V7a4 4 0 00-4-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.3 16a1.8 1.8 0 003.4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               Alertas de vencimientos
             </a>
+            <a href="#/mantenimiento" data-nav="mantenimiento">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M12.6 3.5a3.9 3.9 0 00-5 5L4 12.1a1.45 1.45 0 102.05 2.05L9.6 10.6a3.9 3.9 0 005-5l-2 2-1.6-.4-.4-1.6 2-2z" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/></svg>
+              Mantenimiento
+            </a>
           </div>
         </details>
 
@@ -2201,6 +2205,117 @@
           <div class="person-list" id="ac-lista"></div>
         </section>
 
+        <!-- ========== MANTENIMIENTO (ALISTAMIENTOS SICOV) ========== -->
+        <section data-view="mantenimiento" class="view">
+          <p class="view-intro">Alistamientos diarios y mantenimientos que registra la plataforma SICOV y que se le reportan a la Superintendencia de Transporte. Acá solo se consultan: el registro lo hacen el conductor y el taller en sus formularios.</p>
+
+          <div class="cards">
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M3 13.5V9l1.8-4.2A1.5 1.5 0 016.2 4h7.6a1.5 1.5 0 011.4.8L17 9v4.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 13.5h14v1.9a.6.6 0 01-.6.6h-1.3a.6.6 0 01-.6-.6v-1.9M3 13.5v1.9c0 .3.3.6.6.6h1.3c.3 0 .6-.3.6-.6v-1.9" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11" r="1" fill="currentColor"/><circle cx="14" cy="11" r="1" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="mt-kpi-hoy">—</div>
+                <div class="card-label">Alistados hoy</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2l7 12.3H3L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="mt-kpi-novedad">—</div>
+                <div class="card-label">Con novedad hoy</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="mt-kpi-faltan">—</div>
+                <div class="card-label">Vinculados sin alistar hoy</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M12.5 3.6a3.9 3.9 0 00-5 5L4 12.1a1.4 1.4 0 102 2l3.5-3.5a3.9 3.9 0 005-5l-2 2-1.6-.4-.4-1.6 2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="mt-kpi-mant">—</div>
+                <div class="card-label">Mantenimientos del período</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="mt-search" placeholder="Buscar por placa, conductor o responsable…" />
+            </div>
+            <label class="filtro-inline">Desde<input type="date" id="mt-desde" /></label>
+            <label class="filtro-inline">Hasta<input type="date" id="mt-hasta" /></label>
+            <label class="filtro-inline">Estado
+              <select id="mt-estado">
+                <option value="">Todos</option>
+                <option value="OK">Sin novedad</option>
+                <option value="CON_NOVEDAD">Con novedad</option>
+              </select>
+            </label>
+            <button type="button" id="mt-hoy" class="btn-secondary">Hoy</button>
+            <button type="button" id="mt-mes" class="btn-secondary">Este mes</button>
+          </div>
+
+          <!-- Dos listados, uno por tabla de origen. Van como pestañas y no
+               uno debajo del otro porque se consultan por separado: quien
+               revisa el alistamiento del día no está mirando el taller. -->
+          <div class="toolbar" id="mt-tabs">
+            <button type="button" class="btn-secondary" data-tab="alistamientos">Alistamientos</button>
+            <button type="button" class="btn-secondary" data-tab="mantenimientos">Mantenimientos</button>
+            <span class="muted" id="mt-contador"></span>
+          </div>
+
+          <div id="mt-panel-alistamientos">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th><th>Vehículo</th><th>Conductor</th><th>Km</th><th>Estado</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="mt-tbody-alist"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="mt-panel-mantenimientos" class="hidden">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th><th>Hora</th><th>Vehículo</th><th>Tipo</th><th>Responsable</th><th>Km</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="mt-tbody-mant"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Los vehículos vinculados que no tienen alistamiento del día.
+               Es lo que la Supertransporte reclama, así que va a la vista y
+               no escondido en un KPI. -->
+          <details class="filtros-avanzados" id="mt-faltantes-detalle">
+            <summary>
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <span id="mt-faltantes-titulo">Vehículos sin alistamiento hoy</span>
+              <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="panel-card" style="margin-top:0.75rem">
+              <div class="detalle-list" id="mt-faltantes-lista"></div>
+            </div>
+          </details>
+        </section>
+
         <!-- ================= CONTABILIDAD: FONDO DE REPOSICIÓN ================= -->
         <section data-view="fondo-siniestros" class="view">
           <p class="view-intro">Fondos de reposición que lleva contabilidad. Elige cuál ver arriba: cada uno tiene sus propios vehículos y su cuadro de resumen. La ruta se toma del parque automotor cruzando por el número interno.</p>
@@ -2636,6 +2751,7 @@
   <script src="js/documentos-disciplinarios.js"></script>
   <script src="js/hoja-procesos.js"></script>
   <script src="js/views/procesos-disciplinarios.js"></script>
+  <script src="js/views/mantenimiento.js"></script>
   <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>
   <script src="js/views/inventario-historico.js"></script>
