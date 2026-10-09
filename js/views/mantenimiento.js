@@ -99,6 +99,54 @@ const MT_ESTADOS_POR_TAB = {
   preoperacionales: [['', 'Todos'], ['OK', 'OK'], ['ALERTA', 'Alerta'], ['CRITICO', 'Crítico']],
 };
 
+// ---- Qué flota reporta por cuál formulario -------------------------------
+// La flota no alista toda por el mismo lado. SICOV es la operación del
+// AEROPUERTO; el checklist urbano es el de ZAMORA y ARANJUEZ - GUADALUPE; y
+// los vehículos de terminal no reportan por ninguno de los dos. Medir a todos
+// contra el mismo formulario fue lo que infló la alerta de "sin alistar" a 70
+// cuando los carros del aeropuerto son 51.
+//
+// Se reconoce por el NOMBRE de la ruta y no por su código (700, 2, 41, 313),
+// porque el mismo código aparece con nombres distintos: hay vehículos de
+// ruta 313 que son de Aranjuez y otros que son de terminal.
+const MT_OPERACIONES = [
+  ['aeropuerto', 'Aeropuerto', /AEROPUERTO/],
+  ['zamora', 'Zamora', /ZAMORA/],
+  ['aranjuez', 'Aranjuez - Guadalupe', /ARANJUEZ/],
+];
+
+function mtNormalizar(texto) {
+  return String(texto == null ? '' : texto)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().trim();
+}
+
+// 'aeropuerto' | 'zamora' | 'aranjuez' | null (terminal y cualquier otra).
+function mtOperacion(texto) {
+  const t = mtNormalizar(texto);
+  if (!t) return null;
+  const hit = MT_OPERACIONES.find(([, , re]) => re.test(t));
+  return hit ? hit[0] : null;
+}
+
+// El vehículo de la flota trae el nombre en nombre_ruta ('AEROPUERTO') y el
+// código en ruta ('700'); el preoperacional la trae ya con nombre en ruta.
+function mtOperacionVehiculo(v) {
+  return mtOperacion(v && v.nombre_ruta) || mtOperacion(v && v.ruta);
+}
+
+// Los íconos los pone el JS porque la tarjeta cambia de significado con la
+// pestaña: el mismo recuadro mide alistamientos, correctivos o una ruta.
+const MT_ICONOS = {
+  bus: '<svg viewBox="0 0 20 20" fill="none"><path d="M3 13.5V9l1.8-4.2A1.5 1.5 0 016.2 4h7.6a1.5 1.5 0 011.4.8L17 9v4.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 13.5h14v1.9a.6.6 0 01-.6.6h-1.3a.6.6 0 01-.6-.6v-1.9M3 13.5v1.9c0 .3.3.6.6.6h1.3c.3 0 .6-.3.6-.6v-1.9" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11" r="1" fill="currentColor"/><circle cx="14" cy="11" r="1" fill="currentColor"/></svg>',
+  alerta: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2l7 12.3H3L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  reloj: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4.5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  llave: '<svg viewBox="0 0 20 20" fill="none"><path d="M12.5 3.6a3.9 3.9 0 00-5 5L4 12.1a1.4 1.4 0 102 2l3.5-3.5a3.9 3.9 0 005-5l-2 2-1.6-.4-.4-1.6 2-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.4 10.2l2.4 2.4 4.8-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  escudo: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2.8l5.4 2v4.6c0 3.3-2.2 6.3-5.4 7.3-3.2-1-5.4-4-5.4-7.3V4.8l5.4-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  pin: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 17.2s5.2-4.7 5.2-8.4A5.2 5.2 0 0010 3.6a5.2 5.2 0 00-5.2 5.2c0 3.7 5.2 8.4 5.2 8.4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="8.8" r="1.9" stroke="currentColor" stroke-width="1.4"/></svg>',
+};
+
 function mtMensajeError(err) {
   const m = String(err?.message || err || '');
   if (/permission denied|row-level security|policy/i.test(m)) {
@@ -119,6 +167,7 @@ Router.register('mantenimiento', {
     if (!this._bound) {
       document.getElementById('mt-search').addEventListener('input', () => this._pintar());
       document.getElementById('mt-estado').addEventListener('change', () => this._pintar());
+      document.getElementById('mt-ruta').addEventListener('change', () => this._pintar());
       document.getElementById('mt-desde').addEventListener('change', () => this._load());
       document.getElementById('mt-hasta').addEventListener('change', () => this._load());
       document.getElementById('mt-hoy').addEventListener('click', () => this._rango('hoy'));
@@ -161,6 +210,9 @@ Router.register('mantenimiento', {
     if (opciones.length) {
       sel.innerHTML = opciones.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
     }
+    // La ruta solo existe en las urbanas: el aeropuerto es una sola.
+    document.getElementById('mt-ruta-filtro').classList.toggle('hidden', tab !== 'preoperacionales');
+    if (tab !== 'preoperacionales') document.getElementById('mt-ruta').value = '';
     if (this._alistamientos) this._pintar();
   },
 
@@ -212,50 +264,192 @@ Router.register('mantenimiento', {
     this._pintarFaltantes();
   },
 
-  // Los KPI del día son del DÍA, no del rango que se esté mirando: son el
-  // semáforo de hoy, y cambiarlos al mover el filtro los volvería inútiles
-  // como alerta. El único que sigue al rango es el de mantenimientos, y por
-  // eso su etiqueta dice "del período".
-  _pintarKpis() {
-    const hoy = mtHoyISO();
-    const deHoy = (this._alistamientos || []).filter((a) => a.fecha === hoy);
-    document.getElementById('mt-kpi-hoy').textContent = deHoy.length;
-    document.getElementById('mt-kpi-novedad').textContent =
-      deHoy.filter((a) => a.estado === 'CON_NOVEDAD').length;
-    document.getElementById('mt-kpi-faltan').textContent = this._faltantes().length;
-    document.getElementById('mt-kpi-mant').textContent = (this._mantenimientos || []).length;
+  // ---- Dashboard ---------------------------------------------------------
+  // Los KPI siguen la PESTAÑA y el RANGO de fechas. Antes estaban clavados en
+  // "hoy" y en los alistamientos, así que no se movían con nada: tres
+  // pestañas que miden operaciones distintas mostraban el mismo número.
+  // El buscador, el estado y la ruta siguen filtrando solo la tabla: son otra
+  // pregunta ("dónde está este carro", no "cómo va la operación").
+
+  // El día en foco es el 'hasta' del filtro, no hoy: así el panel sigue al
+  // rango, y la etiqueta siempre dice de qué día está hablando.
+  _diaFoco() {
+    return document.getElementById('mt-hasta').value || mtHoyISO();
   },
 
-  // Vehículos vinculados que hoy no tienen alistamiento. Solo los vinculados:
-  // un vehículo retirado de la operación no tiene por qué alistarse, y
-  // contarlo inflaría la alerta hasta volverla ruido.
-  _faltantes() {
-    const hoy = mtHoyISO();
-    const alistadas = new Set((this._alistamientos || [])
-      .filter((a) => a.fecha === hoy)
-      .map((a) => String(a.placa || '').toUpperCase().trim()));
-    return (this._vehiculos || [])
-      .filter((v) => v.vinculado !== false)
-      .filter((v) => !alistadas.has(String(v.placa || '').toUpperCase().trim()))
+  _diaTexto() {
+    const h = this._diaFoco();
+    return h === mtHoyISO() ? 'hoy' : `el ${mtFecha(h)}`;
+  },
+
+  _periodoTexto() {
+    const d = document.getElementById('mt-desde').value;
+    if (d === this._diaFoco()) return this._diaTexto();
+    return `del ${mtFecha(d)} al ${mtFecha(this._diaFoco())}`;
+  },
+
+  // Vehículos vinculados de una operación: el universo contra el que se mide
+  // quién faltó. Devuelve null -- y no [] -- cuando la flota no se pudo leer,
+  // porque "faltan 0" sería una afirmación y lo que pasa es que no se sabe.
+  _flotaDe(op) {
+    if (!this._vehiculos || !this._vehiculos.length) return null;
+    return this._vehiculos.filter((v) => v.vinculado && mtOperacionVehiculo(v) === op);
+  },
+
+  // Cada operación reporta por su propio formulario.
+  _reportesDe(op) {
+    if (op === 'aeropuerto') return this._alistamientos || [];
+    return (this._preoperacionales || []).filter((p) => mtOperacion(p.ruta) === op);
+  },
+
+  _faltantes(op) {
+    const flota = this._flotaDe(op);
+    if (!flota) return null;
+    const dia = this._diaFoco();
+    const reportaron = new Set(this._reportesDe(op)
+      .filter((r) => r.fecha === dia)
+      .map((r) => mtNormalizar(r.placa)));
+    return flota
+      .filter((v) => !reportaron.has(mtNormalizar(v.placa)))
       .sort((a, b) => String(a.placa).localeCompare(String(b.placa), 'es'));
   },
 
+  _kpiRuta(op, nombre) {
+    const flota = this._flotaDe(op);
+    const hechos = this._reportesDe(op).filter((p) => p.fecha === this._diaFoco()).length;
+    return {
+      valor: flota ? `${hechos}/${flota.length}` : String(hechos),
+      label: `${nombre} ${this._diaTexto()}`,
+      tono: flota && hechos >= flota.length ? 'green' : 'amber',
+      icono: 'pin',
+    };
+  },
+
+  _kpis() {
+    const periodo = this._periodoTexto();
+
+    if (this._tab === 'mantenimientos') {
+      const ms = this._mantenimientos || [];
+      return [
+        { valor: ms.length, label: `Mantenimientos ${periodo}`, tono: 'green', icono: 'llave' },
+        { valor: ms.filter((m) => Number(m.tipo) === 1).length, label: 'Preventivos', tono: 'blue', icono: 'escudo' },
+        { valor: ms.filter((m) => Number(m.tipo) === 2).length, label: 'Correctivos', tono: 'red', icono: 'alerta' },
+        { valor: new Set(ms.map((m) => mtNormalizar(m.placa))).size, label: 'Vehículos intervenidos', tono: 'amber', icono: 'bus' },
+      ];
+    }
+
+    if (this._tab === 'preoperacionales') {
+      // Las urbanas son dos rutas con su propia flota, así que van separadas:
+      // "20 preoperacionales" no dice si Zamora reportó y Aranjuez no.
+      const ps = this._preoperacionales || [];
+      const graves = ps.filter((p) => p.estado_general === 'ALERTA' || p.estado_general === 'CRITICO').length;
+      return [
+        { valor: ps.length, label: `Preoperacionales ${periodo}`, tono: 'blue', icono: 'bus' },
+        this._kpiRuta('zamora', 'Zamora'),
+        this._kpiRuta('aranjuez', 'Aranjuez'),
+        { valor: graves, label: `Con alerta o crítico ${periodo}`, tono: 'red', icono: 'alerta' },
+      ];
+    }
+
+    const as = this._alistamientos || [];
+    const flota = this._flotaDe('aeropuerto');
+    const faltan = this._faltantes('aeropuerto');
+    const tarjetas = [
+      { valor: as.length, label: `Alistamientos ${periodo}`, tono: 'blue', icono: 'bus' },
+      { valor: as.filter((a) => a.estado === 'CON_NOVEDAD').length, label: `Con novedad ${periodo}`, tono: 'red', icono: 'alerta' },
+      {
+        valor: faltan ? faltan.length : '—',
+        label: faltan
+          ? `Sin alistar ${this._diaTexto()} · de ${flota.length} del aeropuerto`
+          : 'Sin alistar: no se pudo leer la flota',
+        tono: 'amber',
+        icono: 'reloj',
+      },
+    ];
+    if (faltan && flota.length) {
+      const cobertura = Math.round(((flota.length - faltan.length) / flota.length) * 100);
+      tarjetas.push({ valor: `${cobertura}%`, label: `Cobertura del aeropuerto ${this._diaTexto()}`, tono: 'green', icono: 'check' });
+    }
+    return tarjetas;
+  },
+
+  _pintarKpis() {
+    const tarjetas = this._kpis();
+    for (let i = 1; i <= 4; i++) {
+      const caja = document.getElementById(`mt-kpi-${i}`);
+      const k = tarjetas[i - 1];
+      caja.classList.toggle('hidden', !k);
+      if (!k) continue;
+      const icono = document.getElementById(`mt-kpi-${i}-icono`);
+      icono.dataset.tone = k.tono;
+      icono.innerHTML = MT_ICONOS[k.icono] || MT_ICONOS.bus;
+      document.getElementById(`mt-kpi-${i}-valor`).textContent = k.valor;
+      document.getElementById(`mt-kpi-${i}-label`).textContent = k.label;
+    }
+  },
+
+  // El panel de "quién no reportó" también cambia con la pestaña, porque cada
+  // operación se mide contra su propio formulario. En mantenimientos no
+  // aplica -- un vehículo que no entró al taller no está en falta -- y por eso
+  // ahí el panel desaparece en vez de mostrar una cuenta que no significa nada.
   _pintarFaltantes() {
-    const faltan = this._faltantes();
-    document.getElementById('mt-faltantes-titulo').textContent =
-      faltan.length ? `${faltan.length} vehículo(s) sin alistamiento hoy` : 'Todos los vehículos vinculados alistaron hoy';
+    const detalle = document.getElementById('mt-faltantes-detalle');
+    const ops = this._tab === 'alistamientos'
+      ? [['aeropuerto', 'Aeropuerto']]
+      : this._tab === 'preoperacionales'
+        ? [['zamora', 'Zamora'], ['aranjuez', 'Aranjuez - Guadalupe']]
+        : [];
+    detalle.classList.toggle('hidden', !ops.length);
+    if (!ops.length) return;
+
+    const titulo = document.getElementById('mt-faltantes-titulo');
     const lista = document.getElementById('mt-faltantes-lista');
-    if (!faltan.length) {
-      lista.innerHTML = '<p class="empty-note">Nada pendiente.</p>';
+
+    // Si la consulta de preoperacionales falló, TODOS saldrían como faltantes.
+    // Decir "faltan 54" cuando lo que pasa es que no se pudo leer sería la
+    // peor versión de esta pantalla.
+    if (this._tab === 'preoperacionales' && this._errorPreop) {
+      titulo.textContent = 'No se puede saber quién falta';
+      lista.innerHTML = `<p class="empty-note">${mtEsc(mtMensajeError(this._errorPreop))}</p>`;
       return;
     }
-    lista.innerHTML = faltan.map((v) => `
-      <div class="detalle-list-item">
-        <span class="lc-item-texto">
-          <span class="detalle-list-item-main">${mtEsc(v.placa)}</span>
-          <span class="detalle-list-item-sub">${mtEsc(v.numero_interno ? `Interno ${v.numero_interno}` : 'Sin interno')}${v.ruta ? ` · Ruta ${mtEsc(v.ruta)}` : ''}</span>
-        </span>
-      </div>`).join('');
+
+    const grupos = ops.map(([op, nombre]) => ({
+      nombre,
+      flota: this._flotaDe(op),
+      faltan: this._faltantes(op),
+    }));
+    const sinFlota = grupos.some((g) => !g.faltan);
+    const total = grupos.reduce((n, g) => n + (g.faltan ? g.faltan.length : 0), 0);
+    titulo.textContent = sinFlota
+      ? 'No se pudo leer la flota para saber quién falta'
+      : total
+        ? `${total} vehículo(s) sin reportar ${this._diaTexto()}`
+        : `Todos reportaron ${this._diaTexto()}`;
+
+    lista.innerHTML = grupos.map((g) => {
+      if (!g.faltan) {
+        return `<p class="empty-note">${mtEsc(g.nombre)}: no se pudo leer la flota, así que no se puede decir quién falta.</p>`;
+      }
+      if (!g.faltan.length) {
+        return `<p class="muted" style="margin:0 0 .6rem"><strong>${mtEsc(g.nombre)}</strong> · los ${g.flota.length} vinculados reportaron.</p>`;
+      }
+      return `<p class="muted" style="margin:0 0 .4rem"><strong>${mtEsc(g.nombre)}</strong> · ${g.faltan.length} de ${g.flota.length} vinculados sin reportar</p>
+        <div class="detalle-list" style="margin-bottom:1rem">${g.faltan.map((v) => `
+          <div class="detalle-list-item">
+            <span class="lc-item-texto">
+              <span class="detalle-list-item-main">${mtEsc(v.placa)}</span>
+              <span class="detalle-list-item-sub">${mtEsc(v.interno ? `Interno ${v.interno}` : 'Sin interno')}${v.nombre_ruta ? ` · ${mtEsc(v.nombre_ruta)}` : ''}</span>
+            </span>
+          </div>`).join('')}</div>`;
+    }).join('');
+
+    // Los de terminal no reportan por ninguno de los dos formularios y por eso
+    // no se cuentan en ningún lado. Decirlo evita que parezca que se perdieron.
+    const otros = (this._vehiculos || []).filter((v) => v.vinculado && !mtOperacionVehiculo(v)).length;
+    if (otros) {
+      lista.innerHTML += `<p class="empty-note">No se cuentan ${otros} vehículo(s) vinculado(s) de otras rutas (terminal): no reportan por estos formularios.</p>`;
+    }
   },
 
   _pintarAlistamientos() {
@@ -319,9 +513,11 @@ Router.register('mantenimiento', {
 
   _pintarPreoperacionales() {
     const estado = document.getElementById('mt-estado').value;
+    const ruta = document.getElementById('mt-ruta').value;
     let filas = this._filtrados(this._preoperacionales || [],
       ['placa', 'ruta', 'interno', 'conductor_nombre', 'conductor_cedula']);
     if (estado) filas = filas.filter((p) => p.estado_general === estado);
+    if (ruta) filas = filas.filter((p) => mtOperacion(p.ruta) === ruta);
 
     const total = (this._preoperacionales || []).length;
     document.getElementById('mt-contador').textContent =
