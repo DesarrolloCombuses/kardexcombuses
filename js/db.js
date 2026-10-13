@@ -1648,6 +1648,26 @@ const DB = {
     return data;
   },
 
+  // Estadística de procesos disciplinarios: solo conteos, por RPC y no
+  // consultando la tabla. El módulo está en marcha blanca, así que leerla
+  // directo le devolvería cero filas a Gestión Humana y a SST, y un tablero
+  // en cero se lee como "no hubo procesos" en vez de "no puedes ver esto".
+  // La función exige su propio permiso y no devuelve ningún nombre
+  // (ver sql/procesos_disciplinarios_estadistica_2026-10-13.sql).
+  //
+  // Vuelve como filas {dimension, etiqueta, total}; acá se arma el mapa
+  // { dimension: [{label, count}] } que es lo que las gráficas esperan.
+  async getEstadisticaProcesosDisciplinarios(desde, hasta) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_pd_estadistica', { p_desde: desde || null, p_hasta: hasta || null });
+    if (error) throw error;
+    const por = {};
+    (data || []).forEach((f) => {
+      (por[f.dimension] = por[f.dimension] || []).push({ label: f.etiqueta, count: Number(f.total) });
+    });
+    return por;
+  },
+
   // La fila cruda de la hoja, solo cuando se abre una ficha.
   async getOrigenProceso(id) {
     const { data, error } = await window.supabaseClient

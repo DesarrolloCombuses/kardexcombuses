@@ -33,6 +33,11 @@ const GRUPO_EXTRA_VIEWS = {
     'aspirantes', 'empleados',
     'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion',
     'actividades',
+    // Los dos tableros de estadistica disciplinaria SI los ve Gestion
+    // Humana, aunque el modulo de expedientes siga en marcha blanca: lo que
+    // muestran son conteos, sin un solo nombre. El servidor piensa igual
+    // (kardex_pd_estadistica_puede_ver), no es solo un enlace visible.
+    'procesos-disciplinarios-gh', 'procesos-disciplinarios-historico',
   ],
 };
 

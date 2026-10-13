@@ -49,8 +49,14 @@ const SECCIONES_PERMISOS = [
     { key: 'alertas-vencimientos', label: 'Alertas de vencimientos' },
     { key: 'mantenimiento', label: 'Seguridad vial (alistamientos y preoperacionales)' },
   ] },
-  { titulo: 'Seguridad y salud', modulos: [
+  // El perfil sociodemografico tambien se entra desde este menu, pero NO se
+  // lista aca: es la misma vista que ya esta arriba en Personal, asi que el
+  // permiso es uno solo ('personal-perfil'). Dos casillas para la misma
+  // pantalla solo servirian para dejarlas en desacuerdo.
+  { titulo: 'Informes de Gestión Humana y SST', modulos: [
     { key: 'informe-gestion', label: 'Informe de gestion (indicadores SG-SST y PESV)' },
+    { key: 'procesos-disciplinarios-gh', label: 'Procesos disciplinarios gestion humana (solo totales)' },
+    { key: 'procesos-disciplinarios-historico', label: 'Procesos disciplinarios historico (solo totales)' },
   ] },
   { titulo: 'Contabilidad', modulos: [
     { key: 'fondo-siniestros', label: 'Fondo de reposición' },
