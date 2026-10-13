@@ -19,6 +19,27 @@ function acFormatFecha(fechaIso) {
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd)).toLocaleDateString('es-CO');
 }
 
+// Las fotos de la actividad usan el mismo permiso que la actividad: quien
+// puede agregarle registros puede subirle fotos. Gestión humana también, igual
+// que en las policies.
+function acPuede(accion) {
+  if (window.APP_ROLE === 'admin') return true;
+  if (window.APP_GRUPO === 'GESTION HUMANA') return true;
+  const p = (window.APP_PERMISOS_MODULOS || {}).actividades;
+  return !!(p && p[accion]);
+}
+
+function acMensajeFotos(err) {
+  const m = String(err?.message || err || '');
+  if (/relation .* does not exist|PGRST205|bucket/i.test(m)) {
+    return 'Falta crear la galería en la base de datos: corre sql/actividades_fotos_2026-10-13.sql.';
+  }
+  if (/permission denied|row-level security|policy|Unauthorized/i.test(m)) {
+    return 'Tu cuenta no tiene permiso para subir fotos a las actividades.';
+  }
+  return m || 'No se pudo completar.';
+}
+
 Router.register('actividades', {
   title: 'Actividades',
 
@@ -105,6 +126,18 @@ Router.register('actividades', {
       </div>
 
       <div class="modal-section">
+        <h3 class="modal-section-title">Fotos de la actividad</h3>
+        <p class="muted">Las del evento: el almuerzo, la capacitación, la entrega. La foto de cada persona que recibe algo va con su firma, más abajo.</p>
+        <label class="file-picker" for="ac-galeria-input" id="ac-galeria-picker">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M3.5 14.5V5.5a1 1 0 011-1h11a1 1 0 011 1v9a1 1 0 01-1 1h-11a1 1 0 01-1-1z" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 12.5l3.2-3a1 1 0 011.3 0l3 2.8M12 10.6l1.4-1.2a1 1 0 011.3 0l1.8 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12.6" cy="7.6" r="1.1" stroke="currentColor" stroke-width="1.3"/></svg>
+          Agregar fotos
+        </label>
+        <input type="file" id="ac-galeria-input" accept="image/*" multiple class="hidden" />
+        <p id="ac-galeria-msg" class="form-msg"></p>
+        <div id="ac-galeria" class="ac-collage"></div>
+      </div>
+
+      <div class="modal-section">
         <h3 class="modal-section-title">Registrar entrega</h3>
         <form id="ac-registro-form" class="form">
           <label>Empleado que recibe
@@ -151,8 +184,111 @@ Router.register('actividades', {
 
     this._setupEmpleadoCombobox();
     document.getElementById('ac-registro-form').addEventListener('submit', (e) => this._registrar(e));
+    document.getElementById('ac-galeria-input').addEventListener('change', (e) => this._subirFotos(e));
+    document.getElementById('ac-galeria-picker').classList.toggle('hidden', !acPuede('agregar'));
 
-    await this._cargarRegistros();
+    await Promise.all([this._cargarRegistros(), this._cargarGaleria()]);
+  },
+
+  // ---- Galería de la actividad -------------------------------------------
+  async _cargarGaleria() {
+    const caja = document.getElementById('ac-galeria');
+    if (!caja) return;
+    try {
+      const fotos = await DB.getFotosActividad(this._actividadAbierta.id);
+      this._fotos = fotos;
+      if (!fotos.length) {
+        caja.innerHTML = '<p class="empty-note">Esta actividad todavía no tiene fotos.</p>';
+        return;
+      }
+      // Las URL se piden todas de una: el bucket es privado y cada foto
+      // necesita su enlace firmado, que además expira.
+      const urls = await DB.getSignedUrls('actividades-fotos', fotos.map((f) => f.storage_path));
+      caja.innerHTML = fotos.map((f, i) => `
+        <figure class="ac-foto">
+          <img src="${urls[f.storage_path] || ''}" alt="${acEscapeHtml(f.descripcion || `Foto ${i + 1} de la actividad`)}"
+               loading="lazy" data-ver="${f.id}" />
+          ${acPuede('borrar') ? `<button type="button" class="ac-foto-quitar" data-quitar="${f.id}" title="Quitar esta foto">×</button>` : ''}
+          ${f.descripcion ? `<figcaption>${acEscapeHtml(f.descripcion)}</figcaption>` : ''}
+        </figure>`).join('');
+
+      caja.querySelectorAll('[data-ver]').forEach((img) => {
+        img.addEventListener('click', () => this._verFoto(img.src, img.alt));
+      });
+      caja.querySelectorAll('[data-quitar]').forEach((b) => {
+        b.addEventListener('click', () => this._quitarFoto(b.dataset.quitar));
+      });
+    } catch (err) {
+      caja.innerHTML = `<p class="empty-note">${acEscapeHtml(acMensajeFotos(err))}</p>`;
+    }
+  },
+
+  // De a una y en orden, no todas en paralelo: si la quinta falla, las cuatro
+  // que ya subieron quedan guardadas y el mensaje dice exactamente cuántas
+  // entraron. Subirlas en lote obligaría a volver a escogerlas todas.
+  async _subirFotos(e) {
+    const archivos = [...(e.target.files || [])];
+    e.target.value = '';
+    if (!archivos.length) return;
+    const msg = document.getElementById('ac-galeria-msg');
+    const base = (this._fotos || []).length;
+    let subidas = 0;
+    Loading.show(`Subiendo 1 de ${archivos.length}…`);
+    try {
+      for (const file of archivos) {
+        Loading.show(`Subiendo ${subidas + 1} de ${archivos.length}…`);
+        await DB.subirFotoActividad({
+          actividadId: this._actividadAbierta.id,
+          file,
+          orden: base + subidas,
+        });
+        subidas += 1;
+      }
+      msg.textContent = `${subidas} foto(s) agregada(s).`;
+      msg.className = 'form-msg success';
+    } catch (err) {
+      msg.textContent = subidas
+        ? `Se subieron ${subidas} de ${archivos.length}. La siguiente falló: ${acMensajeFotos(err)}`
+        : acMensajeFotos(err);
+      msg.className = 'form-msg error';
+    } finally {
+      Loading.hide();
+      await this._cargarGaleria();
+    }
+  },
+
+  async _quitarFoto(id) {
+    if (!confirm('¿Quitar esta foto de la actividad?')) return;
+    Loading.show('Quitando…');
+    try {
+      await DB.borrarFotoActividad(id);
+      await this._cargarGaleria();
+    } catch (err) {
+      const msg = document.getElementById('ac-galeria-msg');
+      msg.textContent = acMensajeFotos(err);
+      msg.className = 'form-msg error';
+    } finally {
+      Loading.hide();
+    }
+  },
+
+  // Visor a pantalla completa. Va pegado al body y no dentro del modal porque
+  // el modal tiene su propio scroll y recorte: la foto quedaría encajonada.
+  _verFoto(src, alt) {
+    const previo = document.getElementById('ac-lightbox');
+    if (previo) previo.remove();
+    const caja = document.createElement('div');
+    caja.id = 'ac-lightbox';
+    caja.className = 'ac-lightbox';
+    caja.innerHTML = `<img src="${src}" alt="${acEscapeHtml(alt || '')}" /><button type="button" class="ac-lightbox-cerrar" aria-label="Cerrar">×</button>`;
+    const cerrar = () => {
+      caja.remove();
+      document.removeEventListener('keydown', alTeclear);
+    };
+    const alTeclear = (ev) => { if (ev.key === 'Escape') cerrar(); };
+    caja.addEventListener('click', cerrar);
+    document.addEventListener('keydown', alTeclear);
+    document.body.appendChild(caja);
   },
 
   _setupEmpleadoCombobox() {

@@ -1671,3 +1671,49 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 .bar-fill.ig-ok { background: linear-gradient(90deg, #0f8a4f, #6be3a0); box-shadow: 0 0 10px rgba(15, 138, 79, 0.45); }
 .bar-fill.ig-limite { background: linear-gradient(90deg, #b45309, #fbbf24); box-shadow: 0 0 10px rgba(180, 83, 9, 0.35); }
 .bar-fill.ig-mal { background: linear-gradient(90deg, #b91c1c, #f87171); box-shadow: 0 0 10px rgba(185, 28, 28, 0.35); }
+
+/* =====================================================================
+   Galeria de la actividad -- collage de fotos del evento
+   ===================================================================== */
+.ac-collage {
+  display: grid; gap: 0.6rem; margin-top: 0.8rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.ac-foto { position: relative; margin: 0; }
+.ac-foto img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block;
+  border-radius: var(--radius); border: 1px solid var(--slate-200);
+  cursor: zoom-in; background: var(--slate-100);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ac-foto img:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.ac-foto figcaption {
+  font-size: 0.72rem; color: var(--slate-500); margin-top: 0.3rem; line-height: 1.35;
+}
+/* La X de quitar: arriba a la derecha de su propia foto, no del collage. */
+.ac-foto-quitar {
+  position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0;
+  border-radius: 50%; border: none; background: rgba(15, 23, 42, 0.72); color: #fff;
+  font-size: 1rem; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.ac-foto-quitar:hover { background: #b91c1c; }
+
+.ac-lightbox {
+  position: fixed; inset: 0; z-index: 1200; display: flex;
+  align-items: center; justify-content: center; padding: 2rem;
+  background: rgba(15, 23, 42, 0.88); cursor: zoom-out;
+}
+.ac-lightbox img {
+  max-width: 100%; max-height: 100%; border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.ac-lightbox-cerrar {
+  position: absolute; top: 1rem; right: 1.25rem; width: 40px; height: 40px; padding: 0;
+  border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.15); color: #fff;
+  font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+@media (max-width: 600px) {
+  .ac-collage { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .ac-lightbox { padding: 1rem; }
+}

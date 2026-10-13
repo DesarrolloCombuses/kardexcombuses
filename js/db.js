@@ -1144,6 +1144,17 @@ const DB = {
     return path;
   },
 
+  // Varias de una sola llamada: una galería de 20 fotos haría 20 viajes de
+  // ida y vuelta pidiéndolas de a una. Devuelve un mapa ruta -> url.
+  async getSignedUrls(bucket, paths, expiresInSeconds = 3600) {
+    if (!paths || !paths.length) return {};
+    const { data, error } = await window.supabaseClient.storage
+      .from(bucket)
+      .createSignedUrls(paths, expiresInSeconds);
+    if (error) throw error;
+    return Object.fromEntries((data || []).map((d) => [d.path, d.signedUrl]));
+  },
+
   async getSignedUrl(bucket, path, expiresInSeconds = 3600) {
     if (!path) return null;
     const { data, error } = await window.supabaseClient.storage
@@ -1216,6 +1227,56 @@ const DB = {
         registrado_por_email: sessionData.session.user.email,
         registrado_por_nombre: nombreRegistrador,
       });
+    if (error) throw error;
+  },
+
+  // ---- Fotos de la actividad (galería) -----------------------------------
+  // Son las fotos DEL EVENTO, no la foto de cada receptor: esa sigue en
+  // kardex_actividad_registros con su firma, y es evidencia de entrega.
+  // Ver sql/actividades_fotos_2026-10-13.sql.
+  async getFotosActividad(actividadId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividad_fotos')
+      .select('*')
+      .eq('actividad_id', actividadId)
+      .order('orden')
+      .order('created_at');
+    if (error) throw error;
+    return data;
+  },
+
+  // Sube una sola foto y guarda su fila. Van de a una y no todas en un lote
+  // porque si la quinta falla, las cuatro que ya subieron tienen que quedar
+  // guardadas: perderlas obligaría a volver a escogerlas todas.
+  async subirFotoActividad({ actividadId, file, descripcion, orden }) {
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const nombre = await this.getMyDisplayName();
+    const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = await this.uploadToBucket('actividades-fotos', file, extension, actividadId);
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividad_fotos')
+      .insert({
+        actividad_id: actividadId,
+        storage_path: path,
+        descripcion: descripcion || null,
+        orden: orden || 0,
+        subido_por_email: sessionData.session.user.email,
+        subido_por_nombre: nombre,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  // Solo la fila; el archivo se queda en el bucket. Mismo criterio que las
+  // evidencias de los procesos: borrar el archivo no se puede deshacer, y la
+  // foto desaparece igual de la galería.
+  async borrarFotoActividad(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_actividad_fotos')
+      .delete()
+      .eq('id', id);
     if (error) throw error;
   },
 
