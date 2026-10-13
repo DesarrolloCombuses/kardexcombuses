@@ -33,3 +33,7 @@ personal.csv
 # cumplimiento interno). La estructura y el catalogo de indicadores si se
 # versionan: en sql/informe_gestion_*.sql.
 sql/import_ig_*.sql
+
+# Cualquier carga manual de datos reales (actividades, mediciones, perfiles):
+# nombres y cedulas de empleados no van a un repositorio publico.
+sql/import_*.sql
