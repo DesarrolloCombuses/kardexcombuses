@@ -93,27 +93,47 @@ function pdeSeparar(filas) {
 }
 
 // El pie de cada gráfica. Solo aparece cuando de verdad falta algo.
+//
+// Dice sobre cuántos procesos está hecho el cálculo y nada más. De dónde
+// salió el dato o por qué falta es asunto nuestro, no de quien lee el
+// tablero: lo único que necesita saber es que la gráfica no cubre el total.
 function pdeNotaCobertura(conDato, sinDato) {
   if (!sinDato) return '';
-  const total = conDato + sinDato;
-  const pct = Math.round((sinDato / total) * 100);
-  return `<p class="empty-note">Sobre ${conDato} de ${total} procesos.`
-    + ` Los otros ${sinDato} (${pct}%) llegaron sin este dato desde la hoja.</p>`;
+  return `<p class="empty-note">Calculado sobre ${conDato} de ${conDato + sinDato} procesos.</p>`;
+}
+
+// Esconde o muestra la tarjeta entera de una gráfica. Una gráfica sin un
+// solo dato no es información: es un hueco que hay que leer para descubrir
+// que no dice nada. Se esconde la tarjeta completa y vuelve sola el día que
+// haya algo que mostrar -- por eso se decide acá, con los datos en la mano,
+// y no borrando la gráfica del HTML.
+function pdeTarjeta(elId, visible) {
+  const el = document.getElementById(elId);
+  const tarjeta = el && el.closest('.panel-card');
+  if (tarjeta) tarjeta.classList.toggle('hidden', !visible);
+}
+
+// Y si las dos tarjetas de una fila quedaron escondidas, se esconde la fila:
+// si no, deja un espacio en blanco que parece que algo no cargó.
+function pdeAjustarFilas(vista) {
+  document.querySelectorAll(`[data-view="${vista}"] .stat-grid`).forEach((fila) => {
+    const tarjetas = [...fila.querySelectorAll('.panel-card')];
+    const visibles = tarjetas.filter((t) => !t.classList.contains('hidden'));
+    fila.classList.toggle('hidden', tarjetas.length > 0 && visibles.length === 0);
+    fila.classList.toggle('stat-grid--sola', visibles.length === 1);
+  });
 }
 
 function pdeBarras(elId, dist) {
   const el = document.getElementById(elId);
   if (!el) return;
-  if (!(dist || []).length) {
-    el.innerHTML = '<p class="empty-note">Sin procesos en este periodo.</p>';
-    return;
-  }
-  const { con, sin } = pdeSeparar(dist);
-  const nota = pdeNotaCobertura(con.reduce((s, d) => s + d.count, 0), sin);
+  const { con, sin } = pdeSeparar(dist || []);
+  pdeTarjeta(elId, con.length > 0);
   if (!con.length) {
-    el.innerHTML = '<p class="empty-note">Ningún proceso del periodo tiene este dato registrado.</p>' + nota;
+    el.innerHTML = '';
     return;
   }
+  const nota = pdeNotaCobertura(con.reduce((s, d) => s + d.count, 0), sin);
   const max = Math.max(...con.map((d) => d.count)) || 1;
   el.innerHTML = con.map((d) => `
     <div class="bar-row">
@@ -138,6 +158,7 @@ function pdeDonut(donutId, legendId, totalId, dist) {
   const { con, sin } = pdeSeparar(dist || []);
   const total = con.reduce((s, d) => s + d.count, 0);
   if (elTotal) elTotal.textContent = total;
+  pdeTarjeta(donutId, total > 0);
   // El porcentaje se calcula sobre los que SÍ tienen el dato. Repartir el
   // 100% incluyendo los que no lo tienen daría, por ejemplo, "Suspensión
   // 1.7%" cuando sobre los procesos con decisión registrada es el 13%.
@@ -145,9 +166,7 @@ function pdeDonut(donutId, legendId, totalId, dist) {
 
   if (!total) {
     donut.style.background = 'var(--slate-200)';
-    legend.innerHTML = sin
-      ? `<li class="empty-note">Ningún proceso del periodo tiene este dato registrado.</li><li>${nota}</li>`
-      : '<li class="empty-note">Sin procesos en este periodo.</li>';
+    legend.innerHTML = '';
     return;
   }
 
@@ -192,7 +211,7 @@ function pdeMensajeError(err) {
 // La vista. Se construye dos veces con distinto prefijo de ids y
 // distinto periodo de arranque; todo lo demás es idéntico.
 // ------------------------------------------------------------------
-function pdeCrearVista({ titulo, p, periodoInicial }) {
+function pdeCrearVista({ titulo, vista, p, periodoInicial }) {
   const id = (sufijo) => `${p}-${sufijo}`;
   const $ = (sufijo) => document.getElementById(id(sufijo));
 
@@ -273,6 +292,7 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
         .forEach((b) => pdeBarras(id(b), []));
       pdeDonut(id('donut-decision'), id('legend-decision'), id('donut-decision-total'), []);
       pdeDonut(id('donut-asistencia'), id('legend-asistencia'), id('donut-asistencia-total'), []);
+      pdeAjustarFilas(vista);
     },
 
     _pintar(datos) {
@@ -293,8 +313,10 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
       const totalProc = this._resumen(datos, 'procesos');
       $('kpi-tarde').textContent = tarde;
       $('kpi-tarde-label').textContent = (conFalta < totalProc)
-        ? `Llegadas tarde · solo ${conFalta} de ${totalProc} procesos tienen la falta registrada`
+        ? `Llegadas tarde · de ${conFalta} procesos con falta registrada`
         : 'Llegadas tarde (retardo o incumplir horario)';
+      const tarjetaTarde = $('kpi-tarde').closest('.card');
+      if (tarjetaTarde) tarjetaTarde.classList.toggle('hidden', conFalta === 0);
 
       // Los meses van en orden cronológico, no de mayor a menor: la gráfica
       // de evolución pierde todo su sentido si se reordena por tamaño.
@@ -317,18 +339,22 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
       pdeBarras(id('bars-responsable'), pdeMapear(datos.responsable));
       pdeBarras(id('bars-reincidencia'),
         pdeMapear(datos.reincidencia, { '4 o mas': '4 o más' }, PDE_ORDEN_REINCIDENCIA));
+
+      pdeAjustarFilas(vista);
     },
   };
 }
 
 Router.register('procesos-disciplinarios-gh', pdeCrearVista({
   titulo: 'Procesos disciplinarios gestión humana',
+  vista: 'procesos-disciplinarios-gh',
   p: 'pdg',
   periodoInicial: 'informe',
 }));
 
 Router.register('procesos-disciplinarios-historico', pdeCrearVista({
   titulo: 'Procesos disciplinarios histórico',
+  vista: 'procesos-disciplinarios-historico',
   p: 'pdh',
   periodoInicial: 'todo',
 }));

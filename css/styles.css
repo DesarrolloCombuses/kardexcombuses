@@ -601,6 +601,11 @@ a.card-link:hover { border-color: var(--blue-600); box-shadow: var(--shadow-md);
 }
 @media (max-width: 900px) { .stat-grid { grid-template-columns: 1fr; } }
 
+/* Una fila a la que se le escondió la gráfica vecina por no tener datos:
+   la que queda ocupa el ancho completo en vez de dejar un hueco que se lee
+   como que algo no cargó. */
+.stat-grid--sola { grid-template-columns: 1fr; }
+
 .chart-card { box-shadow: var(--shadow-md); }
 
 .bar-chart {
