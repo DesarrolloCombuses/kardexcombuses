@@ -117,14 +117,24 @@ function igResultadoAnual(ind, mediciones) {
     return { valor: Math.round((num / den) * 10000) / 100, medicion: ultima, modo: 'suma', num, den, periodos: ms.length };
   }
 
-  const prom = ms.reduce((s, m) => s + Number(m.valor), 0) / ms.length;
   const ultima = ms.reduce((a, b) => (b.periodo > a.periodo ? b : a));
+
+  // Un conteo se suma: doce meses con 2 actividades cada uno son 24 en el
+  // año, no 2. Promediar solo tiene sentido cuando el valor ya es una tasa o
+  // un porcentaje de algo.
+  if (ind.unidad === 'numero') {
+    const total = ms.reduce((s, m) => s + Number(m.valor), 0);
+    return { valor: total, medicion: ultima, modo: 'total', periodos: ms.length };
+  }
+
+  const prom = ms.reduce((s, m) => s + Number(m.valor), 0) / ms.length;
   return { valor: Math.round(prom * 100) / 100, medicion: ultima, modo: 'promedio', periodos: ms.length };
 }
 
 function igPeriodoTexto(ind, res) {
   if (!res) return '—';
   if (res.modo === 'suma') return `Suma de ${res.periodos} periodo(s)`;
+  if (res.modo === 'total') return `Total de ${res.periodos} periodo(s)`;
   if (res.modo === 'promedio') return `Promedio de ${res.periodos} periodo(s)`;
   const m = res.medicion;
   if (ind.frecuencia === 'anual') return 'Del año';
@@ -224,6 +234,7 @@ Router.register('informe-gestion', {
       ]);
       this._mediciones = mediciones;
       this._series = series;
+      await this._cargarCalculados();
       this._error = null;
       this._pintar();
     } catch (err) {
@@ -236,6 +247,38 @@ Router.register('informe-gestion', {
       });
     } finally {
       Loading.hide();
+    }
+  },
+
+  // Los indicadores que el ERP cuenta solo. Sus mediciones no se guardan en
+  // kardex_ig_mediciones: se arman en cada carga a partir de la fuente real,
+  // así nunca quedan desactualizadas respecto a lo que de verdad hay.
+  async _cargarCalculados() {
+    const calculados = (this._catalogo || []).filter((i) => i.fuente && i.fuente !== 'manual');
+    if (!calculados.length) return;
+    for (const ind of calculados) {
+      if (ind.fuente !== 'actividades') continue;
+      try {
+        const porMes = await DB.getActividadesPorMesGestion(this._anio);
+        porMes.forEach((fila) => {
+          this._mediciones.push({
+            id: `calc-${ind.id}-${fila.periodo}`,
+            indicador_id: ind.id,
+            anio: this._anio,
+            periodo: Number(fila.periodo),
+            numerador: null,
+            denominador: null,
+            valor: Number(fila.total),
+            acumulado: false,
+            calculado: true,
+            observacion: null,
+          });
+        });
+      } catch (err) {
+        // Que falle el conteo no puede tumbar el resto del informe: el
+        // indicador se queda sin medición y se ve como tal.
+        this._errorCalculado = err;
+      }
     }
   },
 
@@ -321,9 +364,11 @@ Router.register('informe-gestion', {
           <br><span class="muted">${igEsc(igPeriodoTexto(f.ind, f.res))}</span></td>
         <td><span class="tag ${f.estado.clase}">${f.estado.texto}</span>
           ${f.calificacion ? `<br><span class="muted">${f.calificacion.texto}</span>` : ''}</td>
-        <td>${puedeEditar
-          ? `<button type="button" class="btn-secondary" data-registrar="${f.ind.id}">Registrar</button>`
-          : ''}</td>
+        <td>${f.ind.fuente && f.ind.fuente !== 'manual'
+          ? '<span class="muted">Automático</span>'
+          : (puedeEditar
+            ? `<button type="button" class="btn-secondary" data-registrar="${f.ind.id}">Registrar</button>`
+            : '')}</td>
       </tr>`;
     }).join('');
 
@@ -592,7 +637,8 @@ Router.register('informe-gestion', {
   // ---- Registrar una medición --------------------------------------------
   _abrirForm(indicadorId) {
     const cat = this._catalogo || [];
-    const ind = cat.find((i) => i.id === indicadorId) || cat[0];
+    const manuales = cat.filter((i) => !i.fuente || i.fuente === 'manual');
+    const ind = manuales.find((i) => i.id === indicadorId) || manuales[0];
     if (!ind) return;
     const mes = new Date().getMonth() + 1;
     const periodoSugerido = ind.frecuencia === 'mensual' ? mes
@@ -604,7 +650,8 @@ Router.register('informe-gestion', {
         <form id="ig-form" class="form">
           <label>Indicador
             <select id="ig-f-indicador">
-              ${cat.map((i) => `<option value="${i.id}" ${i.id === ind.id ? 'selected' : ''}>${igEsc(IG_SISTEMAS[i.sistema])} · ${igEsc(i.nombre)}</option>`).join('')}
+              ${cat.filter((i) => !i.fuente || i.fuente === 'manual')
+                .map((i) => `<option value="${i.id}" ${i.id === ind.id ? 'selected' : ''}>${igEsc(IG_SISTEMAS[i.sistema])} · ${igEsc(i.nombre)}</option>`).join('')}
             </select>
           </label>
           <p class="muted" id="ig-f-ayuda"></p>

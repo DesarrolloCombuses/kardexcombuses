@@ -1938,6 +1938,18 @@ const DB = {
     if (error) throw error;
   },
 
+  // Cuántas actividades de bienestar hubo en cada mes del año. Va por RPC y no
+  // consultando kardex_actividades directo porque una cuenta puede tener el
+  // informe de gestión y no el módulo Actividades: por RLS vería cero, que se
+  // leería como "no se hizo ninguna" en vez de "no puedes ver eso". La función
+  // exige el permiso del informe y devuelve solo mes y total.
+  async getActividadesPorMesGestion(anio) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_ig_actividades_por_mes', { p_anio: anio });
+    if (error) throw error;
+    return data || [];
+  },
+
   // Los años que de verdad tienen algo cargado, para no ofrecer años vacíos.
   async getAniosGestion() {
     const { data, error } = await window.supabaseClient
