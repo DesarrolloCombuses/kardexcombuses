@@ -223,11 +223,11 @@ begin
   select 'cargo', coalesce(nullif(btrim(empleado_cargo), ''), 'Sin dato'), count(*)::bigint
     from filtrado group by 2
   union all
-  -- Responsable: la columna RESPONSABLE de la hoja. Es donde deberia estar
-  -- el area que lleva el proceso (SST, seguridad vial, gestion humana). Se
-  -- agrupa por lo que haya escrito, sin normalizar: normalizar a ciegas
-  -- escondería que la hoja viene con el dato disparejo, que es justo lo que
-  -- hay que ver primero.
+  -- Responsable: la columna RESPONSABLE de la hoja, que es donde deberia
+  -- estar el area que lleva el proceso (SST, seguridad vial, gestion
+  -- humana). Se reconocen las variantes de escritura de esas tres y se
+  -- agrupan bajo un solo nombre, para que "GESTION HUMANA" y "Gestion
+  -- Humana" no salgan como dos barras distintas.
   select 'responsable',
          case
            when nullif(btrim(coalesce(responsable, '')), '') is null then 'Sin dato'
