@@ -139,6 +139,26 @@ function igUnidad(ind, v) {
   return ind.unidad === 'porcentaje' ? `${igNum(v)}%` : igNum(v, 2);
 }
 
+// Colores de los estados. Van acá y no en el CSS porque el conic-gradient de
+// la dona se arma en JS: la leyenda y los sectores tienen que salir del mismo
+// sitio o terminan diciendo cosas distintas.
+const IG_COLOR_ESTADO = {
+  cumple: '#0f8a4f',
+  limite: '#d97706',
+  no_cumple: '#dc2626',
+  sin_ref: '#64748b',
+  sin_dato: '#94a3b8',
+  informativo: '#2f6fed',
+};
+
+const IG_COLOR_NIVEL = {
+  Excelente: '#0f8a4f',
+  Sobresaliente: '#20b2aa',
+  Bueno: '#2f6fed',
+  Aceptable: '#d97706',
+  Inaceptable: '#dc2626',
+};
+
 function igPuede(accion) {
   if (window.APP_ROLE === 'admin') return true;
   const p = (window.APP_PERMISOS_MODULOS || {})['informe-gestion'];
@@ -246,6 +266,10 @@ Router.register('informe-gestion', {
     this._pintarTabla(filas);
     this._pintarBarras(filas);
     this._pintarEvolucion(filas);
+    this._pintarDonut(filas);
+    this._pintarNiveles(filas);
+    this._pintarPorSistema(filas);
+    this._pintarComparativo();
     this._pintarSeries();
   },
 
@@ -381,6 +405,147 @@ Router.register('informe-gestion', {
         <span class="bar-value">${igNum(m.valor, 0)}%</span>
       </div>`;
     }).join('');
+    requestAnimationFrame(() => {
+      el.querySelectorAll('.bar-fill').forEach((b) => { b.style.width = b.dataset.pct + '%'; });
+    });
+  },
+
+  // ---- Estadística del conjunto ------------------------------------------
+  // Cómo está repartido el sistema entre lo que cumple, lo que no, y lo que
+  // ni siquiera se puede juzgar. Esto último va aparte a propósito: un
+  // indicador sin medición no es un indicador que falle, y mezclarlos haría
+  // ver el sistema peor (o mejor) de lo que se sabe que está.
+  _pintarDonut(filas) {
+    const donut = document.getElementById('ig-donut');
+    const legend = document.getElementById('ig-donut-legend');
+    const total = document.getElementById('ig-donut-total');
+    if (!donut) return;
+    total.textContent = filas.length;
+
+    const grupos = [
+      ['cumple', 'Cumplen la meta'],
+      ['limite', 'En el límite'],
+      ['no_cumple', 'No cumplen'],
+      ['sin_ref', 'Sin año anterior'],
+      ['sin_dato', 'Sin medición'],
+      ['informativo', 'Informativos'],
+    ].map(([clave, texto]) => ({
+      clave, texto, n: filas.filter((f) => f.estado.clave === clave).length,
+    })).filter((g) => g.n);
+
+    if (!filas.length || !grupos.length) {
+      donut.style.background = 'var(--slate-200)';
+      legend.innerHTML = '<li class="empty-note">Sin indicadores para este filtro.</li>';
+      return;
+    }
+
+    let acc = 0;
+    const stops = [];
+    legend.innerHTML = grupos.map((g) => {
+      const color = IG_COLOR_ESTADO[g.clave];
+      const pct = (g.n / filas.length) * 100;
+      stops.push(`${color} ${acc}% ${acc + pct}%`);
+      acc += pct;
+      return `
+        <li>
+          <span class="dot" style="background:${color}"></span>
+          <span class="legend-label">${g.texto}</span>
+          <span class="legend-value">${g.n}</span>
+        </li>`;
+    }).join('');
+    donut.style.background = `conic-gradient(${stops.join(', ')})`;
+  },
+
+  // Cuántos indicadores caen en cada nivel de la escala del informe. Es otra
+  // lectura, no la misma: un indicador puede estar en "Sobresaliente" y aun
+  // así no alcanzar su meta, como el cumplimiento legal del 90% contra una
+  // meta del 95%.
+  _pintarNiveles(filas) {
+    const el = document.getElementById('ig-niveles');
+    if (!el) return;
+    const conNivel = filas.filter((f) => f.calificacion);
+    if (!conNivel.length) {
+      el.innerHTML = '<p class="empty-note">Todavía no hay indicadores con nivel de gestión calculado.</p>';
+      return;
+    }
+    const orden = ['Excelente', 'Sobresaliente', 'Bueno', 'Aceptable', 'Inaceptable'];
+    const datos = orden.map((nivel) => ({
+      nivel, n: conNivel.filter((f) => f.calificacion.texto === nivel).length,
+    }));
+    const max = Math.max(...datos.map((d) => d.n)) || 1;
+    el.innerHTML = datos.map((d, i) => `
+      <div class="ranked-row${d.n === max && d.n ? ' top-rank' : ''}">
+        <span class="ranked-rank">${i + 1}</span>
+        <div class="ranked-body">
+          <div class="ranked-top-row">
+            <span class="ranked-label">${d.nivel}</span>
+            <span class="ranked-value">${d.n}<span class="ranked-pct">${
+              conNivel.length ? Math.round((d.n / conNivel.length) * 100) : 0}%</span></span>
+          </div>
+          <span class="ranked-track"><span class="ranked-fill" data-pct="${(d.n / max) * 100}"
+            style="background:${IG_COLOR_NIVEL[d.nivel]}"></span></span>
+        </div>
+      </div>`).join('');
+    requestAnimationFrame(() => {
+      el.querySelectorAll('.ranked-fill').forEach((b) => { b.style.width = b.dataset.pct + '%'; });
+    });
+  },
+
+  // El índice de cada sistema por separado: un promedio de los 24 junto
+  // esconde que uno de los dos puede estar bastante peor que el otro.
+  _pintarPorSistema(filas) {
+    const caja = document.getElementById('ig-por-sistema');
+    if (!caja) return;
+    const indices = Object.keys(IG_SISTEMAS).map((sis) => {
+      const suyos = filas.filter((f) => f.ind.sistema === sis && f.res && igAplicaEscala(f.ind));
+      const valor = suyos.length
+        ? Math.round(suyos.reduce((s, f) => s + f.res.valor, 0) / suyos.length) : null;
+      return { sis, valor, n: suyos.length, cal: igCalificacion(valor) };
+    }).filter((x) => x.n);
+
+    caja.innerHTML = indices.length
+      ? indices.map((x) => `
+        <div class="ruta-kpi">
+          <div class="ruta-kpi-value" style="color:${x.cal ? IG_COLOR_NIVEL[x.cal.texto] : 'inherit'}">${x.valor}%</div>
+          <div class="ruta-kpi-label">${igEsc(IG_SISTEMAS[x.sis])} · ${x.cal ? x.cal.texto : ''}</div>
+        </div>`).join('')
+      : '<p class="empty-note">Sin indicadores medidos para calcular el índice.</p>';
+  },
+
+  // Lo que se reportó frente a lo que encontró la auditoría. Es el hallazgo
+  // del informe técnico y no se entiende con un solo número: hay que ver los
+  // dos al lado.
+  _pintarComparativo() {
+    const el = document.getElementById('ig-comparativo');
+    if (!el) return;
+    const dato = (grupo) => (this._series || []).filter((s) => s.grupo === grupo);
+    const auto = dato('pesv_autogestion');
+    const audi = dato('pesv_auditoria');
+    if (!auto.length && !audi.length) {
+      el.innerHTML = '<p class="empty-note">Sin resultados de autogestión ni de auditoría cargados para este año.</p>';
+      return;
+    }
+    const columna = (titulo, datos, colores) => {
+      const total = datos.reduce((s, d) => s + Number(d.valor), 0) || 1;
+      return `
+        <div>
+          <p class="muted" style="margin:0 0 .5rem"><strong>${igEsc(titulo)}</strong> · ${igNum(total, 0)} ítems</p>
+          <div class="bar-chart" style="max-height:none">
+            ${datos.map((d, i) => `
+              <div class="bar-row">
+                <span class="bar-label" title="${igEsc(d.etiqueta)}">${igEsc(d.etiqueta)}</span>
+                <span class="bar-track"><span class="bar-fill" data-pct="${(Number(d.valor) / total) * 100}"
+                  style="background:${colores[i % colores.length]}"></span></span>
+                <span class="bar-value">${igNum(d.valor, 0)}</span>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    };
+    el.innerHTML = `
+      <div class="stat-grid" style="margin:0">
+        ${auto.length ? columna('Reporte de autogestión', auto, ['#0f8a4f', '#dc2626', '#94a3b8']) : ''}
+        ${audi.length ? columna('Auditoría interna', audi, ['#0f8a4f', '#d97706', '#dc2626']) : ''}
+      </div>`;
     requestAnimationFrame(() => {
       el.querySelectorAll('.bar-fill').forEach((b) => { b.style.width = b.dataset.pct + '%'; });
     });

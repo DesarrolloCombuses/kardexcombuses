@@ -2406,6 +2406,39 @@
             <button type="button" id="ig-registrar">Registrar medición</button>
           </div>
 
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Cómo está el sistema</h2></div>
+              <div class="donut-wrap">
+                <div id="ig-donut" class="donut">
+                  <div class="donut-center">
+                    <span id="ig-donut-total">0</span>
+                    <small>indicadores</small>
+                  </div>
+                </div>
+                <ul id="ig-donut-legend" class="donut-legend"></ul>
+              </div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Nivel de gestión</h2></div>
+              <p class="muted">Escala del propio informe: inferior a 70% inaceptable, 70-79% aceptable, 80-89% bueno, 90-95% sobresaliente, superior a 95% excelente.</p>
+              <div id="ig-niveles" class="ranked-bars"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Índice por sistema</h2></div>
+              <p class="muted">Promedio de los indicadores de cumplimiento de cada sistema.</p>
+              <div class="ruta-kpis" id="ig-por-sistema"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading"><h2>Autogestión frente a auditoría</h2></div>
+              <p class="muted">Lo que se reportó y lo que encontró la auditoría interna, sobre el mismo PESV.</p>
+              <div id="ig-comparativo"></div>
+            </div>
+          </div>
+
           <div class="table-wrap">
             <table>
               <thead>
