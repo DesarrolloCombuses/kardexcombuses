@@ -42,6 +42,11 @@ const PDE_ORDEN_REINCIDENCIA = ['1 proceso', '2 procesos', '3 procesos', '4 o m�
 
 const PDE_MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
+// Las etiquetas que significan "nadie llenó esto". Van juntas porque las
+// tratan igual las barras y las donas: salen de la gráfica, pero NUNCA del
+// pie que dice sobre cuántos procesos está hecha.
+const PDE_SIN_DATO = ['Sin dato', 'Sin clasificar', 'Sin registrar', 'Sin decisión todavía'];
+
 function pdeEsc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -70,30 +75,53 @@ function pdeMapear(dist, diccionario, ordenFijo) {
       return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
     });
   } else {
-    const sinDato = filas.filter((f) => f.label === 'Sin dato' || f.label === 'Sin clasificar');
-    filas = filas.filter((f) => f.label !== 'Sin dato' && f.label !== 'Sin clasificar')
-      .sort((a, b) => b.count - a.count)
-      .concat(sinDato);
+    filas.sort((a, b) => b.count - a.count);
   }
   return filas;
+}
+
+// Separa lo que tiene dato de lo que no. La gráfica se dibuja solo con lo
+// primero -- una barra de "sin clasificar" con 365 de 418 procesos aplasta la
+// escala y deja las demás ilegibles --, y lo segundo se dice con palabras
+// debajo. Esconder la barra arregla la lectura; esconder que el dato falta
+// sería hacer pasar 53 procesos por 418.
+function pdeSeparar(filas) {
+  const con = filas.filter((f) => !PDE_SIN_DATO.includes(f.label));
+  const sin = filas.filter((f) => PDE_SIN_DATO.includes(f.label))
+    .reduce((s, f) => s + f.count, 0);
+  return { con, sin };
+}
+
+// El pie de cada gráfica. Solo aparece cuando de verdad falta algo.
+function pdeNotaCobertura(conDato, sinDato) {
+  if (!sinDato) return '';
+  const total = conDato + sinDato;
+  const pct = Math.round((sinDato / total) * 100);
+  return `<p class="empty-note">Sobre ${conDato} de ${total} procesos.`
+    + ` Los otros ${sinDato} (${pct}%) llegaron sin este dato desde la hoja.</p>`;
 }
 
 function pdeBarras(elId, dist) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const total = (dist || []).reduce((s, d) => s + d.count, 0);
-  if (!total) {
+  if (!(dist || []).length) {
     el.innerHTML = '<p class="empty-note">Sin procesos en este periodo.</p>';
     return;
   }
-  const max = Math.max(...dist.map((d) => d.count)) || 1;
-  el.innerHTML = dist.map((d) => `
+  const { con, sin } = pdeSeparar(dist);
+  const nota = pdeNotaCobertura(con.reduce((s, d) => s + d.count, 0), sin);
+  if (!con.length) {
+    el.innerHTML = '<p class="empty-note">Ningún proceso del periodo tiene este dato registrado.</p>' + nota;
+    return;
+  }
+  const max = Math.max(...con.map((d) => d.count)) || 1;
+  el.innerHTML = con.map((d) => `
     <div class="bar-row">
       <span class="bar-label" title="${pdeEsc(d.label)}">${pdeEsc(d.label)}</span>
       <span class="bar-track"><span class="bar-fill" data-pct="${(d.count / max) * 100}"></span></span>
       <span class="bar-value">${d.count}</span>
     </div>
-  `).join('');
+  `).join('') + nota;
   requestAnimationFrame(() => {
     el.querySelectorAll('.bar-fill').forEach((bar) => { bar.style.width = bar.dataset.pct + '%'; });
   });
@@ -105,23 +133,29 @@ function pdeDonut(donutId, legendId, totalId, dist) {
   const donut = document.getElementById(donutId);
   const legend = document.getElementById(legendId);
   if (!donut || !legend) return;
-  const total = (dist || []).reduce((s, d) => s + d.count, 0);
   const elTotal = document.getElementById(totalId);
+
+  const { con, sin } = pdeSeparar(dist || []);
+  const total = con.reduce((s, d) => s + d.count, 0);
   if (elTotal) elTotal.textContent = total;
+  // El porcentaje se calcula sobre los que SÍ tienen el dato. Repartir el
+  // 100% incluyendo los que no lo tienen daría, por ejemplo, "Suspensión
+  // 1.7%" cuando sobre los procesos con decisión registrada es el 13%.
+  const nota = pdeNotaCobertura(total, sin);
 
   if (!total) {
     donut.style.background = 'var(--slate-200)';
-    legend.innerHTML = '<li class="empty-note">Sin procesos en este periodo.</li>';
+    legend.innerHTML = sin
+      ? `<li class="empty-note">Ningún proceso del periodo tiene este dato registrado.</li><li>${nota}</li>`
+      : '<li class="empty-note">Sin procesos en este periodo.</li>';
     return;
   }
 
   let acc = 0;
-  let colorIdx = 0;
   const stops = [];
   const items = [];
-  dist.forEach((d) => {
-    const neutra = d.label === 'Sin registrar' || d.label === 'Sin decisión todavía';
-    const color = neutra ? '#c9d0db' : PDE_PALETA[colorIdx++ % PDE_PALETA.length];
+  con.forEach((d, i) => {
+    const color = PDE_PALETA[i % PDE_PALETA.length];
     const pct = (d.count / total) * 100;
     stops.push(`${color} ${acc}% ${acc + pct}%`);
     items.push(`
@@ -134,7 +168,7 @@ function pdeDonut(donutId, legendId, totalId, dist) {
     acc += pct;
   });
   donut.style.background = `conic-gradient(${stops.join(', ')})`;
-  legend.innerHTML = items.join('');
+  legend.innerHTML = items.join('') + (nota ? `<li>${nota}</li>` : '');
 }
 
 function pdeMensajeError(err) {
@@ -230,11 +264,12 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
 
     _vaciar() {
       ['kpi-procesos', 'kpi-personas', 'kpi-reincidentes', 'kpi-abiertos',
-        'kpi-suspensiones', 'kpi-terminaciones', 'kpi-dias'].forEach((k) => {
+        'kpi-suspensiones', 'kpi-terminaciones', 'kpi-dias', 'kpi-tarde'].forEach((k) => {
         const el = $(k);
         if (el) el.textContent = '—';
       });
-      ['bars-mes', 'bars-falta', 'bars-estado', 'bars-area', 'bars-ruta', 'bars-reincidencia']
+      ['bars-mes', 'bars-falta', 'bars-sancion', 'bars-estado', 'bars-area', 'bars-ruta',
+        'bars-cargo', 'bars-responsable', 'bars-reincidencia']
         .forEach((b) => pdeBarras(id(b), []));
       pdeDonut(id('donut-decision'), id('legend-decision'), id('donut-decision-total'), []);
       pdeDonut(id('donut-asistencia'), id('legend-asistencia'), id('donut-asistencia-total'), []);
@@ -249,6 +284,18 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
       $('kpi-terminaciones').textContent = this._resumen(datos, 'terminaciones');
       $('kpi-dias').textContent = this._resumen(datos, 'dias_suspension');
 
+      // Las llegadas tarde salen del campo "falta", que en la mayoría de los
+      // procesos importados viene vacío. El número solo, sin decir sobre
+      // cuántos está hecho, se leería como el total de llegadas tarde de la
+      // empresa -- y es el total de las que alguien alcanzó a clasificar.
+      const tarde = this._resumen(datos, 'llegadas_tarde');
+      const conFalta = this._resumen(datos, 'con_falta');
+      const totalProc = this._resumen(datos, 'procesos');
+      $('kpi-tarde').textContent = tarde;
+      $('kpi-tarde-label').textContent = (conFalta < totalProc)
+        ? `Llegadas tarde · solo ${conFalta} de ${totalProc} procesos tienen la falta registrada`
+        : 'Llegadas tarde (retardo o incumplir horario)';
+
       // Los meses van en orden cronológico, no de mayor a menor: la gráfica
       // de evolución pierde todo su sentido si se reordena por tamaño.
       const meses = (datos.mes || []).slice()
@@ -262,9 +309,12 @@ function pdeCrearVista({ titulo, p, periodoInicial }) {
         pdeMapear(datos.asistencia, PDE_ASISTENCIA));
 
       pdeBarras(id('bars-falta'), pdeMapear(datos.falta));
+      pdeBarras(id('bars-sancion'), pdeMapear(datos.sancion));
       pdeBarras(id('bars-estado'), pdeMapear(datos.estado, PDE_ESTADO, PDE_ORDEN_ESTADO));
       pdeBarras(id('bars-area'), pdeMapear(datos.area));
       pdeBarras(id('bars-ruta'), pdeMapear(datos.ruta));
+      pdeBarras(id('bars-cargo'), pdeMapear(datos.cargo));
+      pdeBarras(id('bars-responsable'), pdeMapear(datos.responsable));
       pdeBarras(id('bars-reincidencia'),
         pdeMapear(datos.reincidencia, { '4 o mas': '4 o más' }, PDE_ORDEN_REINCIDENCIA));
     },

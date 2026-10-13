@@ -23,10 +23,16 @@
 -- estadistica SIN abrir la marcha blanca del modulo -- los expedientes
 -- siguen cerrados.
 --
--- Se desglosa por mes, decision, falta, area, ruta, estado, asistencia a
--- descargos y reincidencia. NO por cargo ni por interno: hay cargos con una
--- sola persona, y un conteo de uno deja de ser una estadistica para ser un
--- senalamiento.
+-- Se desglosa por mes, decision, sancion, falta, area, ruta, cargo,
+-- responsable, estado, asistencia a descargos y reincidencia, y trae aparte
+-- el conteo de llegadas tarde (faltas 1 y 2 del Art. 108).
+--
+-- OJO CON DOS COLUMNAS QUE HOY ESTAN VACIAS: tipo_decision y falta_numero no
+-- los llena la importacion de la hoja -- esa hoja no trae esas columnas --, y
+-- como todavia no se ha creado ningun proceso desde el ERP, estan nulos en
+-- los 418. La grafica de tipo de decision se vera en gris hasta que se cierre
+-- un proceso desde el modulo. No es un error de la grafica: es que el dato no
+-- existe, y mostrarlo asi es preferible a inventarle una categoria.
 --
 -- Seguro de re-ejecutar.
 -- ============================================================================
@@ -176,6 +182,23 @@ begin
          ), 0)::bigint
     from filtrado
   union all
+  -- Llegadas tarde: faltas 1 y 2 del Art. 108 ("Retardo injustificado en el
+  -- inicio de labores" e "Incumplir con el horario laboral"), mas lo que
+  -- alguien haya escrito a mano como "llegada tarde". Se busca por texto
+  -- porque falta_numero esta nulo en todos: la hoja nunca trajo el numero de
+  -- la falta, solo su descripcion.
+  --
+  -- Este conteo vale lo que valga el campo falta, y hoy ese campo esta vacio
+  -- en la gran mayoria de los procesos. El tablero lo dice al lado del
+  -- numero; sin esa advertencia, un 3 se leeria como "hubo 3 llegadas tarde"
+  -- cuando lo que dice es "3 de los pocos procesos que tienen falta
+  -- registrada son por horario".
+  select 'resumen', 'llegadas_tarde', count(*)::bigint from filtrado
+   where falta ~* 'RETARDO|HORARIO LABORAL|LLEGADA[S]? TARDE'
+  union all
+  select 'resumen', 'con_falta', count(*)::bigint from filtrado
+   where nullif(btrim(coalesce(falta, '')), '') is not null
+  union all
   select 'mes', to_char(fecha_base, 'YYYY-MM'), count(*)::bigint
     from filtrado where fecha_base is not null group by 2
   union all
@@ -191,6 +214,59 @@ begin
     from filtrado group by 2
   union all
   select 'ruta', coalesce(nullif(btrim(empleado_ruta), ''), 'Sin dato'), count(*)::bigint
+    from filtrado group by 2
+  union all
+  -- Cargo: se habia dejado fuera por prudencia (hay cargos de una sola
+  -- persona y un conteo de uno senala a alguien). Se agrega porque se pidio
+  -- expresamente. Los cargos con uno o dos procesos hay que leerlos sabiendo
+  -- eso: no son una tendencia, son un caso.
+  select 'cargo', coalesce(nullif(btrim(empleado_cargo), ''), 'Sin dato'), count(*)::bigint
+    from filtrado group by 2
+  union all
+  -- Responsable: la columna RESPONSABLE de la hoja. Es donde deberia estar
+  -- el area que lleva el proceso (SST, seguridad vial, gestion humana). Se
+  -- agrupa por lo que haya escrito, sin normalizar: normalizar a ciegas
+  -- escondería que la hoja viene con el dato disparejo, que es justo lo que
+  -- hay que ver primero.
+  select 'responsable',
+         case
+           when nullif(btrim(coalesce(responsable, '')), '') is null then 'Sin dato'
+           -- 'VIAL' va primero: "SEGURIDAD VIAL" y "SEGURIDAD Y SALUD"
+           -- empiezan igual y se confundirian.
+           when upper(responsable) ~ 'VIAL' then 'Seguridad vial'
+           when upper(responsable) ~ '(^|[^A-Z])SST([^A-Z]|$)|SEGURIDAD Y SALUD' then 'SST'
+           when upper(responsable) ~ 'HUMANA|TALENTO|RRHH' then 'Gestion humana'
+           -- Lo que no cae en ninguna de las tres se deja TAL CUAL. Si la
+           -- hoja trae nombres de persona en vez de areas, se vera de una
+           -- en la grafica en vez de quedar todo en un "Otro" que no dice
+           -- nada ni deja arreglarlo.
+           else btrim(responsable)
+         end,
+         count(*)::bigint
+    from filtrado group by 2
+  union all
+  -- Que sancion se repite mas. tipo_decision esta vacio en todos los
+  -- procesos importados (la hoja no trae esa columna), asi que se arma con
+  -- lo mejor que haya, en este orden:
+  --   1) la decision, cuando el proceso se cerro desde el ERP;
+  --   2) los dias de suspension, que la hoja si trae;
+  --   3) la sancion que corresponde en primera vez segun el RIT.
+  -- La (3) no es lo que se aplico sino lo que correspondia, y por eso va de
+  -- ultima: solo se usa cuando no hay nada mejor.
+  select 'sancion',
+         case
+           when tipo_decision = 'suspension' then 'Suspension'
+           when tipo_decision = 'llamado' then 'Llamado de atencion'
+           when tipo_decision = 'terminacion' then 'Terminacion del contrato'
+           when tipo_decision = 'invitacion' then 'Invitacion formal'
+           when regexp_replace(coalesce(dias_suspension, ''), '[^0-9]', '', 'g') ~ '^[0-9]{1,3}$'
+             then 'Suspension de '
+                  || regexp_replace(dias_suspension, '[^0-9]', '', 'g') || ' dias'
+           when nullif(btrim(coalesce(sancion_primera, '')), '') is not null
+             then btrim(sancion_primera)
+           else 'Sin dato'
+         end,
+         count(*)::bigint
     from filtrado group by 2
   union all
   select 'asistencia', coalesce(nullif(btrim(asistencia), ''), 'sin_dato'), count(*)::bigint
