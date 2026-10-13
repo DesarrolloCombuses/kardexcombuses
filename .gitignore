@@ -20,3 +20,16 @@ _export_local/
 # Exports de BUK u otras fuentes externas con cedulas/nombres reales que el
 # usuario deja sueltos en la carpeta del proyecto para comparar -- nunca a git.
 personal.csv
+
+# Informes y plantillas en Word que el usuario deja en la carpeta del
+# proyecto para trabajarlos (auditorías, SG-SST, formatos de descargos).
+# Llevan datos de la empresa y nombres de personas, y este repositorio es
+# público: no se versionan acá.
+*.docx
+*.doc
+*.xlsx
+
+# Mediciones reales de los indicadores de gestion (accidentalidad, auditorias,
+# cumplimiento interno). La estructura y el catalogo de indicadores si se
+# versionan: en sql/informe_gestion_*.sql.
+sql/import_ig_*.sql

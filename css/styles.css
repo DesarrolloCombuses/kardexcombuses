@@ -1662,3 +1662,12 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
    falla de seguridad detectada antes de salir a ruta: en gris se lee como un
    estado más, y el punto de la pantalla es que salte a la vista. */
 .tag.novedad { background: var(--danger-bg); color: var(--danger-text); }
+
+/* =====================================================================
+   Informe de gestion -- la barra se pinta segun el estado del indicador
+   contra su meta, no segun su tamano. Un 100%% de un indicador que no
+   cumple (porque su meta es "menos es mejor") no puede verse verde.
+   ===================================================================== */
+.bar-fill.ig-ok { background: linear-gradient(90deg, #0f8a4f, #6be3a0); box-shadow: 0 0 10px rgba(15, 138, 79, 0.45); }
+.bar-fill.ig-limite { background: linear-gradient(90deg, #b45309, #fbbf24); box-shadow: 0 0 10px rgba(180, 83, 9, 0.35); }
+.bar-fill.ig-mal { background: linear-gradient(90deg, #b91c1c, #f87171); box-shadow: 0 0 10px rgba(185, 28, 28, 0.35); }

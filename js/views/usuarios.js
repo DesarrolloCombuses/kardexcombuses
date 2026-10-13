@@ -49,6 +49,9 @@ const SECCIONES_PERMISOS = [
     { key: 'alertas-vencimientos', label: 'Alertas de vencimientos' },
     { key: 'mantenimiento', label: 'Seguridad vial (alistamientos y preoperacionales)' },
   ] },
+  { titulo: 'Seguridad y salud', modulos: [
+    { key: 'informe-gestion', label: 'Informe de gestion (indicadores SG-SST y PESV)' },
+  ] },
   { titulo: 'Contabilidad', modulos: [
     { key: 'fondo-siniestros', label: 'Fondo de reposición' },
     { key: 'fondo-rendimientos', label: 'Rendimientos del fondo' },

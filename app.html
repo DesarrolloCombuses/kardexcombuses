@@ -208,6 +208,19 @@
 
         <details class="nav-group" open>
           <summary>
+            <span>Seguridad y salud</span>
+            <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </summary>
+          <div class="nav-group-items">
+            <a href="#/informe-gestion" data-nav="informe-gestion">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M4.5 16V9M8.8 16V4.5M13.2 16v-4.6M17 16H3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Informe de gestión
+            </a>
+          </div>
+        </details>
+
+        <details class="nav-group" open>
+          <summary>
             <span>Contabilidad</span>
             <svg class="nav-group-chevron" viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5l6 5.5-6 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </summary>
@@ -2335,6 +2348,105 @@
           </details>
         </section>
 
+
+        <!-- ================= INFORME DE GESTIÓN (SG-SST + PESV) ================= -->
+        <section data-view="informe-gestion" class="view">
+          <p class="view-intro">Indicadores del <strong>SG-SST</strong> (Resolución 0312 de 2019) y del <strong>PESV</strong> (Paso 20 de la Resolución 40595 de 2022). Se registra lo que se contó -- por ejemplo 21 capacitaciones de 28 programadas -- y el sistema calcula el porcentaje, lo compara con la meta y arma la estadística. El estado no se escribe a mano.</p>
+
+          <div class="cards">
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4.5 16V9M8.8 16V4.5M13.2 16v-4.6M17 16H3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ig-kpi-indice">—</div>
+                <div class="card-label" id="ig-kpi-indice-label">Índice de gestión</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="green">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.4 10.2l2.4 2.4 4.8-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ig-kpi-cumplen">—</div>
+                <div class="card-label" id="ig-kpi-cumplen-label">Cumplen la meta</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2l7 12.3H3L10 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.2M10 13.2v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ig-kpi-nocumplen">—</div>
+                <div class="card-label">No cumplen la meta</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.2v4.4M10 13.4v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ig-kpi-sinmedir">—</div>
+                <div class="card-label" id="ig-kpi-sinmedir-label">Sin medición cargada</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <label class="filtro-inline">Año
+              <select id="ig-anio"></select>
+            </label>
+            <label class="filtro-inline">Sistema
+              <select id="ig-sistema">
+                <option value="">Los dos</option>
+                <option value="sgsst">SG-SST</option>
+                <option value="pesv">PESV / Seguridad vial</option>
+              </select>
+            </label>
+            <button type="button" id="ig-registrar">Registrar medición</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Indicador</th><th>Sistema</th><th>Meta</th><th>Resultado</th><th>Estado</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="ig-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="stat-grid" style="margin-top:1.25rem">
+            <div class="panel-card chart-card">
+              <div class="section-heading">Cumplimiento por indicador</div>
+              <p class="muted">De peor a mejor. Verde cumple la meta, ámbar queda en el límite, rojo no la alcanza.</p>
+              <div id="ig-bars" class="bar-chart"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading" id="ig-evolucion-titulo">Evolución del periodo</div>
+              <p class="muted">Toca un indicador en la tabla para ver su evolución. Solo aparecen los periodos cargados uno por uno; un acumulado del año no se grafica como si fuera un mes.</p>
+              <div id="ig-evolucion" class="bar-chart"></div>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading">Participación por tema de capacitación</div>
+              <div id="ig-series-capacitacion" class="bar-chart"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading">Atenciones por especialidad</div>
+              <div id="ig-series-salud" class="bar-chart"></div>
+            </div>
+          </div>
+
+          <div class="panel-card chart-card" style="margin-bottom:1.25rem">
+            <div class="section-heading">Accidentalidad laboral</div>
+            <div class="ruta-kpis" id="ig-accidentalidad"></div>
+          </div>
+        </section>
+
         <!-- ================= CONTABILIDAD: FONDO DE REPOSICIÓN ================= -->
         <section data-view="fondo-siniestros" class="view">
           <p class="view-intro">Fondos de reposición que lleva contabilidad. Elige cuál ver arriba: cada uno tiene sus propios vehículos y su cuadro de resumen. La ruta se toma del parque automotor cruzando por el número interno.</p>
@@ -2771,6 +2883,7 @@
   <script src="js/hoja-procesos.js"></script>
   <script src="js/views/procesos-disciplinarios.js"></script>
   <script src="js/views/mantenimiento.js"></script>
+  <script src="js/views/informe-gestion.js"></script>
   <script src="js/views/usuarios.js"></script>
   <script src="js/views/inventario.js"></script>
   <script src="js/views/inventario-historico.js"></script>

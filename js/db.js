@@ -1806,6 +1806,86 @@ const DB = {
     if (error) throw error;
     return Array.isArray(data) ? data[0] : data;
   },
+
+  // ---- Informe de gestión (indicadores SG-SST y PESV) ---------------------
+  // El catálogo es chico (24 renglones) y no cambia de una consulta a otra, así
+  // que la vista lo pide una vez y lo reutiliza al cambiar de año.
+  async getIndicadoresGestion() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_ig_indicadores')
+      .select('*')
+      .eq('activo', true)
+      .order('sistema')
+      .order('orden');
+    if (error) throw error;
+    return data;
+  },
+
+  // Se traen dos años: el que se mira y el anterior, porque dos indicadores
+  // tienen como meta "no empeorar frente al año pasado" y sin ese dato no se
+  // pueden calificar.
+  async getMedicionesGestion(anio) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_ig_mediciones')
+      .select('*')
+      .in('anio', [anio, anio - 1])
+      .order('anio')
+      .order('periodo');
+    if (error) throw error;
+    return data;
+  },
+
+  async getSeriesGestion(anio) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_ig_series')
+      .select('*')
+      .eq('anio', anio)
+      .order('grupo')
+      .order('orden');
+    if (error) throw error;
+    return data;
+  },
+
+  // El valor y el estado NO viajan desde el navegador: el valor lo calcula el
+  // trigger a partir del numerador y el denominador, y el estado lo deriva la
+  // vista comparando con la meta. Acá solo va lo que alguien contó.
+  async guardarMedicionGestion(m) {
+    const fila = {
+      indicador_id: m.indicadorId,
+      anio: m.anio,
+      periodo: m.periodo,
+      numerador: m.numerador,
+      denominador: m.denominador,
+      acumulado: !!m.acumulado,
+      observacion: m.observacion || null,
+    };
+    if (m.numerador == null || m.denominador == null) fila.valor = m.valor;
+    const { data, error } = await window.supabaseClient
+      .from('kardex_ig_mediciones')
+      .upsert(fila, { onConflict: 'indicador_id,anio,periodo' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async borrarMedicionGestion(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_ig_mediciones')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // Los años que de verdad tienen algo cargado, para no ofrecer años vacíos.
+  async getAniosGestion() {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_ig_mediciones')
+      .select('anio')
+      .order('anio', { ascending: false });
+    if (error) throw error;
+    return [...new Set((data || []).map((d) => d.anio))];
+  },
 };
 
 // Todas las funciones async de esta capa pasan por acá para traducir
