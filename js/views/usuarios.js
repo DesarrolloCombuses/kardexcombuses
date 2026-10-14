@@ -26,9 +26,6 @@ const SECCIONES_PERMISOS = [
     { key: 'historial', label: 'Historial' },
     { key: 'facturas', label: 'Facturas' },
   ] },
-  { titulo: 'Actividades', modulos: [
-    { key: 'actividades', label: 'Registro y creación de actividades' },
-  ] },
   { titulo: 'Personal', modulos: [
     { key: 'aspirantes', label: 'Selección de personal' },
     { key: 'empleados', label: 'Empleados' },
@@ -55,6 +52,7 @@ const SECCIONES_PERMISOS = [
   // pantalla solo servirian para dejarlas en desacuerdo.
   { titulo: 'Informes de Gestión Humana y SST', modulos: [
     { key: 'informe-gestion', label: 'Informe de gestion (indicadores SG-SST y PESV)' },
+    { key: 'actividades', label: 'Actividades de bienestar (registro y fotos)' },
     { key: 'procesos-disciplinarios-gh', label: 'Procesos disciplinarios gestion humana (solo totales)' },
     { key: 'procesos-disciplinarios-historico', label: 'Procesos disciplinarios historico (solo totales)' },
   ] },

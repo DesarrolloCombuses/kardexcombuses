@@ -133,6 +133,7 @@ Router.register('actividades', {
           Agregar fotos
         </label>
         <input type="file" id="ac-galeria-input" accept="image/*" multiple class="hidden" />
+        <button type="button" class="btn-secondary hidden" id="ac-collage-btn">Armar collage</button>
         <p id="ac-galeria-msg" class="form-msg"></p>
         <div id="ac-galeria" class="ac-collage"></div>
       </div>
@@ -185,6 +186,7 @@ Router.register('actividades', {
     this._setupEmpleadoCombobox();
     document.getElementById('ac-registro-form').addEventListener('submit', (e) => this._registrar(e));
     document.getElementById('ac-galeria-input').addEventListener('change', (e) => this._subirFotos(e));
+    document.getElementById('ac-collage-btn').addEventListener('click', () => this._collage());
     document.getElementById('ac-galeria-picker').classList.toggle('hidden', !acPuede('agregar'));
 
     await Promise.all([this._cargarRegistros(), this._cargarGaleria()]);
@@ -197,6 +199,8 @@ Router.register('actividades', {
     try {
       const fotos = await DB.getFotosActividad(this._actividadAbierta.id);
       this._fotos = fotos;
+      const btnCollage = document.getElementById('ac-collage-btn');
+      if (btnCollage) btnCollage.classList.toggle('hidden', !fotos.length);
       if (!fotos.length) {
         caja.innerHTML = '<p class="empty-note">Esta actividad todavía no tiene fotos.</p>';
         return;
@@ -221,6 +225,121 @@ Router.register('actividades', {
     } catch (err) {
       caja.innerHTML = `<p class="empty-note">${acEscapeHtml(acMensajeFotos(err))}</p>`;
     }
+  },
+
+  // ---- Collage ----------------------------------------------------------
+
+  // Baja la foto y la reduce antes de meterla al collage. Dos razones:
+  //
+  // 1) Se incrusta como data URI y no con su enlace. El bucket es privado y
+  //    sus enlaces firmados expiran; una página con la URL adentro dejaría de
+  //    verse a las pocas horas. Además html2pdf no puede leer una imagen de
+  //    otro dominio sin CORS, y el PDF saldría con huecos en blanco.
+  // 2) Una foto de celular pesa varios MB. Veinte sin reducir hacen un PDF
+  //    que no se puede enviar por correo, que es justo para lo que se arma.
+  async _fotoReducida(url, maxLado = 1100) {
+    const blob = await (await fetch(url)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.round(bitmap.width * escala);
+    lienzo.height = Math.round(bitmap.height * escala);
+    lienzo.getContext('2d').drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
+    bitmap.close?.();
+    return lienzo.toDataURL('image/jpeg', 0.82);
+  },
+
+  async _collage() {
+    const fotos = this._fotos || [];
+    const msg = document.getElementById('ac-galeria-msg');
+    msg.className = 'form-msg';
+    if (!fotos.length) return;
+
+    // La ventana se abre ANTES del primer await: abrirla después de una
+    // operación lenta hace que el navegador la bloquee como emergente.
+    const ventana = window.open('', '_blank');
+    if (!ventana) {
+      msg.className = 'form-msg error';
+      msg.textContent = 'El navegador bloqueó la ventana del collage. Permite las ventanas emergentes de este sitio.';
+      return;
+    }
+    ventana.document.write('<p style="font:16px Arial;padding:24px">Armando el collage…</p>');
+
+    Loading.show('Armando el collage…');
+    const listas = [];
+    try {
+      const urls = await DB.getSignedUrls('actividades-fotos', fotos.map((f) => f.storage_path));
+      for (let i = 0; i < fotos.length; i++) {
+        Loading.show(`Armando el collage… ${i + 1} de ${fotos.length}`);
+        try {
+          listas.push({
+            src: await this._fotoReducida(urls[fotos[i].storage_path]),
+            pie: fotos[i].descripcion || '',
+          });
+        } catch (err) {
+          // Una foto que no se pudo leer no bota el collage entero: se
+          // omite y abajo se dice cuántas quedaron.
+        }
+      }
+    } catch (err) {
+      Loading.hide();
+      ventana.close();
+      msg.className = 'form-msg error';
+      msg.textContent = 'No se pudo armar el collage: ' + acMensajeFotos(err);
+      return;
+    }
+    Loading.hide();
+
+    if (!listas.length) {
+      ventana.close();
+      msg.className = 'form-msg error';
+      msg.textContent = 'No se pudo leer ninguna de las fotos.';
+      return;
+    }
+    msg.className = listas.length === fotos.length ? 'form-msg success' : 'form-msg error';
+    msg.textContent = listas.length === fotos.length
+      ? `Collage de ${listas.length} foto(s) listo.`
+      : `Collage con ${listas.length} de ${fotos.length} foto(s): las demás no se pudieron leer.`;
+
+    // Una sola foto va a toda la hoja; de dos en adelante, en rejilla. Tres
+    // columnas solo cuando hay muchas: con cuatro fotos deja cada una del
+    // tamaño de un sello, y con dos a una columna cada una se come una
+    // página entera.
+    const columnas = listas.length === 1 ? 1 : (listas.length <= 6 ? 2 : 3);
+    const act = this._actividadAbierta;
+    const estilos = `
+  .hoja { padding: 0.5in 0.55in; }
+  .cab { border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 16px; }
+  .cab h1 { font-size: 19px; margin: 0 0 4px; }
+  .cab .sub { font-size: 13px; color: #444; }
+  .rejilla { display: grid; grid-template-columns: repeat(${columnas}, 1fr); gap: 10px; }
+  .celda { break-inside: avoid; }
+  .celda img { width: 100%; height: auto; display: block; border: 1px solid #ccc; border-radius: 4px; }
+  .celda figcaption { font-size: 11px; color: #444; margin-top: 3px; }
+  .pie { margin-top: 18px; font-size: 11px; color: #555; border-top: 1px solid #ccc; padding-top: 8px; }
+`;
+    const cuerpoHtml = `
+      <div class="cab">
+        <h1>${acEscapeHtml(act.nombre)}</h1>
+        <div class="sub">${acFormatFecha(act.fecha)}${act.descripcion ? ' — ' + acEscapeHtml(act.descripcion) : ''}</div>
+      </div>
+      <div class="rejilla">
+        ${listas.map((f) => `
+          <figure class="celda">
+            <img src="${f.src}" alt="" />
+            ${f.pie ? `<figcaption>${acEscapeHtml(f.pie)}</figcaption>` : ''}
+          </figure>`).join('')}
+      </div>
+      <p class="pie">${listas.length} foto(s) — Combuses S.A.</p>`;
+
+    ventana.document.open();
+    ventana.document.write(paginaImprimible({
+      titulo: `Collage — ${act.nombre}`,
+      estilos,
+      cuerpoHtml,
+      archivo: `collage-${String(act.nombre).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.pdf`,
+    }));
+    ventana.document.close();
   },
 
   // De a una y en orden, no todas en paralelo: si la quinta falla, las cuatro
