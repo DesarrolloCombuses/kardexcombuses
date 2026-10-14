@@ -297,13 +297,27 @@ Router.register('procesos-disciplinarios', {
 
     lista.querySelectorAll('[data-detalle]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const p = this._procesos.find((x) => x.id === btn.dataset.detalle);
-        if (p) this._verDetalle(p);
+        this._abrirDetalle(btn.dataset.detalle);
       });
     });
   },
 
   // ---- Detalle y pasos ---------------------------------------------------
+
+  // El listado viene sin los campos largos (acta de descargos, normas,
+  // consideraciones…). Al abrir una ficha se pide el proceso completo: es
+  // una fila, se trae en nada, y evita que el listado cargue 435 actas que
+  // nadie va a leer.
+  async _abrirDetalle(id) {
+    Loading.show('Abriendo…');
+    try {
+      this._verDetalle(await DB.getProcesoDisciplinario(id));
+    } catch (err) {
+      alert('No se pudo abrir el proceso: ' + pdMensajeError(err));
+    } finally {
+      Loading.hide();
+    }
+  },
 
   _verDetalle(p) {
     const est = PD_ESTADOS[p.estado] || PD_ESTADOS.citacion;
@@ -643,7 +657,7 @@ Router.register('procesos-disciplinarios', {
     try {
       for (const file of files) await DB.subirPruebaProceso(p.id, file);
       await this._load();
-      this._verDetalle(this._procesos.find((x) => x.id === p.id));
+      await this._abrirDetalle(p.id);
     } catch (err) {
       alert('No se pudo subir: ' + pdMensajeError(err));
     } finally {
@@ -657,7 +671,7 @@ Router.register('procesos-disciplinarios', {
     try {
       await DB.borrarPruebaProceso(pruebaId);
       await this._load();
-      this._verDetalle(this._procesos.find((x) => x.id === p.id));
+      await this._abrirDetalle(p.id);
     } catch (err) {
       alert('No se pudo quitar: ' + pdMensajeError(err));
     } finally {
@@ -678,7 +692,7 @@ Router.register('procesos-disciplinarios', {
       await this._load();
       msg.textContent = 'Guardado.';
       msg.className = 'form-msg success';
-      this._verDetalle(this._procesos.find((x) => x.id === p.id));
+      await this._abrirDetalle(p.id);
     } catch (err) {
       msg.textContent = 'No se pudo guardar: ' + pdMensajeError(err);
       msg.className = 'form-msg error';
@@ -845,9 +859,22 @@ Router.register('procesos-disciplinarios', {
       await this._load();
       msg.textContent = editando ? 'Proceso actualizado.' : 'Proceso creado.';
       msg.className = 'form-msg success';
-      const guardado = (this._procesos || []).find((x) => x.id === id);
       // Al crear se abre la citación de una: el proceso existe para citar.
-      if (guardado && !editando) this._generarDocumento(guardado, 'citacion');
+      // Se pide completo porque el documento usa los campos largos, que el
+      // listado ya no trae.
+      //
+      // Va en su propio try: el proceso YA quedó guardado, y si falla traerlo
+      // para imprimir, el mensaje no puede decir "no se pudo guardar". Eso
+      // haría que alguien lo volviera a crear y quedara duplicado.
+      if (!editando && id) {
+        try {
+          this._generarDocumento(await DB.getProcesoDisciplinario(id), 'citacion');
+        } catch (err) {
+          msg.textContent = 'Proceso creado, pero no se pudo abrir la citación: '
+            + pdMensajeError(err) + ' Ábrela desde “Ver detalle”.';
+          msg.className = 'form-msg error';
+        }
+      }
     } catch (err) {
       msg.textContent = 'No se pudo guardar: ' + pdMensajeError(err);
       msg.className = 'form-msg error';

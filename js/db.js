@@ -1639,11 +1639,44 @@ const DB = {
     'created_at', 'updated_at',
   ].join(', '),
 
+  // Los campos largos que NO van en el listado. El acta de descargos es un
+  // cuestionario de varios parrafos por proceso; con 435 procesos, traerla
+  // para pintar una lista de nombre, fecha y estado son varios MB por cada
+  // vez que se abre el modulo. Se piden cuando se abre una ficha, que es
+  // cuando de verdad se leen.
+  //
+  // `motivo` sí se queda: el buscador de la lista busca por hechos.
+  _COLS_SOLO_FICHA: [
+    'acta_descargos', 'antecedentes', 'resumen_descargos', 'consideraciones',
+    'compromisos', 'normas', 'pruebas_texto',
+  ],
+
+  _colsLista() {
+    const pesados = new Set(this._COLS_SOLO_FICHA);
+    return this._COLS_PROCESO.split(', ').filter((c) => !pesados.has(c)).join(', ');
+  },
+
+  // El listado. De las pruebas solo se trae el id, que es lo unico que usa
+  // (el contador "N prueba(s)"); los nombres y las URL se piden al abrir.
+  // El join de firmas que habia aca no lo usaba ninguna pantalla.
   async getProcesosDisciplinarios() {
     const { data, error } = await window.supabaseClient
       .from('kardex_procesos_disciplinarios')
-      .select(`${this._COLS_PROCESO}, pruebas:kardex_procesos_disc_pruebas(id, archivo_url, archivo_nombre), firmas:kardex_procesos_disc_firmas(id, documento, estado, firmado_en, operador_email)`)
+      .select(`${this._colsLista()}, pruebas:kardex_procesos_disc_pruebas(id)`)
       .order('fecha_citacion', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Un proceso completo, para abrir su ficha, editarlo o imprimir su
+  // documento. No se cachea a proposito: se abre despues de guardar y una
+  // copia vieja mostraria lo que acaba de cambiar.
+  async getProcesoDisciplinario(id) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_procesos_disciplinarios')
+      .select(`${this._COLS_PROCESO}, pruebas:kardex_procesos_disc_pruebas(id, archivo_url, archivo_nombre)`)
+      .eq('id', id)
+      .single();
     if (error) throw error;
     return data;
   },
