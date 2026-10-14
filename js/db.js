@@ -1569,6 +1569,35 @@ const DB = {
     return data;
   },
 
+  // Marca (o desmarca) un informe como revisado. Va por RPC y no con un
+  // update porque la policy de update exige permiso de "editar", y revisar
+  // no es editar: quien revisa tiene que poder decir "ya lo vi" sin poder
+  // cambiarle los hechos a un documento que se firma. El correo del revisor
+  // lo pone el servidor con la sesión, no este código.
+  async marcarInformeRevisado(id, revisado, nombre) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_informes_disc_marcar_revisado', {
+        p_id: id,
+        p_revisado: revisado !== false,
+        p_nombre: nombre || null,
+      });
+    if (error) throw error;
+    return data;
+  },
+
+  // Para el contador del menú. Si falla (por ejemplo, porque todavía no se ha
+  // corrido el SQL) devuelve 0 en vez de reventar: un contador es un extra,
+  // y que no esté no puede impedir entrar a la aplicación.
+  async getInformesSinRevisar() {
+    try {
+      const { data, error } = await window.supabaseClient.rpc('kardex_informes_disc_sin_revisar');
+      if (error) throw error;
+      return Number(data) || 0;
+    } catch (err) {
+      return 0;
+    }
+  },
+
   // Sube primero las evidencias al bucket y después guarda todo de una sola
   // llamada -- el storage no se puede escribir desde plpgsql, así que las
   // rutas ya subidas se le pasan a la función como jsonb.

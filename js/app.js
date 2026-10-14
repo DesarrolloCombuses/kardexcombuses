@@ -87,6 +87,28 @@
     if (!group.querySelector('[data-nav]')) group.remove();
   });
 
+  // Contador de informes disciplinarios pendientes de revisar, al lado de su
+  // enlace del menú. Se expone global para que el propio módulo lo refresque
+  // al marcar uno como revisado, sin tener que recargar la página.
+  //
+  // Va DESPUÉS de armar el menú: si el enlace no está (esta cuenta no tiene
+  // el módulo), no hay nada que pintar y la consulta ni se hace.
+  window.actualizarPendientesInformes = async function () {
+    const enlace = document.querySelector('[data-nav="informes-disciplinarios"]');
+    if (!enlace) return;
+    const n = await DB.getInformesSinRevisar();
+    let globo = enlace.querySelector('.nav-badge');
+    if (!n) { if (globo) globo.remove(); return; }
+    if (!globo) {
+      globo = document.createElement('span');
+      globo.className = 'nav-badge';
+      enlace.appendChild(globo);
+    }
+    globo.textContent = n > 99 ? '99+' : String(n);
+    globo.title = `${n} informe(s) sin revisar`;
+  };
+  window.actualizarPendientesInformes();
+
   const sidebarToggle = document.getElementById('sidebar-toggle');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
   const closeSidebar = () => {

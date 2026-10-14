@@ -67,7 +67,11 @@ Router.register('informes-disciplinarios', {
       document.getElementById('dis-archivos-input').addEventListener('change', () => this._pintarArchivosElegidos());
       document.getElementById('dis-cancelar-edicion').addEventListener('click', () => this._salirDeEdicion());
       document.getElementById('dis-search').addEventListener('input', () => this._render());
-      ['dis-filtro-tipo', 'dis-filtro-desde', 'dis-filtro-hasta'].forEach((id) => {
+      document.getElementById('dis-card-pendientes').addEventListener('click', () => {
+        document.getElementById('dis-filtro-revision').value = 'pendientes';
+        this._render();
+      });
+      ['dis-filtro-revision', 'dis-filtro-tipo', 'dis-filtro-desde', 'dis-filtro-hasta'].forEach((id) => {
         document.getElementById(id).addEventListener('change', () => this._render());
       });
       document.getElementById('dis-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
@@ -206,6 +210,8 @@ Router.register('informes-disciplinarios', {
     document.getElementById('dis-stat-empleados').textContent = porEmpleado.size;
     document.getElementById('dis-stat-reincidentes').textContent =
       [...porEmpleado.values()].filter((n) => n >= 2).length;
+    document.getElementById('dis-stat-pendientes').textContent =
+      informes.filter((i) => !i.revisado_en).length;
   },
 
   // Los tipos del filtro salen de lo que realmente hay registrado, no de
@@ -221,6 +227,7 @@ Router.register('informes-disciplinarios', {
   },
 
   _limpiarFiltros() {
+    document.getElementById('dis-filtro-revision').value = '';
     document.getElementById('dis-search').value = '';
     document.getElementById('dis-filtro-tipo').value = '';
     document.getElementById('dis-filtro-desde').value = '';
@@ -239,7 +246,11 @@ Router.register('informes-disciplinarios', {
     const desde = document.getElementById('dis-filtro-desde').value;
     const hasta = document.getElementById('dis-filtro-hasta').value;
 
+    const revision = document.getElementById('dis-filtro-revision').value;
+
     let filtrados = this._informes || [];
+    if (revision === 'pendientes') filtrados = filtrados.filter((i) => !i.revisado_en);
+    else if (revision === 'revisados') filtrados = filtrados.filter((i) => i.revisado_en);
     if (tipo) filtrados = filtrados.filter((i) => i.tipo_novedad === tipo);
     if (desde) filtrados = filtrados.filter((i) => (i.fecha_hechos || '') >= desde);
     if (hasta) filtrados = filtrados.filter((i) => (i.fecha_hechos || '') <= hasta);
@@ -249,6 +260,15 @@ Router.register('informes-disciplinarios', {
         (i.empleado_cedula || '').includes(q) ||
         (i.tipo_novedad || '').toLowerCase().includes(q));
     }
+
+    // Lo que falta por revisar va arriba, sin importar la fecha: esta
+    // pantalla existe para atender lo que llegó, no para consultar historia.
+    filtrados = filtrados.slice().sort((a, b) => {
+      const pa = a.revisado_en ? 1 : 0;
+      const pb = b.revisado_en ? 1 : 0;
+      if (pa !== pb) return pa - pb;
+      return String(b.fecha_hechos || '').localeCompare(String(a.fecha_hechos || ''));
+    });
 
     const total = (this._informes || []).length;
     document.getElementById('dis-contador').textContent =
@@ -284,6 +304,7 @@ Router.register('informes-disciplinarios', {
             <div class="person-meta"><span>${meta}</span></div>
           </div>
           ${n >= 2 ? `<span class="tag pendiente">${n} informes</span>` : ''}
+          <span class="tag ${i.revisado_en ? 'completo' : 'descartado'}">${i.revisado_en ? 'Revisado' : 'Sin revisar'}</span>
           <button type="button" class="btn-secondary" data-detalle="${i.id}">Ver detalle</button>
         </div>
       `;
@@ -345,6 +366,17 @@ Router.register('informes-disciplinarios', {
       </div>
 
       <div class="modal-section">
+        <h3 class="modal-section-title">Revisión</h3>
+        ${informe.revisado_en
+          ? `<p class="prose-p">Revisado por ${escapeHtml(informe.revisado_por_nombre || informe.revisado_por_email || 'alguien')} el ${new Date(informe.revisado_en).toLocaleString('es-CO')}.</p>`
+          : '<p class="prose-p">Este informe todavía no se ha revisado.</p>'}
+        <button type="button" class="btn-secondary" id="dis-revisar">
+          ${informe.revisado_en ? 'Devolver a sin revisar' : 'Marcar como revisado'}
+        </button>
+        <p id="dis-revisar-msg" class="form-msg"></p>
+      </div>
+
+      <div class="modal-section">
         <h3 class="modal-section-title">Acciones</h3>
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center">
           <button type="button" id="dis-generar">Generar formato FO-GH-06</button>
@@ -357,12 +389,36 @@ Router.register('informes-disciplinarios', {
     document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
 
+    document.getElementById('dis-revisar').addEventListener('click', () => this._marcarRevisado(informe));
     document.getElementById('dis-generar').addEventListener('click', () => this._generarDocumento(informe));
     document.getElementById('dis-editar').addEventListener('click', () => this._editar(informe));
     document.getElementById('dis-borrar').addEventListener('click', () => this._borrar(informe));
     document.querySelectorAll('#dis-archivos-detalle [data-archivo]').forEach((btn) => {
       btn.addEventListener('click', () => this._verArchivo(btn.dataset.archivo, btn.dataset.nombre));
     });
+  },
+
+  // Marcar como revisado es lo que apaga el contador del menú. Se vuelve a
+  // cargar la lista y se repinta el globo: si el número siguiera ahí después
+  // de revisar el último, nadie volvería a creerle.
+  async _marcarRevisado(informe) {
+    const msg = document.getElementById('dis-revisar-msg');
+    const btn = document.getElementById('dis-revisar');
+    btn.disabled = true;
+    msg.className = 'form-msg';
+    msg.textContent = '';
+    try {
+      const nombre = await DB.getMyDisplayName().catch(() => null);
+      await DB.marcarInformeRevisado(informe.id, !informe.revisado_en, nombre);
+      await this._load();
+      if (window.actualizarPendientesInformes) await window.actualizarPendientesInformes();
+      const actualizado = (this._informes || []).find((x) => x.id === informe.id);
+      if (actualizado) this._verDetalle(actualizado);
+    } catch (err) {
+      msg.className = 'form-msg error';
+      msg.textContent = 'No se pudo marcar: ' + disMensajeError(err);
+      btn.disabled = false;
+    }
   },
 
   async _verArchivo(path, nombre) {
@@ -384,6 +440,7 @@ Router.register('informes-disciplinarios', {
       await DB.borrarInformeDisciplinario(informe.id);
       document.getElementById('modal-backdrop').classList.add('hidden');
       await this._load();
+      if (window.actualizarPendientesInformes) await window.actualizarPendientesInformes();
     } catch (err) {
       msg.textContent = 'No se pudo eliminar: ' + disMensajeError(err);
       msg.className = 'form-msg error';
@@ -526,6 +583,7 @@ Router.register('informes-disciplinarios', {
       this._salirDeEdicion();
       document.getElementById('dis-registrar-detalle').open = false;
       await this._load();
+      if (window.actualizarPendientesInformes) await window.actualizarPendientesInformes();
       msg.textContent = editando ? 'Informe actualizado.' : 'Informe guardado.';
       msg.className = 'form-msg success';
       // Al crearlo se abre el formato de una: el informe existe para

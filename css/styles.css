@@ -354,6 +354,23 @@ legend { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font
 .form-msg.success { color: var(--success-text); }
 
 .hidden { display: none !important; }
+
+/* Contador de pendientes al lado de un enlace del menú. Va pegado a la
+   derecha para que no empuje el texto del enlace cuando aparece o
+   desaparece. */
+.nav-badge {
+  margin-left: auto;
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .muted { color: var(--slate-500); }
 .req-star { color: var(--danger-text); font-weight: 700; }
 
