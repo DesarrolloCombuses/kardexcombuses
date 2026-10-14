@@ -1697,11 +1697,17 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 /* =====================================================================
    Galeria de la actividad -- collage de fotos del evento
    ===================================================================== */
+/* Una sola fila que se corre hacia el lado, no una cuadricula de varias
+   filas: las fotos de la actividad se recorren como una tira. */
 .ac-collage {
-  display: grid; gap: 0.6rem; margin-top: 0.8rem;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: flex; gap: 0.6rem; margin-top: 0.8rem;
+  overflow-x: auto; padding-bottom: 0.45rem;
+  scroll-snap-type: x proximity;
 }
-.ac-foto { position: relative; margin: 0; }
+/* El aviso de "todavia no tiene fotos" (o el del SQL que falta) es el otro
+   hijo posible de la caja: sin esto el flex se lo encoge a una columna. */
+.ac-collage > p { flex: 1; min-width: 0; margin: 0; }
+.ac-foto { position: relative; margin: 0; flex: none; width: 190px; scroll-snap-align: start; }
 .ac-foto img {
   width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block;
   border-radius: var(--radius); border: 1px solid var(--slate-200);
@@ -1761,7 +1767,7 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
   font-size: 1.5rem; line-height: 1; cursor: pointer;
 }
 @media (max-width: 600px) {
-  .ac-collage { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .ac-foto { width: 150px; }
   .ac-tira-foto { width: 46px; height: 34px; }
   .ac-lightbox { padding: 1rem; }
 }
