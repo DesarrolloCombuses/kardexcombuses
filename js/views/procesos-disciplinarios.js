@@ -934,15 +934,19 @@ Router.register('procesos-disciplinarios', {
     const url = await this._pedirUrlHoja();
     if (!url) return;
 
+    // Un solo show para toda la importacion; las etapas y el progreso van
+    // por setMessage. Con un show por lote el contador quedaba en decenas y
+    // el overlay no se cerraba al terminar -- la pantalla se veia colgada
+    // cuando en realidad ya habia acabado.
     Loading.show('Trayendo procesos…');
     const partes = [];
     try {
       // 1) La tabla del programa anterior. Si falla (por ejemplo, si ya la
       //    apagaron) no se detiene la importación: la hoja es la fuente buena.
       try {
-        Loading.show('Leyendo el programa anterior…');
+        Loading.setMessage('Leyendo el programa anterior…');
         const r = await DB.importarProcesosDisciplinarios((hechas, total) => {
-          Loading.show(`Leyendo el programa anterior… ${hechas} de ${total}`);
+          Loading.setMessage(`Leyendo el programa anterior… ${hechas} de ${total}`);
         });
         partes.push(`Del programa anterior: ${r.copiados} de ${r.total} proceso(s).`);
       } catch (err) {
@@ -950,10 +954,10 @@ Router.register('procesos-disciplinarios', {
       }
 
       // 2) La hoja.
-      Loading.show('Descargando la hoja…');
+      Loading.setMessage('Descargando la hoja…');
       const { filas, descartadas } = await window.HOJA_PROCESOS.traer(url);
       const r = await DB.importarProcesosDeHoja(filas, (hechas, total) => {
-        Loading.show(`Subiendo procesos… ${hechas} de ${total}`);
+        Loading.setMessage(`Subiendo procesos… ${hechas} de ${total}`);
       });
       partes.push(
         `De la hoja: ${r.insertados} nuevo(s) y ${r.actualizados} completado(s).`

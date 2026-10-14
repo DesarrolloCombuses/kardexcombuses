@@ -372,6 +372,9 @@ Router.register('salida', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      // Faltaba: el overlay se abria al enviar y no se cerraba nunca, asi que
+      // despues de registrar una entrega la pantalla quedaba tapada.
+      Loading.hide();
     }
   },
 });

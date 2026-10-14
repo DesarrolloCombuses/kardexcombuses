@@ -270,7 +270,7 @@ Router.register('actividades', {
     try {
       const urls = await DB.getSignedUrls('actividades-fotos', fotos.map((f) => f.storage_path));
       for (let i = 0; i < fotos.length; i++) {
-        Loading.show(`Armando el collage… ${i + 1} de ${fotos.length}`);
+        Loading.setMessage(`Armando el collage… ${i + 1} de ${fotos.length}`);
         try {
           listas.push({
             src: await this._fotoReducida(urls[fotos[i].storage_path]),
@@ -352,10 +352,13 @@ Router.register('actividades', {
     const msg = document.getElementById('ac-galeria-msg');
     const base = (this._fotos || []).length;
     let subidas = 0;
+    // show() lleva un contador y solo se apaga cuando vuelve a cero, asi que
+    // el progreso va por setMessage: un show por foto dejaba el contador en
+    // alto y el overlay tapando la pantalla para siempre.
     Loading.show(`Subiendo 1 de ${archivos.length}…`);
     try {
       for (const file of archivos) {
-        Loading.show(`Subiendo ${subidas + 1} de ${archivos.length}…`);
+        Loading.setMessage(`Subiendo ${subidas + 1} de ${archivos.length}…`);
         await DB.subirFotoActividad({
           actividadId: this._actividadAbierta.id,
           file,
