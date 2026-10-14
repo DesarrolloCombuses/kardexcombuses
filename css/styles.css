@@ -1721,6 +1721,31 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 }
 .ac-foto-quitar:hover { background: #b91c1c; }
 
+/* La tira del listado: la evidencia de cada actividad, en su propia fila.
+   Lleva su propio scroll horizontal para que seis miniaturas no estiren la
+   fila ni partan el nombre de la actividad en pantalla de celular. */
+.ac-tira {
+  display: flex; align-items: center; gap: 0.35rem; margin-top: 0.45rem;
+  overflow-x: auto; padding-bottom: 0.15rem;
+}
+.ac-tira-foto {
+  width: 54px; height: 40px; flex: none; object-fit: cover; display: block;
+  border-radius: var(--radius-sm); border: 1px solid var(--slate-200);
+  background: var(--slate-100); cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ac-tira-foto:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.ac-tira-mas {
+  flex: none; font-size: 0.72rem; font-weight: 600; color: var(--slate-500);
+  background: var(--slate-100); border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm); padding: 0.3rem 0.42rem;
+}
+.ac-tira-total {
+  flex: none; font-size: 0.72rem; color: var(--slate-500);
+  margin-left: 0.25rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ac-tira-vacia { font-size: 0.72rem; color: var(--slate-400); font-style: italic; }
+
 .ac-lightbox {
   position: fixed; inset: 0; z-index: 1200; display: flex;
   align-items: center; justify-content: center; padding: 2rem;
@@ -1737,5 +1762,6 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 }
 @media (max-width: 600px) {
   .ac-collage { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .ac-tira-foto { width: 46px; height: 34px; }
   .ac-lightbox { padding: 1rem; }
 }

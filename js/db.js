@@ -1245,6 +1245,26 @@ const DB = {
     return data;
   },
 
+  // Las fotos de VARIAS actividades de una sola consulta, para la tira de
+  // miniaturas del listado. Una consulta por actividad pondria una peticion
+  // por fila de la lista; aqui se piden todas juntas y se agrupan en memoria.
+  // Devuelve { actividadId: [fotos] }, con las actividades sin fotos ausentes.
+  async getFotosDeActividades(actividadIds) {
+    if (!actividadIds || !actividadIds.length) return {};
+    const { data, error } = await window.supabaseClient
+      .from('kardex_actividad_fotos')
+      .select('id, actividad_id, storage_path, descripcion, orden, created_at')
+      .in('actividad_id', actividadIds)
+      .order('orden')
+      .order('created_at');
+    if (error) throw error;
+    const porActividad = {};
+    (data || []).forEach((f) => {
+      (porActividad[f.actividad_id] = porActividad[f.actividad_id] || []).push(f);
+    });
+    return porActividad;
+  },
+
   // Sube una sola foto y guarda su fila. Van de a una y no todas en un lote
   // porque si la quinta falla, las cuatro que ya subieron tienen que quedar
   // guardadas: perderlas obligaría a volver a escogerlas todas.

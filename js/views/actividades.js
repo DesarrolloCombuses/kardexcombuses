@@ -56,6 +56,7 @@ Router.register('actividades', {
   async _load() {
     this._actividades = await DB.getActividades();
     this._render();
+    await this._cargarTiras();
   },
 
   _render() {
@@ -71,6 +72,7 @@ Router.register('actividades', {
             <span>${acFormatFecha(a.fecha)}</span>
             <span>Creada por ${acEscapeHtml(a.creado_por_nombre || a.creado_por_email)}</span>
           </div>
+          <div class="ac-tira" data-tira="${a.id}"></div>
         </div>
         <button type="button" class="btn-secondary" data-abrir="${a.id}">Abrir</button>
       </div>
@@ -192,6 +194,67 @@ Router.register('actividades', {
     await Promise.all([this._cargarRegistros(), this._cargarGaleria()]);
   },
 
+  // ---- Tira de miniaturas del listado ------------------------------------
+  // La prueba de que una actividad se cumplió son sus fotos. Verlas en la
+  // misma fila evita abrir actividad por actividad para saber cuáles
+  // quedaron sin evidencia: la fila que aparece vacía es justo la que falta.
+  _MAX_MINIATURAS: 6,
+  // Tope de enlaces firmados por carga. El bucket es privado y cada
+  // miniatura necesita el suyo; con cientos de actividades esa firma en
+  // bloque sería lo más pesado del módulo, así que de ahí en adelante la
+  // fila se queda con el conteo en texto, que es lo que de verdad importa.
+  _MAX_FIRMAS_TIRA: 150,
+
+  async _cargarTiras() {
+    const actividades = this._actividades || [];
+    if (!actividades.length) return;
+
+    let porActividad;
+    try {
+      porActividad = await DB.getFotosDeActividades(actividades.map((a) => a.id));
+    } catch (err) {
+      // Sin la galería creada (o sin permiso para verla) el listado sigue
+      // sirviendo igual: las tiras simplemente no se pintan.
+      return;
+    }
+
+    const aFirmar = [];
+    actividades.forEach((a) => {
+      (porActividad[a.id] || []).slice(0, this._MAX_MINIATURAS).forEach((f) => {
+        if (aFirmar.length < this._MAX_FIRMAS_TIRA) aFirmar.push(f.storage_path);
+      });
+    });
+
+    let urls = {};
+    try {
+      urls = await DB.getSignedUrls('actividades-fotos', aFirmar);
+    } catch (err) {
+      // Queda el conteo, que ya responde lo único urgente: si hay evidencia.
+    }
+
+    actividades.forEach((a) => this._pintarTira(a.id, porActividad[a.id] || [], urls));
+  },
+
+  _pintarTira(actividadId, fotos, urls) {
+    const caja = document.querySelector(`[data-tira="${actividadId}"]`);
+    if (!caja) return;
+    if (!fotos.length) {
+      caja.innerHTML = '<span class="ac-tira-vacia">Sin fotos todavía</span>';
+      return;
+    }
+    const visibles = fotos.slice(0, this._MAX_MINIATURAS).filter((f) => urls[f.storage_path]);
+    const restantes = fotos.length - visibles.length;
+    caja.innerHTML = visibles.map((f, i) => `
+      <img class="ac-tira-foto" src="${urls[f.storage_path]}" loading="lazy"
+           alt="${acEscapeHtml(f.descripcion || `Foto ${i + 1} de la actividad`)}"
+           data-ver-tira="${f.id}" />`).join('')
+      + (restantes > 0 ? `<span class="ac-tira-mas">+${restantes}</span>` : '')
+      + `<span class="ac-tira-total">${fotos.length} foto(s)</span>`;
+    caja.querySelectorAll('[data-ver-tira]').forEach((img) => {
+      img.addEventListener('click', () => this._verFoto(img.src, img.alt));
+    });
+  },
+
   // ---- Galería de la actividad -------------------------------------------
   async _cargarGaleria() {
     const caja = document.getElementById('ac-galeria');
@@ -203,6 +266,7 @@ Router.register('actividades', {
       if (btnCollage) btnCollage.classList.toggle('hidden', !fotos.length);
       if (!fotos.length) {
         caja.innerHTML = '<p class="empty-note">Esta actividad todavía no tiene fotos.</p>';
+        this._pintarTira(this._actividadAbierta.id, [], {});
         return;
       }
       // Las URL se piden todas de una: el bucket es privado y cada foto
@@ -222,6 +286,10 @@ Router.register('actividades', {
       caja.querySelectorAll('[data-quitar]').forEach((b) => {
         b.addEventListener('click', () => this._quitarFoto(b.dataset.quitar));
       });
+
+      // Misma lista y mismos enlaces que acaba de traer la galería: la fila
+      // del listado queda al día sin pedir nada otra vez.
+      this._pintarTira(this._actividadAbierta.id, fotos, urls);
     } catch (err) {
       caja.innerHTML = `<p class="empty-note">${acEscapeHtml(acMensajeFotos(err))}</p>`;
     }
