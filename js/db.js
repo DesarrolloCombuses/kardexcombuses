@@ -423,6 +423,61 @@ const DB = {
     return data;
   },
 
+  // Guarda (o registra por primera vez) un documento de un vehículo.
+  //
+  // OJO: flota_documentos es del "Portal de Documentos", otra aplicación
+  // sobre el mismo Supabase. Hasta ahora el ERP solo la leía. Se escribe
+  // respetando lo que ese programa ya espera:
+  //
+  // - La ruta del archivo sigue su mismo formato, PLACA/TIPO/<epoch>_<nombre>,
+  //   para que sus pantallas lo sigan encontrando.
+  // - nombre_archivo_original guarda el nombre con el que llegó el archivo.
+  // - No se tocan subido_por_conductor ni revisado: son de SU flujo (el
+  //   conductor sube, alguien revisa) y el ERP no tiene por qué opinar.
+  //
+  // El archivo viejo NO se borra del bucket: si el guardado de la fila falla
+  // despues de subir, quedarse sin el documento anterior seria peor que
+  // dejar un archivo suelto que ya nadie referencia.
+  async guardarDocumentoFlota({ id = null, placa, tipo, fechaVencimiento, file = null }) {
+    const fila = {
+      placa: String(placa || '').trim().toUpperCase(),
+      tipo,
+      fecha_vencimiento: fechaVencimiento || null,
+    };
+
+    if (file) {
+      const extension = (file.name.split('.').pop() || 'pdf').toLowerCase();
+      const limpio = file.name.replace(/[^A-Za-z0-9._-]+/g, '_');
+      const ruta = `${fila.placa}/${tipo}/${Math.floor(Date.now() / 1000)}_${limpio || 'documento.' + extension}`;
+      const { error: errorSubida } = await window.supabaseClient.storage
+        .from('flota-documentos')
+        .upload(ruta, file, { contentType: file.type || undefined });
+      if (errorSubida) throw errorSubida;
+      fila.storage_path = ruta;
+      fila.nombre_archivo_original = file.name;
+    }
+
+    if (id) {
+      // updated_at a mano: es columna de otra aplicación y no se sabe si
+      // tiene trigger propio. Ponerla de más no rompe nada; no ponerla
+      // dejaría la fila como si nadie la hubiera tocado.
+      const { error } = await window.supabaseClient
+        .from('flota_documentos')
+        .update({ ...fila, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    }
+
+    const { data, error } = await window.supabaseClient
+      .from('flota_documentos')
+      .insert(fila)
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  },
+
   // URL firmada (expira pronto, el bucket es privado) para abrir/descargar
   // el documento real de un vehículo.
   async getUrlDocumentoFlota(storagePath) {

@@ -12,6 +12,41 @@
 // registrados todavía -- igual aparecen en la ficha de detalle si existen.
 const PA_TIPOS_TABLA = ['SOAT', 'TECNOMECANICA', 'TARJETA_OPERACION', 'MANTENIMIENTO_PREVENTIVO'];
 
+// Quien puede corregir un documento. Leer el parque automotor y cambiarle
+// la fecha de vencimiento a un SOAT no son la misma responsabilidad, asi
+// que esto pide 'agregar'/'editar' aparte de 'ver' -- y la base vuelve a
+// comprobarlo en sus policies, porque un permiso que solo vive en el
+// navegador no es un permiso.
+function paPuede(accion) {
+  if (window.APP_ROLE === 'admin') return true;
+  const p = (window.APP_PERMISOS_MODULOS || {})['parque-automotor'];
+  return !!(p && p[accion]);
+}
+
+function paPuedeEditarDocs() {
+  return paPuede('editar') || paPuede('agregar');
+}
+
+// Los documentos viven en tablas del Portal de Documentos, no del ERP: si
+// nadie corrio el SQL que le abre la puerta al ERP, lo que llega es un
+// "permission denied" seco que no le dice nada a quien esta en pantalla.
+function paMensajeError(err) {
+  const codigo = String((err && err.code) || '');
+  const texto = [err && err.message, err && err.hint, err && err.details]
+    .filter(Boolean).join(' ') || String(err || '');
+  if (codigo === '42501' || /permission denied|row-level security|violates row-level|Unauthorized/i.test(texto)) {
+    return 'La base no deja guardar documentos de la flota todavia. Falta correr '
+      + 'sql/flota_documentos_editar_2026-10-16.sql, o tu cuenta no tiene el permiso de editar en Parque automotor.';
+  }
+  if (/duplicate key|already exists|23505/i.test(texto)) {
+    return 'Ese vehiculo ya tiene registrado ese documento. Abre el que ya existe y actualizalo.';
+  }
+  if (/Bucket not found|bucket/i.test(texto)) {
+    return 'No se encontro el deposito de archivos de la flota (flota-documentos).';
+  }
+  return 'No se pudo guardar: ' + texto;
+}
+
 const PA_TIPO_LABELS = {
   SOAT: 'SOAT',
   TECNOMECANICA: 'Tecnomecánica',
@@ -166,7 +201,9 @@ Router.register('parque-automotor', {
       });
       document.getElementById('modal-body').addEventListener('click', (e) => {
         const btnDoc = e.target.closest('.pa-ver-doc');
-        if (btnDoc) this._abrirDocumento(btnDoc);
+        if (btnDoc) { this._abrirDocumento(btnDoc); return; }
+        const btnEditar = e.target.closest('.pa-editar-doc');
+        if (btnEditar) this._abrirFormDocumento(btnEditar.dataset.tipo);
       });
       this._bound = true;
     }
@@ -185,6 +222,7 @@ Router.register('parque-automotor', {
     this._vehiculos = vehiculos
       .map((v) => {
         const docs = (docsPorPlaca.get(v.placa) || []).map((d) => ({
+          id: d.id,
           tipo: d.tipo,
           label: PA_TIPO_LABELS[d.tipo] || d.tipo,
           estado: d.estado_vencimiento,
@@ -326,10 +364,18 @@ Router.register('parque-automotor', {
   // solo si ya existe el archivo real -- así la tabla se lee de un vistazo
   // en vez de una frase larga por celda. El detalle completo (días exactos)
   // queda en el title (tooltip) para quien lo necesite.
-  _tagDocumentoHtml(d) {
+  _tagDocumentoHtml(d, conEditar = false) {
     const boton = d.storagePath
       ? `<button type="button" class="pa-doc-link pa-ver-doc" data-path="${paEscapeHtml(d.storagePath)}" title="Ver documento" aria-label="Ver documento de ${paEscapeHtml(d.label)}">
           <svg viewBox="0 0 20 20" fill="none" width="14" height="14"><path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.3" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>`
+      : '';
+    // En la ficha (no en la tabla) se puede corregir el documento: ahi es
+    // donde se esta mirando un vehiculo en concreto.
+    const editar = conEditar && paPuedeEditarDocs()
+      ? `<button type="button" class="pa-doc-link pa-editar-doc" data-tipo="${paEscapeHtml(d.tipo)}"
+           title="${d.storagePath || d.fechaTexto ? 'Actualizar este documento' : 'Registrar este documento'}">
+          <svg viewBox="0 0 20 20" fill="none" width="14" height="14"><path d="M13.6 3.9l2.5 2.5M4 16l.5-3 8-8 2.5 2.5-8 8-3 .5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         </button>`
       : '';
     return `
@@ -337,6 +383,7 @@ Router.register('parque-automotor', {
         <span class="tag ${d.tag}" title="${paEscapeHtml(d.texto)}">${paEscapeHtml(d.corto)}</span>
         ${d.fechaTexto ? `<span class="pa-doc-fecha">${paEscapeHtml(d.fechaTexto)}</span>` : ''}
         ${boton}
+        ${editar}
       </div>
     `;
   },
@@ -535,13 +582,23 @@ Router.register('parque-automotor', {
       <div class="detalle-card">
         <div class="detalle-card-header"><h4 class="detalle-card-title">Documentos</h4></div>
         <div class="detalle-grid">
-          ${v.docsTodos.map((d) => `
+          ${Object.keys(PA_TIPO_LABELS).map((tipo) => {
+            // Tambien los que faltan: un documento que no se ve en ninguna
+            // parte no se puede registrar.
+            const d = v.docsTodos.find((x) => x.tipo === tipo) || {
+              id: null, tipo, label: PA_TIPO_LABELS[tipo], estado: 'SIN_FECHA',
+              tag: 'inactivo-tag', corto: 'Sin registrar', peso: 0,
+              texto: 'Sin registrar en el Portal de Documentos',
+              fechaTexto: null, fechaIso: null, storagePath: null,
+            };
+            return `
             <div class="detalle-field">
               <div class="detalle-field-label">${paEscapeHtml(d.label)}</div>
-              <div class="detalle-field-value">${this._tagDocumentoHtml(d)}</div>
-            </div>
-          `).join('') || '<p class="empty-note">Sin documentos registrados en el Portal de Documentos.</p>'}
+              <div class="detalle-field-value">${this._tagDocumentoHtml(d, true)}</div>
+            </div>`;
+          }).join('')}
         </div>
+        <div id="pa-doc-form"></div>
       </div>
     `;
 
@@ -562,5 +619,109 @@ Router.register('parque-automotor', {
     `;
     document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
+    this._vehiculoAbierto = v;
+  },
+
+  // ---- Corregir un documento --------------------------------------------
+
+  // El formulario se abre DENTRO de la ficha, debajo de los documentos, y no
+  // en otra ventana: quien corrige un vencimiento esta mirando el resto de
+  // los documentos del mismo vehiculo y los necesita a la vista.
+  _abrirFormDocumento(tipo) {
+    const v = this._vehiculoAbierto;
+    const caja = document.getElementById('pa-doc-form');
+    if (!v || !caja) return;
+    const d = (v.docsTodos || []).find((x) => x.tipo === tipo) || null;
+    const esNuevo = !d || !d.id;
+
+    caja.innerHTML = `
+      <div class="detalle-card" id="pa-doc-form-card">
+        <div class="detalle-card-header">
+          <h4 class="detalle-card-title">${esNuevo ? 'Registrar' : 'Actualizar'} ${paEscapeHtml(PA_TIPO_LABELS[tipo] || tipo)}</h4>
+        </div>
+        <form class="form" id="pa-doc-form-el">
+          <div class="form-row">
+            <label>Placa
+              <input type="text" id="pa-doc-placa" value="${paEscapeHtml(v.placa)}" maxlength="10" />
+            </label>
+            <label>Fecha de vencimiento
+              <input type="date" id="pa-doc-fecha" value="${paEscapeHtml((d && d.fechaIso) || '')}" />
+            </label>
+          </div>
+          <p class="empty-note">La placa solo se cambia si el documento quedo cargado en el vehiculo equivocado.</p>
+
+          <label class="file-picker" for="pa-doc-archivo">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3 3V17a.5.5 0 01-.5.5h-9a.5.5 0 01-.5-.5V3a.5.5 0 01.5-.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v5M7.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span id="pa-doc-archivo-label">${d && d.storagePath ? 'Reemplazar el archivo (opcional)' : 'Adjuntar el documento'}</span>
+          </label>
+          <input type="file" id="pa-doc-archivo" accept=".pdf,image/*" class="hidden" />
+          ${d && d.nombreArchivo ? `<p class="empty-note">Hoy tiene: ${paEscapeHtml(d.nombreArchivo)}</p>` : ''}
+
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.8rem">
+            <button type="submit" id="pa-doc-guardar">Guardar</button>
+            <button type="button" class="btn-secondary" id="pa-doc-cancelar">Cancelar</button>
+          </div>
+          <p id="pa-doc-msg" class="form-msg"></p>
+        </form>
+      </div>`;
+
+    const archivo = document.getElementById('pa-doc-archivo');
+    archivo.addEventListener('change', () => {
+      document.getElementById('pa-doc-archivo-label').textContent =
+        archivo.files.length ? archivo.files[0].name : 'Adjuntar el documento';
+    });
+    document.getElementById('pa-doc-cancelar').addEventListener('click', () => { caja.innerHTML = ''; });
+    document.getElementById('pa-doc-form-el')
+      .addEventListener('submit', (e) => this._guardarDocumento(e, tipo, d));
+    document.getElementById('pa-doc-form-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  },
+
+  async _guardarDocumento(evento, tipo, docActual) {
+    evento.preventDefault();
+    const msg = document.getElementById('pa-doc-msg');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+
+    const placa = document.getElementById('pa-doc-placa').value.trim().toUpperCase();
+    const fecha = document.getElementById('pa-doc-fecha').value;
+    const file = document.getElementById('pa-doc-archivo').files[0] || null;
+    const fallar = (texto) => { msg.textContent = texto; msg.className = 'form-msg error'; };
+
+    if (!placa) return fallar('La placa no puede quedar vacia.');
+    // Una fila sin fecha y sin archivo no es un documento: apareceria como
+    // "Sin registrar" igual que antes, pero ocupando un renglon.
+    if (!fecha && !file && !(docActual && docActual.storagePath)) {
+      return fallar('Pon la fecha de vencimiento, adjunta el documento, o las dos cosas.');
+    }
+
+    const boton = document.getElementById('pa-doc-guardar');
+    boton.disabled = true;
+    Loading.show(file ? 'Subiendo el documento…' : 'Guardando…');
+    try {
+      await DB.guardarDocumentoFlota({
+        id: docActual && docActual.id ? docActual.id : null,
+        placa,
+        tipo,
+        fechaVencimiento: fecha || null,
+        file,
+      });
+      // Se recarga y se vuelve a abrir la ficha: el estado de vencimiento
+      // lo calcula la base, no el navegador, asi que hay que volver a
+      // preguntarlo para que el tag diga la verdad.
+      const placaAbierta = (this._vehiculoAbierto || {}).placa;
+      await this.onEnter();
+      const v = (this._vehiculos || []).find((x) => x.placa === placaAbierta);
+      if (v) this._verDetalle(v);
+      const nuevoMsg = document.getElementById('pa-doc-msg');
+      if (nuevoMsg) {
+        nuevoMsg.textContent = 'Documento guardado.';
+        nuevoMsg.className = 'form-msg success';
+      }
+    } catch (err) {
+      fallar(paMensajeError(err));
+    } finally {
+      boton.disabled = false;
+      Loading.hide();
+    }
   },
 });
