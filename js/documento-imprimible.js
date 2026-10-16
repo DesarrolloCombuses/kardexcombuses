@@ -13,6 +13,59 @@
 // método privado de la vista Empleados; se movió sin tocarle una sola línea
 // del cuerpo (la sangría de 2 espacios que le quedó es la que traía como
 // método -- el HTML generado sale idéntico byte a byte).
+// Baja una imagen y la devuelve como data URI reducido, para incrustarla en
+// un documento imprimible en vez de enlazarla. Tres razones, todas vividas:
+//
+// 1) Los buckets del ERP son privados y sus enlaces firmados EXPIRAN. Un
+//    documento que guarde la URL se queda sin fotos a las pocas horas --
+//    justo cuando alguien lo reabre para imprimirlo.
+// 2) html2pdf dibuja la hoja con html2canvas, que al tropezar con una imagen
+//    de otro dominio deja el recuadro en blanco: el PDF sale con el texto y
+//    sin la evidencia, que es media razon de ser del documento.
+// 3) Una foto de celular pesa varios megas. Varias sin reducir hacen un PDF
+//    que no se puede enviar por correo y que tarda en generarse.
+//
+// Lanza si la imagen no se pudo leer; quien llama decide que hacer con esa
+// foto (listarla como anexo, saltarla) sin perder el documento entero.
+//
+// Lleva limite de tiempo porque createImageBitmap, ante un archivo que no
+// puede decodificar, se queda esperando: ni resuelve ni falla. Sin este
+// corte una sola foto dañada dejaba el documento "generandose" para
+// siempre, con el overlay tapando la pantalla -- comprobado en Chrome.
+//
+// 8 segundos: una foto de celular se lee en menos de uno hasta en un
+// equipo lento, y el limite se paga por cada foto que falle, no una sola
+// vez -- con diez adjuntos dañados, quince segundos cada uno serian dos
+// minutos y medio de espera. Se lee de window para poder bajarlo en las
+// pruebas sin esperar el limite real.
+const IMAGEN_LIMITE_MS = 8000;
+function limiteImagenMs() {
+  return Number(window.IMAGEN_LIMITE_MS) || IMAGEN_LIMITE_MS;
+}
+
+function conLimite(promesa, ms, queEs) {
+  let reloj;
+  return Promise.race([
+    promesa.finally(() => clearTimeout(reloj)),
+    new Promise((_, rechazar) => {
+      reloj = setTimeout(() => rechazar(new Error('La imagen tardó demasiado (' + queEs + ')')), ms);
+    }),
+  ]);
+}
+
+async function imagenComoDataUri(url, maxLado = 1100, calidad = 0.82) {
+  const respuesta = await conLimite(fetch(url), limiteImagenMs(), 'descarga');
+  if (!respuesta.ok) throw new Error('No se pudo descargar la imagen (' + respuesta.status + ')');
+  const bitmap = await conLimite(createImageBitmap(await respuesta.blob()), limiteImagenMs(), 'lectura');
+  const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+  const lienzo = document.createElement('canvas');
+  lienzo.width = Math.round(bitmap.width * escala);
+  lienzo.height = Math.round(bitmap.height * escala);
+  lienzo.getContext('2d').drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
+  bitmap.close?.();
+  return lienzo.toDataURL('image/jpeg', calidad);
+}
+
 function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
     return `<!doctype html>
 <html lang="es">

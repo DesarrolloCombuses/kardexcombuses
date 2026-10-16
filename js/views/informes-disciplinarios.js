@@ -64,7 +64,7 @@ Router.register('informes-disciplinarios', {
   async onEnter() {
     if (!this._bound) {
       document.getElementById('dis-form').addEventListener('submit', (e) => this._submit(e));
-      document.getElementById('dis-archivos-input').addEventListener('change', () => this._pintarArchivosElegidos());
+      document.getElementById('dis-archivos-input').addEventListener('change', () => this._sumarArchivosElegidos());
       document.getElementById('dis-cancelar-edicion').addEventListener('click', () => this._salirDeEdicion());
       document.getElementById('dis-search').addEventListener('input', () => this._render());
       document.getElementById('dis-card-pendientes').addEventListener('click', () => {
@@ -353,6 +353,13 @@ Router.register('informes-disciplinarios', {
                 <button type="button" class="btn-secondary" data-archivo="${a.archivo_url}" data-nombre="${escapeHtml(a.archivo_nombre || '')}">Ver</button>
               </div>`).join('')}</div>`
           : '<p class="muted">Sin archivos adjuntos.</p>'}
+
+        <label class="file-picker" for="dis-sumar-input" style="margin-top:0.6rem">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M3.5 14.5V5.5a1 1 0 011-1h11a1 1 0 011 1v9a1 1 0 01-1 1h-11a1 1 0 01-1-1z" stroke="currentColor" stroke-width="1.5"/><path d="M10 7.5v5M7.5 10h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Agregar más fotos
+        </label>
+        <input type="file" id="dis-sumar-input" accept=".pdf,image/*" multiple class="hidden" />
+        <p id="dis-sumar-msg" class="form-msg"></p>
       </div>
 
       ${informe.observaciones
@@ -396,6 +403,56 @@ Router.register('informes-disciplinarios', {
     document.querySelectorAll('#dis-archivos-detalle [data-archivo]').forEach((btn) => {
       btn.addEventListener('click', () => this._verArchivo(btn.dataset.archivo, btn.dataset.nombre));
     });
+    document.getElementById('dis-sumar-input')
+      .addEventListener('change', (e) => this._sumarEvidencia(informe, e));
+  },
+
+  // Adjuntar evidencia a un informe que ya existe. Antes tocaba entrar a
+  // "Editar" -- que ademas abre todo el formulario y deja reescribir los
+  // hechos -- solo para sumar una foto que llego despues.
+  async _sumarEvidencia(informe, evento) {
+    const archivos = [...(evento.target.files || [])];
+    evento.target.value = '';
+    if (!archivos.length) return;
+    const msg = document.getElementById('dis-sumar-msg');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+
+    // Un solo show para toda la operacion: el progreso va por setMessage,
+    // porque show() lleva contador y uno por archivo deja el overlay
+    // tapando la pantalla con la subida ya terminada.
+    Loading.show(`Subiendo 1 de ${archivos.length}…`);
+    let texto = '';
+    let clase = 'form-msg success';
+    try {
+      const agregados = await DB.agregarArchivosInformeDisciplinario({
+        informeId: informe.id,
+        employeeId: informe.employee_id,
+        archivos,
+      });
+      texto = `${agregados} archivo(s) agregado(s).`;
+    } catch (err) {
+      const pasaron = err && typeof err.agregados === 'number' ? err.agregados : 0;
+      texto = pasaron
+        ? `Se agregaron ${pasaron} de ${archivos.length}. El siguiente falló: ${disMensajeError(err)}`
+        : disMensajeError(err);
+      clase = 'form-msg error';
+    } finally {
+      Loading.hide();
+    }
+
+    // Se repinta pase lo que pase: si la tercera fallo, las dos que si
+    // entraron tienen que verse en la lista. Repintar borra el modal y con
+    // el su mensaje, asi que el texto se pone sobre el modal nuevo.
+    try {
+      await this._load();
+      const actualizado = (this._informes || []).find((i) => i.id === informe.id);
+      this._verDetalle(actualizado || informe);
+    } catch { /* si la recarga falla, queda el modal viejo y su mensaje */ }
+
+    const destino = document.getElementById('dis-sumar-msg') || msg;
+    destino.textContent = texto;
+    destino.className = clase;
   },
 
   // Marcar como revisado es lo que apaga el contador del menú. Se vuelve a
@@ -451,13 +508,58 @@ Router.register('informes-disciplinarios', {
 
   // ---- Registrar / editar -----------------------------------------------
 
-  _pintarArchivosElegidos() {
+  // El input de archivos REEMPLAZA su seleccion cada vez que se usa. En el
+  // celular eso se traduce en que tomar una segunda foto borraba la primera
+  // -- parecia que el formulario solo admitiera una. Por eso lo elegido se
+  // acumula acá y el input se vacia despues de cada escogida, para que la
+  // misma foto se pueda volver a elegir si alguien la quito por error.
+  _sumarArchivosElegidos() {
     const input = document.getElementById('dis-archivos-input');
+    const yaEstan = this._archivosElegidos || [];
+    const nuevos = [...input.files].filter((f) => !yaEstan.some(
+      (v) => v.name === f.name && v.size === f.size && v.lastModified === f.lastModified));
+    this._archivosElegidos = yaEstan.concat(nuevos);
+    input.value = '';
+    this._pintarArchivosElegidos();
+  },
+
+  _archivosParaSubir() {
+    const elegidos = [...(this._archivosElegidos || [])];
+    const input = document.getElementById('dis-archivos-input');
+    [...((input && input.files) || [])].forEach((f) => {
+      const repetido = elegidos.some((v) => v.name === f.name && v.size === f.size
+        && v.lastModified === f.lastModified);
+      if (!repetido) elegidos.push(f);
+    });
+    return elegidos;
+  },
+
+  _quitarArchivoElegido(indice) {
+    this._archivosElegidos = (this._archivosElegidos || []).filter((_, i) => i !== indice);
+    this._pintarArchivosElegidos();
+  },
+
+  _pintarArchivosElegidos() {
     const label = document.getElementById('dis-archivos-label');
-    const n = input.files.length;
-    label.textContent = n === 0
-      ? 'Adjuntar evidencia (fotos o PDF, varios archivos)'
-      : n === 1 ? input.files[0].name : `${n} archivos seleccionados`;
+    const caja = document.getElementById('dis-archivos-lista');
+    const elegidos = this._archivosElegidos || [];
+    label.textContent = elegidos.length
+      ? 'Agregar otra foto o PDF'
+      : 'Adjuntar evidencia (fotos o PDF, varios archivos)';
+    if (!caja) return;
+    if (!elegidos.length) {
+      caja.innerHTML = '';
+      return;
+    }
+    caja.innerHTML = `<div class="detalle-list">${elegidos.map((f, i) => `
+      <div class="detalle-list-item">
+        <span class="lc-item-texto">${escapeHtml(f.name)}</span>
+        <button type="button" class="btn-secondary" data-quitar-elegido="${i}">Quitar</button>
+      </div>`).join('')}</div>
+      <p class="empty-note">${elegidos.length} archivo(s) por subir.</p>`;
+    caja.querySelectorAll('[data-quitar-elegido]').forEach((b) => {
+      b.addEventListener('click', () => this._quitarArchivoElegido(Number(b.dataset.quitarElegido)));
+    });
   },
 
   _editar(informe) {
@@ -507,6 +609,7 @@ Router.register('informes-disciplinarios', {
     buscador.readOnly = false;
     buscador.classList.remove('input-bloqueado');
     this._pintarDatosEmpleado(null);
+    this._archivosElegidos = [];
     this._pintarArchivosElegidos();
     document.getElementById('dis-form-titulo').textContent = 'Registrar informe';
     document.getElementById('dis-submit').textContent = 'Guardar y generar formato';
@@ -527,7 +630,11 @@ Router.register('informes-disciplinarios', {
     const fechaHechos = document.getElementById('dis-fecha-hechos').value;
     const fechaEntrega = document.getElementById('dis-fecha-entrega').value;
     const descripcion = document.getElementById('dis-descripcion').value.trim();
-    const archivos = [...document.getElementById('dis-archivos-input').files];
+    // Lo acumulado MAS lo que todavia este en el input. Normalmente el
+    // input va vacio (se limpia en cada escogida), pero si por lo que sea
+    // no paso por ahi, perder en silencio la evidencia de un informe
+    // disciplinario es lo peor que podria hacer esta pantalla.
+    const archivos = this._archivosParaSubir();
 
     const fallar = (texto) => {
       msg.textContent = texto;
@@ -619,21 +726,39 @@ Router.register('informes-disciplinarios', {
     // Las fotos se incrustan en el documento (no solo su nombre): la
     // evidencia es media razón de ser del informe, y un PDF que diga "ver
     // foto adjunta" sin la foto no sirve de nada al entregarlo.
+    //
+    // Van como data URI y NO como enlace al bucket. El enlace firmado expira
+    // en una hora -- el documento se quedaba sin fotos al reabrirlo -- y
+    // html2canvas, que es quien dibuja la hoja para el PDF, deja en blanco
+    // la imagen que viene de otro dominio: el PDF salía con el texto y sin
+    // la evidencia. Ver imagenComoDataUri en js/documento-imprimible.js.
     const adjuntos = informe.archivos || [];
     const imagenes = [];
     const otros = [];
-    for (const a of adjuntos) {
-      if (disEsImagen(a.archivo_nombre || a.archivo_url)) {
-        try {
-          imagenes.push({ url: await DB.getSignedUrl('informes-disciplinarios', a.archivo_url), nombre: a.archivo_nombre });
-        } catch {
-          // Si la URL firmada falla, el archivo se lista como los demás en
-          // vez de dejar una imagen rota en el documento.
+    const fallaron = [];
+    const paraIncrustar = adjuntos.filter((a) => disEsImagen(a.archivo_nombre || a.archivo_url));
+    let hechas = 0;
+    Loading.show(paraIncrustar.length ? `Preparando evidencia… 1 de ${paraIncrustar.length}` : 'Generando informe…');
+    try {
+      for (const a of adjuntos) {
+        if (!disEsImagen(a.archivo_nombre || a.archivo_url)) {
           otros.push(a);
+          continue;
         }
-      } else {
-        otros.push(a);
+        Loading.setMessage(`Preparando evidencia… ${hechas + 1} de ${paraIncrustar.length}`);
+        try {
+          const url = await DB.getSignedUrl('informes-disciplinarios', a.archivo_url);
+          imagenes.push({ src: await imagenComoDataUri(url), nombre: a.archivo_nombre });
+        } catch {
+          // Una foto que no se pudo leer no bota el informe: se nombra
+          // entre los anexos y el documento sale con las demás.
+          otros.push(a);
+          fallaron.push(a.archivo_nombre || a.archivo_url);
+        }
+        hechas += 1;
       }
+    } finally {
+      Loading.hide();
     }
 
     const caja = (texto) => `<div class="caja">${texto ? escapeHtml(texto) : ''}</div>`;
@@ -643,10 +768,11 @@ Router.register('informes-disciplinarios', {
         ${informe.evidencia ? escapeHtml(informe.evidencia) : ''}
         ${imagenes.length ? `<div class="evidencias">${imagenes.map((i) => `
           <figure>
-            <img src="${i.url}" crossorigin="anonymous" alt="Evidencia" />
+            <img src="${i.src}" alt="Evidencia" />
             ${i.nombre ? `<figcaption>${escapeHtml(i.nombre)}</figcaption>` : ''}
           </figure>`).join('')}</div>` : ''}
         ${otros.length ? `<p class="otros-adjuntos"><b>Otros anexos:</b> ${otros.map((a) => escapeHtml(a.archivo_nombre || a.archivo_url)).join(', ')}</p>` : ''}
+        ${fallaron.length ? `<p class="otros-adjuntos"><b>Sin incrustar:</b> ${fallaron.map((n) => escapeHtml(n)).join(', ')} — abre el informe en el ERP para verlas.</p>` : ''}
       </div>`;
 
     const cuerpoHtml = `
@@ -735,7 +861,10 @@ Router.register('informes-disciplinarios', {
   .datos .value-cell { width: 32%; }
   .caja { border: 1px solid #000; padding: 10px 12px; min-height: 96px; white-space: pre-wrap; }
   .evidencias { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-  .evidencias figure { margin: 0; width: 46%; }
+  /* break-inside: una foto cortada por la mitad entre dos hojas no sirve
+     como evidencia. Con varias fotos el PDF las baja enteras a la hoja
+     siguiente en vez de partirlas. */
+  .evidencias figure { margin: 0; width: 46%; break-inside: avoid; page-break-inside: avoid; }
   .evidencias img { width: 100%; border: 1px solid #94a3b8; display: block; }
   .evidencias figcaption { font-size: 10.5px; color: #334; margin-top: 3px; word-break: break-all; }
   .otros-adjuntos { margin: 10px 0 0; font-size: 11.5px; }

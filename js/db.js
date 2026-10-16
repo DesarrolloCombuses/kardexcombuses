@@ -1642,6 +1642,28 @@ const DB = {
     return data;
   },
 
+  // Suma evidencia a un informe que YA existe, sin pasar por el RPC de
+  // guardar: ese reescribe todos los campos del informe, y agregar una foto
+  // no deberia tocar la descripcion de los hechos ni las fechas. La policy
+  // de insert de la tabla de archivos ya cubre este caso ('agregar' o
+  // 'editar'), asi que no hace falta funcion nueva en la base.
+  //
+  // Sube de a una y guarda cada fila apenas entra: si la cuarta falla, las
+  // tres anteriores quedan adjuntas y quien llama dice cuantas pasaron.
+  async agregarArchivosInformeDisciplinario({ informeId, employeeId, archivos }) {
+    let agregados = 0;
+    for (const file of archivos) {
+      const extension = (file.name.split('.').pop() || 'bin').toLowerCase();
+      const url = await this.uploadToBucket('informes-disciplinarios', file, extension, employeeId);
+      const { error } = await window.supabaseClient
+        .from('kardex_informes_disciplinarios_archivos')
+        .insert({ informe_id: informeId, archivo_url: url, archivo_nombre: file.name });
+      if (error) throw Object.assign(error, { agregados });
+      agregados += 1;
+    }
+    return agregados;
+  },
+
   // Solo la fila -- el archivo en el bucket se queda. Es a propósito: si el
   // borrado del objeto falla (permiso, red), no queremos quedarnos con la
   // fila borrada y el archivo huérfano igual; el archivo suelto sin fila que

@@ -297,24 +297,13 @@ Router.register('actividades', {
 
   // ---- Collage ----------------------------------------------------------
 
-  // Baja la foto y la reduce antes de meterla al collage. Dos razones:
-  //
-  // 1) Se incrusta como data URI y no con su enlace. El bucket es privado y
-  //    sus enlaces firmados expiran; una página con la URL adentro dejaría de
-  //    verse a las pocas horas. Además html2pdf no puede leer una imagen de
-  //    otro dominio sin CORS, y el PDF saldría con huecos en blanco.
-  // 2) Una foto de celular pesa varios MB. Veinte sin reducir hacen un PDF
-  //    que no se puede enviar por correo, que es justo para lo que se arma.
+  // La reduccion y el incrustado viven en js/documento-imprimible.js
+  // (imagenComoDataUri): el informe disciplinario necesitaba exactamente lo
+  // mismo -- enlaces firmados que expiran y html2canvas que deja en blanco
+  // la imagen de otro dominio -- y tener dos copias del mismo arreglo es
+  // pedir que una de las dos se quede atras.
   async _fotoReducida(url, maxLado = 1100) {
-    const blob = await (await fetch(url)).blob();
-    const bitmap = await createImageBitmap(blob);
-    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-    const lienzo = document.createElement('canvas');
-    lienzo.width = Math.round(bitmap.width * escala);
-    lienzo.height = Math.round(bitmap.height * escala);
-    lienzo.getContext('2d').drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
-    bitmap.close?.();
-    return lienzo.toDataURL('image/jpeg', 0.82);
+    return imagenComoDataUri(url, maxLado);
   },
 
   async _collage() {
