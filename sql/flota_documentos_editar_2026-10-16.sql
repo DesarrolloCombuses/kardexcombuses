@@ -54,6 +54,30 @@ begin
   end if;
 end $$;
 
+-- El ERP solo escribe placa, tipo, fecha_vencimiento, storage_path,
+-- nombre_archivo_original y updated_at. Si la tabla exige alguna otra
+-- columna sin valor por defecto, el guardado fallaria al primer intento --
+-- mejor saberlo aca que cuando alguien este corrigiendo un SOAT.
+do $$
+declare
+  v_faltantes text;
+begin
+  select string_agg(column_name, ', ' order by column_name) into v_faltantes
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'flota_documentos'
+    and is_nullable = 'NO'
+    and column_default is null
+    and is_identity = 'NO'
+    and column_name not in ('id', 'placa', 'tipo', 'fecha_vencimiento',
+                            'storage_path', 'nombre_archivo_original', 'updated_at');
+
+  if v_faltantes is not null then
+    raise exception
+      'flota_documentos exige columnas que el ERP no llena (%). Hay que mirarlas con el dueño del Portal antes de seguir: NO se aplico nada.', v_faltantes;
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- 1. Quien puede corregir documentos de la flota
 -- ---------------------------------------------------------------------------
@@ -121,4 +145,28 @@ create policy kardex_flota_documentos_storage_ins on storage.objects
 --   where tablename = 'flota_documentos' and policyname like 'kardex_%';
 --
 --   select kardex_flota_puede_editar();   -- true con una cuenta que pueda
+--
+-- ---------------------------------------------------------------------------
+-- PARA DESHACERLO (deja el Portal de Documentos exactamente como estaba)
+-- ---------------------------------------------------------------------------
+-- Todo lo que agrega este archivo lleva nombre propio, asi que se quita sin
+-- tocar una sola linea de lo que el Portal ya tenia. Correr esto:
+--
+--   drop policy if exists kardex_flota_documentos_ins on public.flota_documentos;
+--   drop policy if exists kardex_flota_documentos_upd on public.flota_documentos;
+--   drop policy if exists kardex_flota_documentos_storage_ins on storage.objects;
+--   revoke insert, update on public.flota_documentos from authenticated;
+--   drop function if exists kardex_flota_puede_editar();
+--
+-- OJO con el revoke: si "authenticated" YA tenia ese permiso antes de correr
+-- este archivo (cosa que se ve con la consulta de abajo), quitarlo si podria
+-- afectar al Portal. Mirar ANTES de aplicar nada:
+--
+--   select grantee, privilege_type
+--   from information_schema.role_table_grants
+--   where table_schema = 'public' and table_name = 'flota_documentos'
+--     and grantee in ('anon', 'authenticated');
+--
+-- Si ahi ya aparecen INSERT/UPDATE para authenticated, al deshacer hay que
+-- saltarse la linea del revoke.
 -- ---------------------------------------------------------------------------
