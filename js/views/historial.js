@@ -1,5 +1,12 @@
 const PAGE_SIZE = 15;
 
+// Tope de personas que puede abarcar una busqueda. El filtro viaja como una
+// lista de ids dentro de la URL de la consulta; con la plantilla completa de
+// empleados esa URL se pasaria de largo. Con dos letras o mas, una busqueda
+// normal no se acerca a este numero -- y si lo hace, la pantalla lo dice en
+// vez de devolver resultados incompletos en silencio.
+const MAX_EMPLEADOS_BUSCADOS = 250;
+
 // Combuses entrega dotación 3 veces al año: abril, agosto y diciembre. En
 // vez de que cada quien anote a mano a qué entrega corresponde una salida,
 // se calcula solo a partir de la fecha de entrega -- cuatrimestre fijo, sin
@@ -36,6 +43,19 @@ Router.register('historial', {
         this._load();
       });
       document.getElementById('historial-export-btn').addEventListener('click', () => this._exportExcel());
+      // Se espera a que deje de escribir: cada letra es una consulta.
+      document.getElementById('historial-buscar').addEventListener('input', () => {
+        clearTimeout(this._debounceBuscar);
+        this._debounceBuscar = setTimeout(() => {
+          this._page = 1;
+          this._load();
+        }, 300);
+      });
+      document.getElementById('historial-buscar-limpiar').addEventListener('click', () => {
+        document.getElementById('historial-buscar').value = '';
+        this._page = 1;
+        this._load();
+      });
       document.getElementById('historial-prev').addEventListener('click', () => {
         if (this._page > 1) { this._page -= 1; this._load(); }
       });
@@ -88,14 +108,72 @@ Router.register('historial', {
     return rangoPeriodo(year, nombre);
   },
 
+  // Convierte lo que se escribió en el buscador a los ids de empleado que
+  // coinciden, que es lo que entiende la consulta.
+  //
+  // Devuelve null cuando no hay búsqueda (no filtrar), [] cuando no coincide
+  // nadie (no hay nada que mostrar), o la lista de ids.
+  async _idsBuscados() {
+    const texto = (document.getElementById('historial-buscar').value || '').trim().toLowerCase();
+    this._busqueda = texto;
+    this._busquedaRecortada = false;
+    if (texto.length < 2) return null;
+
+    // La plantilla se pide una sola vez y se guarda: son unos cientos de
+    // filas y no cambian mientras alguien busca.
+    if (!this._empleados) {
+      this._empleados = await DB.getEmployees({ onlyActive: false });
+    }
+    // Se busca también entre los retirados a propósito: el historial es
+    // justamente donde se consulta qué se le entregó a alguien que ya no
+    // está, por ejemplo para un paz y salvo.
+    const sinPuntos = texto.replace(/[.\s]/g, '');
+    const encontrados = this._empleados.filter((e) =>
+      String(e.nombre || '').toLowerCase().includes(texto)
+      || String(e.cedula || '').replace(/[.\s]/g, '').includes(sinPuntos));
+
+    if (encontrados.length > MAX_EMPLEADOS_BUSCADOS) {
+      this._busquedaRecortada = encontrados.length;
+      return encontrados.slice(0, MAX_EMPLEADOS_BUSCADOS).map((e) => e.id);
+    }
+    return encontrados.map((e) => e.id);
+  },
+
+  _pintarResultadoBusqueda() {
+    const el = document.getElementById('historial-buscar-info');
+    if (!el) return;
+    if (!this._busqueda) { el.textContent = ''; return; }
+    if (this._busquedaRecortada) {
+      el.textContent = `Coinciden ${this._busquedaRecortada} personas: se muestran las primeras ${MAX_EMPLEADOS_BUSCADOS}. Escribe un poco más.`;
+      return;
+    }
+    el.textContent = `${this._total || 0} movimiento(s) de ${this._personasEncontradas || 0} persona(s).`;
+  },
+
   // Trae solo la página actual (no todo el historial): con entregas
   // masivas el listado puede crecer a miles de filas y traerlas todas de
   // una sola vez sería lento tanto para Supabase como para el navegador.
   async _load() {
     const tipo = document.getElementById('historial-tipo').value || undefined;
     const periodo = this._periodoSeleccionado();
+    const ids = await this._idsBuscados();
+    this._personasEncontradas = ids ? ids.length : 0;
+
+    // Nadie coincide: no hay por qué preguntarle a la base.
+    if (ids && ids.length === 0) {
+      this._movements = [];
+      this._total = 0;
+      this._totalPages = 1;
+      this._renderPagination();
+      document.getElementById('historial-list').innerHTML =
+        `<p class="muted">Nadie coincide con "${escapeHtml(this._busqueda)}".</p>`;
+      this._pintarResultadoBusqueda();
+      return;
+    }
+
     const { movements, total } = await DB.getMovements({
       tipo,
+      employeeIds: ids || undefined,
       fechaEntregaFrom: periodo?.from,
       fechaEntregaTo: periodo?.to,
       page: this._page,
@@ -111,9 +189,16 @@ Router.register('historial', {
 
     this._renderPagination();
 
+    this._pintarResultadoBusqueda();
+
     const list = document.getElementById('historial-list');
     if (movements.length === 0) {
-      list.innerHTML = '<p class="muted">Sin movimientos.</p>';
+      // Una entrada de inventario no tiene empleado: buscar por persona y
+      // filtrar por "Entradas" no puede dar nada, y conviene decirlo en vez
+      // de dejar un "sin movimientos" que parece un error.
+      list.innerHTML = this._busqueda && tipo === 'entrada'
+        ? '<p class="muted">Las entradas de inventario no van a nombre de nadie: quita el filtro de "Entradas" para buscar por persona.</p>'
+        : '<p class="muted">Sin movimientos.</p>';
       return;
     }
     list.innerHTML = movements.map((m) => {
@@ -210,7 +295,20 @@ Router.register('historial', {
     btn.disabled = true;
     Loading.show('Preparando Excel…');
     try {
-      const { movements } = await DB.getMovements({ tipo, fechaEntregaFrom: periodo?.from, fechaEntregaTo: periodo?.to });
+      // El Excel sale con lo MISMO que se está viendo. Descargar el
+      // historial completo cuando en pantalla hay una búsqueda sería
+      // entregar un archivo que no es el que se pidió.
+      const ids = await this._idsBuscados();
+      if (ids && ids.length === 0) {
+        alert('No hay movimientos para exportar: nadie coincide con la búsqueda.');
+        return;
+      }
+      const { movements } = await DB.getMovements({
+        tipo,
+        employeeIds: ids || undefined,
+        fechaEntregaFrom: periodo?.from,
+        fechaEntregaTo: periodo?.to,
+      });
       if (movements.length === 0) {
         alert('No hay movimientos para exportar.');
         return;

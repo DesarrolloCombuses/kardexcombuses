@@ -2241,6 +2241,11 @@
         <!-- ================= HISTORIAL ================= -->
         <section data-view="historial" class="view">
           <div class="toolbar">
+            <div class="search-input">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M17 17l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <input type="search" id="historial-buscar" placeholder="Buscar por nombre o cédula…" />
+            </div>
+            <button type="button" id="historial-buscar-limpiar" class="btn-secondary">Limpiar</button>
             <select id="historial-tipo">
               <option value="">Todos los movimientos</option>
               <option value="entrada">Entradas</option>
@@ -2255,6 +2260,7 @@
               Descargar Excel
             </button>
           </div>
+          <p class="empty-note" id="historial-buscar-info"></p>
           <div id="historial-list" class="movement-list"></div>
           <div id="historial-pagination" class="pagination hidden">
             <button type="button" id="historial-prev" class="btn-secondary">← Anterior</button>

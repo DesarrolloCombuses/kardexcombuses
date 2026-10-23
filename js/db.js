@@ -1068,7 +1068,7 @@ const DB = {
   // Cuando sí se pasan, se pide el conteo exacto junto con la página para
   // poder mostrar "Página X de Y" sin traer todas las filas al navegador
   // -- importante si hay miles de movimientos (entregas masivas).
-  async getMovements({ tipo, employeeId, from, to, fechaEntregaFrom, fechaEntregaTo, page, pageSize } = {}) {
+  async getMovements({ tipo, employeeId, employeeIds, from, to, fechaEntregaFrom, fechaEntregaTo, page, pageSize } = {}) {
     let query = window.supabaseClient
       .from('kardex_movements')
       .select(`
@@ -1084,6 +1084,11 @@ const DB = {
 
     if (tipo) query = query.eq('tipo', tipo);
     if (employeeId) query = query.eq('employee_id', employeeId);
+    // Varias personas de una: es lo que usa el buscador del Historial. El
+    // filtro va en la CONSULTA y no sobre lo ya traido, porque el listado
+    // viene paginado -- filtrar la pagina visible dejaria por fuera a quien
+    // este en la pagina siete, que es justo a quien se esta buscando.
+    if (employeeIds) query = query.in('employee_id', employeeIds);
     if (from) query = query.gte('fecha', from);
     if (to) query = query.lte('fecha', to);
     // Filtro por período (Abril/Agosto/Diciembre): usa fecha_entrega, no
