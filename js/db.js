@@ -1219,6 +1219,88 @@ const DB = {
     return data.signedUrl;
   },
 
+  // ---- Contratos laborales (periodo de prueba y preaviso) ---------------------
+  // Ver sql/contratos_laborales_2026-10-22.sql.
+
+  // Las dos cuentas regresivas vienen calculadas de la base, no del
+  // navegador: si el reloj del equipo esta corrido, un preaviso "a tiempo"
+  // podria estar vencido de verdad.
+  async getAlertasContratos(diasPreaviso = 30) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_contratos_alertas', { p_dias_preaviso: diasPreaviso });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getContratosDeEmpleado(employeeId) {
+    const { data, error } = await window.supabaseClient
+      .from('kardex_contratos')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('fecha_inicio', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async guardarContrato({ id = null, employeeId, tipo, fechaInicio, fechaFin,
+                          finPeriodoPrueba, observaciones }) {
+    const fila = {
+      employee_id: employeeId,
+      tipo: tipo || 'FIJO',
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin || null,
+      fin_periodo_prueba: finPeriodoPrueba || null,
+      observaciones: observaciones || null,
+    };
+
+    if (id) {
+      const { error } = await window.supabaseClient
+        .from('kardex_contratos')
+        .update({ ...fila, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    }
+
+    const { data: sessionData } = await window.supabaseClient.auth.getSession();
+    const nombre = await this.getMyDisplayName();
+    const { data, error } = await window.supabaseClient
+      .from('kardex_contratos')
+      .insert({
+        ...fila,
+        creado_por_email: sessionData.session.user.email,
+        creado_por_nombre: nombre,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  },
+
+  // El correo de quien entrega el preaviso lo pone el servidor con la
+  // sesion, no el cliente: esa marca es la que responde "quien aviso y
+  // cuando" si alguien lo discute.
+  async marcarPreavisoContrato(id, { fecha = null, decision = null } = {}) {
+    const nombre = await this.getMyDisplayName();
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_contrato_marcar_preaviso', {
+        p_id: id,
+        p_fecha: fecha,
+        p_decision: decision,
+        p_nombre: nombre,
+      });
+    if (error) throw error;
+    return data;
+  },
+
+  async borrarContrato(id) {
+    const { error } = await window.supabaseClient
+      .from('kardex_contratos')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   // ---- Actividades ------------------------------------------------------------
   // Ver sql/actividades_2026-09-22.sql. Una actividad agrupa muchos
   // registros individuales de "a quién se le dio esto" (firma + foto del

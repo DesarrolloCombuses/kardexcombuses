@@ -991,7 +991,7 @@
 
         <!-- ================= PERSONAL: ALERTAS ================= -->
         <section data-view="personal-alertas" class="view">
-          <p class="view-intro">Personas mayores de 50 años, personas sin dotación entregada, personas con el perfil sin actualizar y conductores sin base asignada -- seguimiento para gestión humana, SG-SST y bodega.</p>
+          <p class="view-intro">Contratos a término fijo (fin del periodo de prueba y entrega del preaviso), personas mayores de 50 años, personas sin dotación entregada, personas con el perfil sin actualizar y conductores sin base asignada -- seguimiento para gestión humana, SG-SST y bodega.</p>
 
           <div class="toolbar">
             <label class="filtro-inline">
@@ -1007,6 +1007,72 @@
               <select id="pa-filtro-cargo" data-todos="Todos los cargos"><option value="">Todos los cargos</option></select>
             </label>
             <span class="muted" id="pa-filtro-resultado"></span>
+          </div>
+
+          <!-- Contratos a termino fijo: lo primero, porque son las dos fechas
+               que no se pueden dejar pasar. El preaviso tiene plazo legal. -->
+          <div class="cards cards--compact" id="ct-kpis">
+            <div class="card">
+              <span class="card-icon" data-tone="amber">
+                <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 5.8V10l2.8 1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ct-kpi-prueba">—</div>
+                <div class="card-label">Periodos de prueba por vencer</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="red">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.2l7 12.3H3l7-12.3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v3.1M10 13.3v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ct-kpi-preaviso">—</div>
+                <div class="card-label">Preavisos por entregar</div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="card-icon" data-tone="blue">
+                <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="3" width="12" height="14" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M7 7.5h6M7 10.5h6M7 13.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <div class="card-value" id="ct-kpi-total">—</div>
+                <div class="card-label">Contratos a término fijo</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button type="button" id="ct-nuevo-btn">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Registrar contrato
+            </button>
+            <label class="filtro-inline">
+              Ver lo que vence en
+              <select id="ct-ventana">
+                <option value="30">30 días</option>
+                <option value="45" selected>45 días</option>
+                <option value="60">60 días</option>
+                <option value="9999">Todo</option>
+              </select>
+            </label>
+            <span class="muted" id="ct-mensaje"></span>
+          </div>
+
+          <div class="stat-grid">
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Periodo de prueba por vencer</h2>
+                <p class="view-intro" id="ct-prueba-subtitulo" style="margin:0.2rem 0 0">—</p>
+              </div>
+              <div id="ct-prueba-lista" class="detalle-list detalle-list-scroll"></div>
+            </div>
+            <div class="panel-card chart-card">
+              <div class="section-heading">
+                <h2>Preaviso por entregar</h2>
+                <p class="view-intro" id="ct-preaviso-subtitulo" style="margin:0.2rem 0 0">—</p>
+              </div>
+              <div id="ct-preaviso-lista" class="detalle-list detalle-list-scroll"></div>
+            </div>
           </div>
 
           <div class="stat-grid">
@@ -3297,6 +3363,7 @@
   <script src="js/views/aspirantes.js"></script>
   <script src="js/views/empleados.js"></script>
   <script src="js/views/personal-cumpleanos.js"></script>
+  <script src="js/contratos-alertas.js"></script>
   <script src="js/views/personal-alertas.js"></script>
   <script src="js/views/personal-conductores.js"></script>
   <script src="js/views/personal-perfil.js"></script>

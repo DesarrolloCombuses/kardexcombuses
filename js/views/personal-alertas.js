@@ -58,6 +58,11 @@ Router.register('personal-alertas', {
     // todavía no ha cerrado, o sea la próxima entrega.
     const hoyISO = new Date().toISOString().slice(0, 10);
     document.getElementById('pa-sindotacion-proxima').textContent = `Próxima entrega estimada: ${periodoDeFecha(hoyISO)}`;
+
+    // Los contratos a término fijo son un bloque aparte (ver
+    // js/contratos-alertas.js): tienen su propio filtro y su propio modal.
+    // Si ese archivo falla, las alertas de siempre siguen funcionando.
+    if (window.ContratosAlertas) await ContratosAlertas.montar();
   },
 
   // Cargo se llena con los valores que realmente existen en los datos (no
