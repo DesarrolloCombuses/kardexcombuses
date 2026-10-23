@@ -22,6 +22,17 @@
 -- cuando vencio el primero y si se preaviso. Aca cada contrato es una fila y
 -- el historial queda.
 --
+-- EL CASO QUE LO MOTIVO
+-- Los administrativos vinculados desde agosto tienen contrato a TRES
+-- MESES con periodo de prueba de 18 dias. Los dos numeros salen solos del
+-- calculo legal y por eso no hay nada que configurar: la quinta parte de 92
+-- dias son 18, y el preaviso de 30 dias antes del vencimiento cae en el dia
+-- 62 del contrato -- los "60 dias calendario" de los que hablaba gestion
+-- humana.
+--
+-- Con tres meses de plazo eso se repite cuatro veces al año por persona, y
+-- al cuarto contrato aparece el techo del art. 46 (ver numero_contrato).
+--
 -- LAS FECHAS NO SE CALCULAN SOLAS A PROPOSITO
 -- fecha_fin y fin_periodo_prueba se guardan como dato, no como formula. El
 -- plazo lo pacta cada contrato y la pantalla propone el calculo al
@@ -181,7 +192,14 @@ returns table (
   observaciones text,
   fecha_limite_preaviso date,
   dias_para_prueba integer,
-  dias_para_preaviso integer
+  dias_para_preaviso integer,
+  -- En que numero va: 1 es el contrato inicial, 2 la primera prorroga, y
+  -- asi. Importa porque un termino fijo INFERIOR A UN AÑO solo se puede
+  -- prorrogar tres veces por periodos iguales o menores; de ahi en
+  -- adelante la renovacion no puede bajar de un año (art. 46 CST). Con
+  -- contratos de tres meses ese techo llega al primer año.
+  numero_contrato integer,
+  duracion_dias integer
 )
 language plpgsql
 stable
@@ -195,12 +213,17 @@ begin
   end if;
 
   return query
-  with vigente as (
+  with numerados as (
+    select c.*,
+           row_number() over (partition by c.employee_id
+                              order by c.fecha_inicio, c.created_at)::integer as n
+    from kardex_contratos c
+  ), vigente as (
     -- Uno por persona: el contrato que empezo mas tarde. Las prorrogas
     -- viejas quedan en la tabla pero no generan alerta.
-    select distinct on (c.employee_id) c.*
-    from kardex_contratos c
-    order by c.employee_id, c.fecha_inicio desc, c.created_at desc
+    select distinct on (v.employee_id) v.*
+    from numerados v
+    order by v.employee_id, v.fecha_inicio desc, v.created_at desc
   )
   select
     v.id,
@@ -223,7 +246,9 @@ begin
     case when v.fin_periodo_prueba is null then null
          else (v.fin_periodo_prueba - current_date)::integer end,
     case when v.fecha_fin is null then null
-         else ((v.fecha_fin - greatest(coalesce(p_dias_preaviso, 30), 0)) - current_date)::integer end
+         else ((v.fecha_fin - greatest(coalesce(p_dias_preaviso, 30), 0)) - current_date)::integer end,
+    v.n,
+    case when v.fecha_fin is null then null else (v.fecha_fin - v.fecha_inicio)::integer end
   from vigente v
   join employees e on e.id = v.employee_id;
 end;

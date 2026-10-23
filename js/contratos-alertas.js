@@ -69,6 +69,27 @@ function ctSugerirFinPrueba(isoInicio, isoFin) {
   return ctAIso(quintaParte < tope ? quintaParte : tope);
 }
 
+// Un termino fijo INFERIOR A UN AÑO solo puede prorrogarse tres veces por
+// periodos iguales o menores; de ahi en adelante la renovacion no puede
+// bajar de un año (art. 46 del Codigo Sustantivo del Trabajo). Con contratos
+// de tres meses ese techo llega al cumplir el primer año, y es facil pasarlo
+// por alto justo porque cada prorroga se siente igual a la anterior.
+//
+// Devuelve el aviso cuando aplica, o cadena vacia.
+function ctAvisoProrrogas(contrato) {
+  if (!contrato || !contrato.fecha_fin) return '';
+  const dias = Number(contrato.duracion_dias) || 0;
+  if (!dias || dias >= 365) return '';
+  const numero = Number(contrato.numero_contrato) || 1;
+  if (numero >= 4) {
+    return 'Ya van ' + numero + ' contratos seguidos de menos de un año: la renovación siguiente no puede ser inferior a un año.';
+  }
+  if (numero === 3) {
+    return 'Esta es la tercera prórroga. La próxima renovación ya no puede ser inferior a un año.';
+  }
+  return '';
+}
+
 function ctPuedeEditar() {
   if (window.APP_ROLE === 'admin') return true;
   if (window.APP_GRUPO === 'GESTION HUMANA') return true;
@@ -188,8 +209,10 @@ const ContratosAlertas = {
         tag = dias <= 7 ? 'pendiente' : 'activo';
       }
       const accion = clase === 'preaviso' && ctPuedeEditar()
-        ? `<button type="button" class="btn-secondary" data-preaviso="${c.id}">Registrar entrega</button>`
+        ? `<button type="button" class="btn-secondary" data-preaviso="${c.id}">Registrar entrega</button>
+           <button type="button" class="btn-secondary" data-contrato="${c.id}">Contrato</button>`
         : (ctPuedeEditar() ? `<button type="button" class="btn-secondary" data-contrato="${c.id}">Ver contrato</button>` : '');
+      const aviso = clase === 'preaviso' ? ctAvisoProrrogas(c) : '';
 
       return `
         <div class="detalle-list-item">
@@ -200,6 +223,7 @@ const ContratosAlertas = {
               <span>${clase === 'prueba' ? 'Prueba hasta' : 'Avisar antes del'} ${ctFormatFecha(fecha)}</span>
               ${clase === 'preaviso' ? `<span>Vence ${ctFormatFecha(c.fecha_fin)}</span>` : ''}
             </div>
+            ${aviso ? `<p class="empty-note" style="margin-top:0.25rem">${ctEscapeHtml(aviso)}</p>` : ''}
           </div>
           <div class="pa-doc-cell">
             <span class="tag ${tag}">${ctEscapeHtml(etiqueta)}</span>
@@ -296,6 +320,16 @@ const ContratosAlertas = {
         </form>
       </div>
 
+      ${!esNuevo && contrato.fecha_fin ? `
+      <div class="modal-section">
+        <h3 class="modal-section-title">Prórroga</h3>
+        <p class="prose-p">Al prorrogarlo se crea el contrato siguiente, que arranca el día
+          después de ${ctFormatFecha(contrato.fecha_fin)} y trae su propia alerta de preaviso.
+          El contrato actual queda en el historial.</p>
+        ${ctAvisoProrrogas(contrato) ? `<p class="form-msg error">${ctEscapeHtml(ctAvisoProrrogas(contrato))}</p>` : ''}
+        <button type="button" class="btn-secondary" id="ct-prorrogar">Registrar prórroga</button>
+      </div>` : ''}
+
       ${!esNuevo && contrato.preaviso_entregado_en ? `
       <div class="modal-section">
         <h3 class="modal-section-title">Preaviso</h3>
@@ -333,6 +367,50 @@ const ContratosAlertas = {
     });
     document.getElementById('ct-form')
       .addEventListener('submit', (e) => this._guardar(e, contrato));
+    const btnProrroga = document.getElementById('ct-prorrogar');
+    if (btnProrroga) btnProrroga.addEventListener('click', () => this._prorrogar(contrato));
+  },
+
+  // La prorroga es un contrato NUEVO, no una fecha cambiada: asi queda
+  // cuando vencio el anterior y si se preaviso. Arranca el dia siguiente al
+  // vencimiento y, por defecto, dura lo mismo que el que termina.
+  //
+  // Sin periodo de prueba: solo cabe en el primer contrato con la persona.
+  _prorrogar(contrato) {
+    const fin = ctParseFecha(contrato.fecha_fin);
+    if (!fin) return;
+    const inicio = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate() + 1);
+    const dias = Number(contrato.duracion_dias) || 0;
+    const nuevoFin = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + dias);
+
+    this._abrirModal(null);
+    // _abrirModal es asincrono solo por la carga de empleados; cuando ya
+    // estan cargados el formulario esta listo en el mismo tick. Se espera
+    // al siguiente para no depender de eso.
+    setTimeout(() => {
+      const buscar = document.getElementById('ct-empleado-buscar');
+      const oculto = document.getElementById('ct-empleado-id');
+      if (!buscar || !oculto) return;
+      oculto.value = contrato.employee_id;
+      buscar.value = `${contrato.nombre} — CC ${contrato.cedula}`;
+      buscar.readOnly = true;
+      document.getElementById('ct-tipo').value = contrato.tipo || 'FIJO';
+      document.getElementById('ct-inicio').value = ctAIso(inicio);
+      document.getElementById('ct-fin').value = ctAIso(nuevoFin);
+      // La prueba se deja vacia y marcada como tocada, para que el
+      // recalculo automatico no la vuelva a llenar.
+      const prueba = document.getElementById('ct-prueba');
+      prueba.value = '';
+      prueba.dataset.tocado = '1';
+      const nota = document.getElementById('ct-prueba-nota');
+      if (nota) nota.textContent = 'En una prórroga no hay periodo de prueba: solo cabe en el primer contrato.';
+      const aviso = ctAvisoProrrogas(contrato);
+      if (aviso) {
+        const msg = document.getElementById('ct-form-msg');
+        msg.textContent = aviso;
+        msg.className = 'form-msg error';
+      }
+    }, 0);
   },
 
   _notaPrueba() {
