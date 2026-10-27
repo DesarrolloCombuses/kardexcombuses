@@ -11,6 +11,8 @@
 
 const ORDEN_GRAVEDAD_ACCIDENTE = ['SOLO DAÑOS', 'HERIDO', 'MUERTO', 'Sin dato'];
 
+const ST_BOTONES_EXPORT = ['st-export-btn-top', 'st-export-btn'];
+
 // Copia local (no compartida con las vistas de personal-*.js) a propósito:
 // cada vista de este proyecto se mantiene autocontenida en vez de depender
 // de que otro archivo se haya cargado antes en app.html.
@@ -161,7 +163,13 @@ Router.register('siniestros-transito', {
       document.getElementById('st-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('st-filtro-tipo').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('st-sst-actualizar-btn').addEventListener('click', () => this._actualizarSiniestrosAhora());
-      document.getElementById('st-export-btn').addEventListener('click', () => this._exportExcel());
+      // Dos botones para la misma descarga: uno arriba, en la barra de
+      // acciones del modulo (lo primero que se ve al entrar), y otro abajo,
+      // junto a los filtros que respeta.
+      ST_BOTONES_EXPORT.forEach((id) => {
+        const boton = document.getElementById(id);
+        if (boton) boton.addEventListener('click', () => this._exportExcel());
+      });
       document.getElementById('st-mes-select').addEventListener('change', () => {
         const porMes = this._mesesConDatos();
         this._renderRanking(porMes.get(document.getElementById('st-mes-select').value) || [], 'st-ranking-mes');
@@ -430,21 +438,27 @@ Router.register('siniestros-transito', {
     this._renderTabla(filtrados);
   },
 
+  _botonesExport(deshabilitados) {
+    ST_BOTONES_EXPORT.forEach((id) => {
+      const boton = document.getElementById(id);
+      if (boton) boton.disabled = deshabilitados;
+    });
+  },
+
   async _exportExcel() {
-    const btn = document.getElementById('st-export-btn');
     const items = this._filtrados || [];
     if (!items.length) {
       alert('No hay registros para exportar con estos filtros.');
       return;
     }
-    btn.disabled = true;
+    this._botonesExport(true);
     Loading.show('Preparando Excel…');
     try {
       this._buildExcel(items);
     } catch (err) {
       alert('No se pudo generar el Excel: ' + err.message);
     } finally {
-      btn.disabled = false;
+      this._botonesExport(false);
       Loading.hide();
     }
   },
