@@ -95,6 +95,58 @@ function stFormatFecha(valor) {
   return valor ? String(valor) : '—';
 }
 
+// Fecha para una celda de Excel: el numero de serie que entiende Excel, no
+// texto -- si va como texto no se puede ordenar ni filtrar por fecha, que es
+// la mitad de la razon para bajar el archivo. Se reusa stParseFecha para no
+// tener dos ideas distintas de que es una fecha en este archivo. Si no se
+// reconoce el formato (pasa con el Sheet, que es texto libre) se devuelve el
+// texto crudo: la celda queda fea pero el dato no se pierde.
+function stFechaCeldaExcel(valor) {
+  const d = stParseFecha(valor);
+  if (!d) return valor ? String(valor) : '';
+  return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+    - Date.UTC(1899, 11, 30)) / 86400000);
+}
+
+// Columnas de cada fuente para el Excel. En pantalla las tres se muestran
+// aplastadas en seis columnas comunes (fecha/tipo/conductor/cedula/placa/un
+// texto de "detalle"), porque no comparten casi nada. Eso sirve para mirar,
+// pero no para trabajar el archivo: el numero del comparendo, el croquis, la
+// direccion o la clase de accidente quedaban por fuera. Acá cada fuente baja
+// con sus propias columnas.
+const ST_COLUMNAS_COMPARENDO = [
+  { label: 'Comparendo No.', get: (r) => r.comparendo_nro || '' },
+  { label: 'Fecha', get: (r) => stFechaCeldaExcel(r.fecha_comparendo), fecha: true },
+  { label: 'Cedula', get: (r) => r.cedula || '' },
+  { label: 'Conductor', get: (r) => r.nombre_infractor || '' },
+  { label: 'Placa', get: (r) => r.placa || '' },
+  { label: 'Codigo', get: (r) => r.codigo_infraccion || '' },
+  { label: 'Infraccion', get: (r) => r.infraccion || '' },
+  { label: 'Tipo de comparendo', get: (r) => r.tipo_comparendo || '' },
+];
+
+const ST_COLUMNAS_ACCIDENTE = [
+  { label: 'Croquis No.', get: (r) => r.nro_croquis || '' },
+  { label: 'Fecha', get: (r) => stFechaCeldaExcel(r.fecha_accidente), fecha: true },
+  { label: 'Cedula', get: (r) => r.cedula || '' },
+  { label: 'Conductor', get: (r) => r.nombre_infractor || '' },
+  { label: 'Placa', get: (r) => r.placa || '' },
+  { label: 'Clase de accidente', get: (r) => r.clase_accidente || '' },
+  { label: 'Gravedad', get: (r) => r.gravedad_accidente || '' },
+  { label: 'Direccion', get: (r) => r.direccion || '' },
+];
+
+// Placa del bus en un siniestro de SST. El Sheet la trae en "PLACA
+// AFILIADO" (hay tambien "PLACA TERCERO", que es la del otro vehiculo, no la
+// nuestra). Los nombres de columna llegan sin espacios al borde y en
+// mayusculas porque asi los guarda sync-siniestros.
+function stPlacaSiniestro(siniestro) {
+  const crudo = siniestro?.crudo || {};
+  const placa = String(crudo['PLACA AFILIADO'] || '').trim().toUpperCase();
+  // "N/N" es como el Sheet marca "no aplica" -- no es una placa.
+  return placa && placa !== 'N/N' ? placa : null;
+}
+
 function stEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -109,6 +161,7 @@ Router.register('siniestros-transito', {
       document.getElementById('st-search').addEventListener('input', () => this._aplicarFiltro());
       document.getElementById('st-filtro-tipo').addEventListener('change', () => this._aplicarFiltro());
       document.getElementById('st-sst-actualizar-btn').addEventListener('click', () => this._actualizarSiniestrosAhora());
+      document.getElementById('st-export-btn').addEventListener('click', () => this._exportExcel());
       document.getElementById('st-mes-select').addEventListener('change', () => {
         const porMes = this._mesesConDatos();
         this._renderRanking(porMes.get(document.getElementById('st-mes-select').value) || [], 'st-ranking-mes');
@@ -154,6 +207,9 @@ Router.register('siniestros-transito', {
     // "detalle" en vez de forzar columnas que casi siempre quedarían vacías.
     this._items = [
       ...infracciones.map((i) => ({
+        // El registro original, para que la descarga pueda bajar las columnas
+        // propias de cada fuente y no solo las seis de la tabla.
+        raw: i,
         fecha: i.fecha_comparendo,
         tipo: 'Comparendo',
         cedula: i.cedula,
@@ -162,6 +218,7 @@ Router.register('siniestros-transito', {
         detalle: [i.codigo_infraccion, i.infraccion].filter(Boolean).join(' — ') || i.tipo_comparendo || '—',
       })),
       ...accidentes.map((a) => ({
+        raw: a,
         fecha: a.fecha_accidente,
         tipo: 'Accidente',
         cedula: a.cedula,
@@ -170,11 +227,12 @@ Router.register('siniestros-transito', {
         detalle: [a.clase_accidente, a.gravedad_accidente].filter(Boolean).join(' — ') || a.direccion || '—',
       })),
       ...this._siniestros.map((s) => ({
+        raw: s,
         fecha: s.fecha,
         tipo: 'Siniestro SST',
         cedula: s.cedula,
         nombre: nombrePorCedula.get(s.cedula) || null,
-        placa: null,
+        placa: stPlacaSiniestro(s),
         detalle: [s.definicion, s.hipotesis].filter((v) => v && v !== 'N/N').join(' — ')
           || (s.pendiente ? 'Pendiente de conciliación' : 'Sin más detalle'),
       })),
@@ -367,7 +425,146 @@ Router.register('siniestros-transito', {
     document.getElementById('st-contador').textContent = filtrados.length === this._items.length
       ? `${this._items.length} registro(s)`
       : `Mostrando ${filtrados.length} de ${this._items.length} registro(s)`;
+    // Lo que se esta viendo es lo que baja el Excel.
+    this._filtrados = filtrados;
     this._renderTabla(filtrados);
+  },
+
+  async _exportExcel() {
+    const btn = document.getElementById('st-export-btn');
+    const items = this._filtrados || [];
+    if (!items.length) {
+      alert('No hay registros para exportar con estos filtros.');
+      return;
+    }
+    btn.disabled = true;
+    Loading.show('Preparando Excel…');
+    try {
+      this._buildExcel(items);
+    } catch (err) {
+      alert('No se pudo generar el Excel: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  // Cuatro hojas, porque son cuatro preguntas distintas:
+  //  - "Todo": las tres fuentes juntas, igual que la tabla en pantalla. Sirve
+  //    para ver el historial de un conductor sin importar de donde salga cada
+  //    incidente.
+  //  - "Comparendos" / "Accidentes": una hoja por fuente con SUS columnas.
+  //  - "Siniestros SST": la hoja de SST completa, tal como la mantienen.
+  //
+  // Se omite la hoja de una fuente que quede sin filas (por el filtro de
+  // tipo): una hoja "Siniestros SST" vacia se lee como "no hay siniestros",
+  // que seria falso.
+  _buildExcel(items) {
+    const libro = XLSX.utils.book_new();
+    const fechaArchivo = new Date().toISOString().slice(0, 10);
+
+    // ---------- Hoja 1: las tres fuentes juntas ----------
+    const headerTodo = ['Fecha', 'Tipo', 'Conductor', 'Cedula', 'Placa', 'Detalle'];
+    const filasTodo = items.map((it) => ({
+      'Fecha': stFechaCeldaExcel(it.fecha),
+      'Tipo': it.tipo,
+      'Conductor': it.nombre || '',
+      'Cedula': it.cedula || '',
+      'Placa': it.placa || '',
+      'Detalle': it.detalle || '',
+    }));
+    XLSX.utils.book_append_sheet(libro, this._hoja(filasTodo, headerTodo, new Set(['Fecha'])), 'Todo');
+
+    // ---------- Hojas 2 y 3: comparendos y accidentes ----------
+    [
+      { tipo: 'Comparendo', nombre: 'Comparendos', cols: ST_COLUMNAS_COMPARENDO },
+      { tipo: 'Accidente', nombre: 'Accidentes', cols: ST_COLUMNAS_ACCIDENTE },
+    ].forEach(({ tipo, nombre, cols }) => {
+      const fuente = items.filter((it) => it.tipo === tipo).map((it) => it.raw).filter(Boolean);
+      if (!fuente.length) return;
+      const header = cols.map((c) => c.label);
+      const fechas = new Set(cols.filter((c) => c.fecha).map((c) => c.label));
+      const filas = fuente.map((r) => {
+        const fila = {};
+        cols.forEach((c) => { fila[c.label] = c.get(r); });
+        return fila;
+      });
+      XLSX.utils.book_append_sheet(libro, this._hoja(filas, header, fechas), nombre);
+    });
+
+    // ---------- Hoja 4: la hoja de SST completa ----------
+    const sst = items.filter((it) => it.tipo === 'Siniestro SST');
+    if (sst.length) {
+      XLSX.utils.book_append_sheet(libro, this._hojaSst(sst), 'Siniestros SST');
+    }
+
+    XLSX.writeFile(libro, `siniestros-combuses-${fechaArchivo}.xlsx`);
+  },
+
+  // La hoja de SST no tiene columnas fijas: las mantiene el equipo de SST en
+  // un Google Sheet y les agregan columnas cuando lo necesitan. Por eso el
+  // encabezado se arma de lo que realmente trajo la sincronizacion, en el
+  // mismo orden del Sheet (sync-siniestros guarda "datos" recorriendo el
+  // encabezado, asi que el orden de las claves ES el orden de las columnas) y
+  // no de una lista escrita aca, que se quedaria vieja sin que nadie se
+  // entere.
+  _hojaSst(items) {
+    const columnas = [];
+    const vistas = new Set();
+    items.forEach((it) => {
+      Object.keys(it.raw?.crudo || {}).forEach((k) => {
+        if (!vistas.has(k)) { vistas.add(k); columnas.push(k); }
+      });
+    });
+
+    // Si la fila cruda no llego (version vieja del cache, o la tabla todavia
+    // sin sincronizar), se baja lo que si se tiene en vez de una hoja con
+    // solo encabezados.
+    if (!columnas.length) {
+      const header = ['Fecha', 'Cedula', 'Conductor', 'Estado', 'Hipotesis', 'Lesionados', 'Conciliacion'];
+      const filas = items.map((it) => ({
+        'Fecha': stFechaCeldaExcel(it.fecha),
+        'Cedula': it.cedula || '',
+        'Conductor': it.nombre || '',
+        'Estado': it.raw?.definicion || '',
+        'Hipotesis': it.raw?.hipotesis || '',
+        'Lesionados': it.raw?.lesionados || '',
+        'Conciliacion': it.raw?.conciliacion || '',
+      }));
+      return this._hoja(filas, header, new Set(['Fecha']));
+    }
+
+    // El nombre que resuelve la app contra la planta va aparte y dice de
+    // donde sale: la columna CONDUCTOR del Sheet se escribe a mano y a veces
+    // viene vacia o con el nombre mal, y cuadrarla en silencio con la planta
+    // taparia justo lo que habria que corregir en el Sheet.
+    const header = ['Conductor (segun la planta)', ...columnas];
+    const filas = items.map((it) => {
+      const fila = { 'Conductor (segun la planta)': it.nombre || '' };
+      columnas.forEach((k) => { fila[k] = (it.raw?.crudo || {})[k] ?? ''; });
+      return fila;
+    });
+    // La fecha del Sheet es texto libre: se deja tal cual (sin convertir a
+    // numero de serie) para no "arreglar" un dato que podria estar mal
+    // escrito en el origen. La hoja "Todo" si la trae como fecha real.
+    return this._hoja(filas, header, new Set());
+  },
+
+  // Igual que en Parque automotor: formato de fecha en las columnas que lo
+  // llevan (si no, el numero de serie se ve como 46000 y nadie entiende que
+  // es) y un ancho de columna proporcional al titulo.
+  _hoja(filas, header, columnasFecha) {
+    const hoja = XLSX.utils.json_to_sheet(filas, { header });
+    const rango = XLSX.utils.decode_range(hoja['!ref']);
+    for (let col = rango.s.c; col <= rango.e.c; col++) {
+      if (!columnasFecha.has(header[col])) continue;
+      for (let row = rango.s.r + 1; row <= rango.e.r; row++) {
+        const celda = hoja[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (celda && celda.t === 'n') celda.z = 'd/m/yyyy';
+      }
+    }
+    hoja['!cols'] = header.map((h) => ({ wch: Math.min(Math.max(String(h).length + 2, 10), 34) }));
+    return hoja;
   },
 
   _renderTabla(items) {

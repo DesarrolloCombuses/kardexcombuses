@@ -56,6 +56,12 @@ function _reshapeFila(datos) {
     definicion: get('ESTADO DE SINIESTRO') || 'N/N',
     hipotesis: get('HIPOTESIS') || 'N/N',
     detalle,
+    // La fila completa tal como la trae el Sheet, con TODAS sus columnas y en
+    // su mismo orden -- incluidas las que "detalle" oculta. Solo la usa la
+    // descarga en Excel del modulo de Siniestros: bajar la base y que le
+    // falten columnas seria peor que no poder bajarla, porque nadie se daria
+    // cuenta de lo que no esta.
+    crudo: datos,
   };
 }
 
