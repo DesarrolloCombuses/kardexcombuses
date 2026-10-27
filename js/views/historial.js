@@ -38,9 +38,22 @@ Router.register('historial', {
         this._page = 1;
         this._load();
       });
+      // Período y rango libre son dos formas de decir lo mismo, así que se
+      // excluyen: elegir una limpia la otra. Mezclarlas (intersección)
+      // daría resultados que nadie pidió y que son difíciles de explicar
+      // mirando la pantalla.
       document.getElementById('historial-periodo').addEventListener('change', () => {
+        document.getElementById('historial-desde').value = '';
+        document.getElementById('historial-hasta').value = '';
         this._page = 1;
         this._load();
+      });
+      ['historial-desde', 'historial-hasta'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', () => {
+          document.getElementById('historial-periodo').value = '';
+          this._page = 1;
+          this._load();
+        });
       });
       document.getElementById('historial-export-btn').addEventListener('click', () => this._exportExcel());
       // Se espera a que deje de escribir: cada letra es una consulta.
@@ -52,7 +65,13 @@ Router.register('historial', {
         }, 300);
       });
       document.getElementById('historial-buscar-limpiar').addEventListener('click', () => {
+        // Limpia TODO: un <input type="date"> no trae una forma obvia de
+        // vaciarse, y dejar una fecha puesta sin salida es una trampa.
         document.getElementById('historial-buscar').value = '';
+        document.getElementById('historial-desde').value = '';
+        document.getElementById('historial-hasta').value = '';
+        document.getElementById('historial-periodo').value = '';
+        document.getElementById('historial-tipo').value = '';
         this._page = 1;
         this._load();
       });
@@ -98,7 +117,7 @@ Router.register('historial', {
       PERIODOS.forEach((p) => opciones.push(`<option value="${year}|${p.nombre}">${p.nombre} ${year}</option>`));
     }
     document.getElementById('historial-periodo').innerHTML =
-      '<option value="">Todos los períodos</option>' + opciones.join('');
+      '<option value="">Todos</option>' + opciones.join('');
   },
 
   _periodoSeleccionado() {
@@ -106,6 +125,43 @@ Router.register('historial', {
     if (!valor) return null;
     const [year, nombre] = valor.split('|');
     return rangoPeriodo(year, nombre);
+  },
+
+  // El rango de fechas que hay que aplicar, venga del período de dotación
+  // o de las fechas escritas a mano. Una sola función para que la pantalla
+  // y el Excel no puedan quedar filtrando distinto.
+  //
+  // Devuelve null si no hay filtro de fechas, o { from, to } -- cualquiera
+  // de los dos puede venir vacío: "desde el 1 de marzo" sin tope, o "hasta
+  // el 30 de junio" sin piso, son filtros válidos y útiles.
+  _rangoSeleccionado() {
+    const desde = document.getElementById('historial-desde').value;
+    const hasta = document.getElementById('historial-hasta').value;
+    this._rangoInvertido = !!(desde && hasta && desde > hasta);
+    if (desde || hasta) {
+      return { from: desde || undefined, to: hasta || undefined, aMano: true };
+    }
+    const periodo = this._periodoSeleccionado();
+    return periodo ? { ...periodo, aMano: false } : null;
+  },
+
+  // Las entradas de inventario no tienen fecha de entrega (esa fecha es de
+  // la entrega al empleado), así que cualquier filtro por fechas las deja
+  // por fuera. Se dice, en vez de que alguien concluya que se perdieron.
+  _avisoFechas(rango, tipo) {
+    if (!rango) return '';
+    if (tipo === 'entrada') {
+      return 'Las entradas de inventario no tienen fecha de entrega: quita el filtro de fechas para verlas.';
+    }
+    if (tipo) return '';
+    return 'El filtro de fechas usa la fecha de entrega, que solo tienen las salidas: las entradas no aparecen mientras esté puesto.';
+  },
+
+  _pintarRangoMsg(texto) {
+    const el = document.getElementById('historial-rango-msg');
+    if (!el) return;
+    el.textContent = texto || '';
+    el.classList.toggle('hidden', !texto);
   },
 
   // Convierte lo que se escribió en el buscador a los ids de empleado que
@@ -155,7 +211,24 @@ Router.register('historial', {
   // una sola vez sería lento tanto para Supabase como para el navegador.
   async _load() {
     const tipo = document.getElementById('historial-tipo').value || undefined;
-    const periodo = this._periodoSeleccionado();
+    const periodo = this._rangoSeleccionado();
+
+    // Fechas al revés: no se consulta. Devolver cero resultados haría
+    // pensar que no hubo entregas en ese rango, cuando el problema es el
+    // rango.
+    if (this._rangoInvertido) {
+      this._pintarRangoMsg('La fecha "Desde" es posterior a la "Hasta". Corrige una de las dos.');
+      this._movements = [];
+      this._total = 0;
+      this._totalPages = 1;
+      this._renderPagination();
+      document.getElementById('historial-list').innerHTML =
+        '<p class="muted">Revisa las fechas: la de inicio va después de la del final.</p>';
+      document.getElementById('historial-buscar-info').textContent = '';
+      return;
+    }
+    this._pintarRangoMsg('');
+
     const ids = await this._idsBuscados();
     this._personasEncontradas = ids ? ids.length : 0;
 
@@ -196,9 +269,12 @@ Router.register('historial', {
       // Una entrada de inventario no tiene empleado: buscar por persona y
       // filtrar por "Entradas" no puede dar nada, y conviene decirlo en vez
       // de dejar un "sin movimientos" que parece un error.
+      const porFechas = this._avisoFechas(periodo, tipo);
       list.innerHTML = this._busqueda && tipo === 'entrada'
         ? '<p class="muted">Las entradas de inventario no van a nombre de nadie: quita el filtro de "Entradas" para buscar por persona.</p>'
-        : '<p class="muted">Sin movimientos.</p>';
+        : porFechas
+          ? `<p class="muted">${escapeHtml(porFechas)}</p>`
+          : '<p class="muted">Sin movimientos.</p>';
       return;
     }
     list.innerHTML = movements.map((m) => {
@@ -291,7 +367,11 @@ Router.register('historial', {
   async _exportExcel() {
     const btn = document.getElementById('historial-export-btn');
     const tipo = document.getElementById('historial-tipo').value || undefined;
-    const periodo = this._periodoSeleccionado();
+    const periodo = this._rangoSeleccionado();
+    if (this._rangoInvertido) {
+      alert('La fecha "Desde" es posterior a la "Hasta". Corrige una de las dos antes de descargar.');
+      return;
+    }
     btn.disabled = true;
     Loading.show('Preparando Excel…');
     try {
@@ -310,17 +390,20 @@ Router.register('historial', {
         fechaEntregaTo: periodo?.to,
       });
       if (movements.length === 0) {
-        alert('No hay movimientos para exportar.');
+        const porFechas = this._avisoFechas(periodo, tipo);
+        alert(porFechas
+          ? 'No hay movimientos para exportar. ' + porFechas
+          : 'No hay movimientos para exportar.');
         return;
       }
-      this._buildExcel(movements);
+      this._buildExcel(movements, periodo);
     } finally {
       btn.disabled = false;
       Loading.hide();
     }
   },
 
-  _buildExcel(movements) {
+  _buildExcel(movements, rango) {
     const data = [];
     movements.forEach((m) => {
       const base = {
@@ -364,7 +447,12 @@ Router.register('historial', {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, 'Historial');
     const fecha = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `historial-kardex-${fecha}.xlsx`);
+    // El nombre dice el rango: quien baja varias descargas necesita
+    // distinguirlas sin abrirlas una por una.
+    const sufijo = rango
+      ? `${rango.from || 'inicio'}_a_${rango.to || fecha}`
+      : fecha;
+    XLSX.writeFile(workbook, `historial-kardex-${sufijo}.xlsx`);
   },
 
   async _openModal(id) {
