@@ -191,6 +191,7 @@ Router.register('usuarios', {
         ${sinFicha ? '' : `<span class="tag ${activo ? 'activo' : 'inactivo-tag'}">${activo ? 'Activo' : `Retirado${salida}`}</span>`}
         <span class="tag activo">${u.grupo}</span>
         <button type="button" class="btn-secondary" data-permisos="${u.employee_id}">Editar permisos</button>
+        <button type="button" class="btn-secondary" data-reset="${u.employee_id}">Restablecer contraseña</button>
         <button type="button" class="btn-secondary" data-quitar="${u.employee_id}">Quitar grupo</button>
       </div>
     `;
@@ -226,6 +227,9 @@ Router.register('usuarios', {
 
     lista.querySelectorAll('[data-quitar]').forEach((btn) => {
       btn.addEventListener('click', () => this._quitarGrupo(btn.dataset.quitar));
+    });
+    lista.querySelectorAll('[data-reset]').forEach((btn) => {
+      btn.addEventListener('click', () => this._resetPassword(btn.dataset.reset, btn));
     });
     lista.querySelectorAll('[data-permisos]').forEach((btn) => {
       btn.addEventListener('click', () => this._abrirPermisos(btn.dataset.permisos));
@@ -400,7 +404,10 @@ Router.register('usuarios', {
         passwordBox.textContent = `Cuenta creada. Contraseña temporal: ${resultado.tempPassword} — cópiala ahora y compártela con el empleado, no se vuelve a mostrar.`;
         passwordBox.classList.remove('hidden');
       } else {
-        msg.textContent = 'Esta cuenta ya existía — se actualizó su grupo.';
+        // Decir solo "ya existía" dejaba a quien la creó sin saber como
+        // seguir: la cuenta existe pero nadie sabe su contraseña.
+        msg.textContent = 'Esta cuenta ya existía — se actualizó su grupo. '
+          + 'Si no tienes la contraseña, usa "Restablecer contraseña" en la lista de abajo.';
         msg.className = 'form-msg success';
       }
       document.getElementById('us-form').reset();
@@ -410,6 +417,48 @@ Router.register('usuarios', {
       msg.className = 'form-msg error';
     } finally {
       submitBtn.disabled = false;
+      Loading.hide();
+    }
+  },
+
+  // Contraseña nueva para una cuenta que ya existe. Es el camino de salida
+  // cuando nadie copió la temporal del día que se creó: antes de esto, el
+  // formulario respondía "esta cuenta ya existía" y no había nada más que
+  // hacer desde el ERP.
+  async _resetPassword(employeeId, boton) {
+    const usuario = this._usuarios.find((u) => u.employee_id === employeeId);
+    const quien = usuario?.employee?.nombre || usuario?.alias || 'esta persona';
+    if (!confirm(
+      `Se genera una contraseña nueva para ${quien}.\n\n`
+      + 'La contraseña anterior deja de servir de inmediato. Si la persona '
+      + 'está usando el ERP en este momento, va a tener que volver a entrar.'
+    )) return;
+
+    const msg = document.getElementById('us-msg');
+    const passwordBox = document.getElementById('us-password-box');
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    passwordBox.classList.add('hidden');
+    boton.disabled = true;
+    Loading.show('Generando contraseña…');
+    try {
+      const r = await DB.resetPasswordUsuario({ employeeId });
+      passwordBox.textContent = `Contraseña nueva de ${r.nombre || quien} (${r.email}): `
+        + `${r.tempPassword} — cópiala ahora y compártela, no se vuelve a mostrar.`;
+      passwordBox.classList.remove('hidden');
+      // La contraseña YA cambió aunque no se haya podido dejar constancia:
+      // callarlo seria peor, porque quedaria un cambio sin rastro y nadie
+      // sabria que falta correr el SQL.
+      if (r.auditado === false) {
+        msg.textContent = 'La contraseña se cambió, pero no quedó constancia de quién lo hizo: falta correr sql/usuarios_reset_password_2026-10-30.sql.';
+        msg.className = 'form-msg error';
+      }
+      await this._load();
+    } catch (err) {
+      msg.textContent = 'No se pudo restablecer: ' + err.message;
+      msg.className = 'form-msg error';
+    } finally {
+      boton.disabled = false;
       Loading.hide();
     }
   },

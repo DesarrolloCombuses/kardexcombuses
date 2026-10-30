@@ -1566,6 +1566,22 @@ const DB = {
     return data;
   },
 
+  // Contraseña nueva para la cuenta de un empleado. La anterior deja de
+  // servir en el momento en que esto responde.
+  async resetPasswordUsuario({ employeeId }) {
+    const { data, error } = await window.supabaseClient.functions.invoke('kardex-reset-password', {
+      body: { employeeId },
+    });
+    if (error) {
+      // Igual que en crearUsuario: con un status distinto de 2xx el mensaje
+      // real viene en el body, no en error.message.
+      const detalle = await error.context?.json?.().catch(() => null);
+      throw new Error(detalle?.message || error.message);
+    }
+    if (!data?.ok) throw new Error(data?.message || 'No se pudo restablecer la contraseña.');
+    return data;
+  },
+
   async getUsuariosGrupos() {
     const { data, error } = await window.supabaseClient
       .from('kardex_empleado_grupos')
