@@ -210,6 +210,57 @@ async function sonarInsertDriver(user: string, password: string, driver: SonarDr
   return await doSoapCall(env2, SOAP_ACTION_INSERT_SONAR, true);
 }
 
+// Sonar responde HTTP 200 aunque rechace la operacion: el resultado real
+// viene en <status>/<description>/<error_code> dentro del XML.
+function sonarResultado(parsed: Record<string, unknown> | null): { status: string; description: string; errorCode: string } {
+  const val = (k: string) => {
+    const v = findByLocalName(parsed, k);
+    return v === null || v === undefined || typeof v === "object" ? "" : String(v).trim();
+  };
+  return { status: val("status").toUpperCase(), description: val("description"), errorCode: val("error_code") };
+}
+
+interface SonarDriverExistente {
+  dr_Id: string;
+  dr_status: string;
+  dr_mId: string;
+  dr_mIdValids: string[];
+}
+
+// Busca un conductor por cedula en la flota. Si ya existe (p.ej. alguien que
+// vuelve a la empresa y quedo DESHABILITADO), hay que actualizar ESE registro:
+// con dr_Id=0 Sonar no crea otro ni toca el existente.
+async function sonarBuscarPorCedula(user: string, password: string, fleetId: number, cedula: string): Promise<SonarDriverExistente | null> {
+  const envelope =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>' +
+    `<GET_Drivers_v2 xmlns="${NS_SONAR}">` +
+    `<User>${xmlEscape(user)}</User><Password>${xmlEscape(password)}</Password><FleetId>${fleetId}</FleetId>` +
+    `<DrvId></DrvId><DrvDoc>${xmlEscape(cedula)}</DrvDoc>` +
+    "</GET_Drivers_v2></soap:Body></soap:Envelope>";
+  const resp = await fetch(SONAR_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"${NS_SONAR}GET_Drivers_v2"` },
+    body: envelope,
+  });
+  const text = await resp.text();
+  // parseTagValue:false para no convertir cedulas/mIds a numero (se pierden ceros a la izquierda).
+  const doc = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false }).parse(text);
+  const result = findByLocalName(doc, "GET_Drivers_v2Result") as Record<string, unknown> | null;
+  if (!result || String(result.status || "").toUpperCase() !== "OK") return null;
+  const raw = (result.drList as Record<string, unknown> | undefined)?.Driver;
+  const lista = (Array.isArray(raw) ? raw : raw ? [raw] : []) as Record<string, unknown>[];
+  const d = lista.find((x) => String(x.dr_cedula || "").trim() === cedula.trim());
+  if (!d) return null;
+  const valids = (d.dr_mIdValids as Record<string, unknown> | undefined)?.string;
+  return {
+    dr_Id: String(d.dr_Id || "0"),
+    dr_status: String(d.dr_status || "").toUpperCase(),
+    dr_mId: typeof d.dr_mId === "string" ? d.dr_mId : "",
+    dr_mIdValids: (Array.isArray(valids) ? valids : valids ? [valids] : []).map(String),
+  };
+}
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     if (req.method !== "POST") {
@@ -272,17 +323,26 @@ export default {
     // en js/views/empleados.js y el trigger que lo recalcula al guardar).
     const dr_email = empleado.base ? `BASE ${String(empleado.base).trim().toUpperCase()}` : "";
 
+    const cedula = String(empleado.cedula || "").trim();
+    let existente: SonarDriverExistente | null = null;
+    try {
+      existente = await sonarBuscarPorCedula(sonarUser, sonarPassword, fleetId, cedula);
+    } catch (_) {
+      existente = null;
+    }
+
     const driver: SonarDriver = {
-      dr_Id: 0,
-      dr_cedula: empleado.cedula || "",
+      dr_Id: existente ? Number(existente.dr_Id) || 0 : 0,
+      dr_cedula: cedula,
       dr_IdFleet: fleetId,
       dr_name: empleado.nombre || "",
       dr_address: direccion,
       dr_phone: empleado.telefono || "",
       dr_cellphone: empleado.telefono || "",
       dr_email,
-      dr_mId: "",
-      dr_mIdValids: [],
+      // Se conservan los vehiculos que el conductor ya tenia habilitados en Sonar.
+      dr_mId: existente?.dr_mId || "",
+      dr_mIdValids: existente?.dr_mIdValids || [],
     };
 
     let result: SoapCallResult;
@@ -294,16 +354,43 @@ export default {
       return Response.json({ ok: false, message }, { status: 502 });
     }
 
-    const summary = compactMessage(result.parsed, result.raw);
-    if (result.ok) {
+    const sonar = sonarResultado(result.parsed);
+    const httpOk = result.httpStatus >= 200 && result.httpStatus < 300;
+    const sonarRechazo = !httpOk || (sonar.status !== "" && sonar.status !== "OK");
+
+    // La unica prueba confiable es volver a leer Sonar: el conductor debe
+    // existir en la flota y estar HABILITADO.
+    let despues: SonarDriverExistente | null = null;
+    try {
+      despues = await sonarBuscarPorCedula(sonarUser, sonarPassword, fleetId, cedula);
+    } catch (_) {
+      despues = null;
+    }
+
+    let ok = false;
+    let message: string;
+    if (sonarRechazo) {
+      message = `Sonar rechazó el envío: ${sonar.description || compactMessage(result.parsed, result.raw)}${sonar.errorCode && sonar.errorCode !== "0" ? ` (código ${sonar.errorCode})` : ""}`;
+    } else if (!despues) {
+      message = `Sonar respondió "${sonar.description || sonar.status || "OK"}", pero el conductor no aparece en la flota ${fleetId}.`;
+    } else if (despues.dr_status !== "ENABLED") {
+      message = `El conductor ya existía en Sonar (id ${despues.dr_Id}) y sigue ${despues.dr_status || "sin estado"}: se actualizaron sus datos, pero hay que habilitarlo directamente en la plataforma de Sonar.`;
+    } else {
+      ok = true;
+      message = existente
+        ? `Actualizado en Sonar (ya existía, id ${despues.dr_Id}).`
+        : `Creado en Sonar (id ${despues.dr_Id}).`;
+    }
+
+    if (ok) {
       await ctx.supabase
         .from("employees")
         .update({ sonar_synced_at: new Date().toISOString(), sonar_sync_error: null })
         .eq("id", employeeId);
     } else {
-      await ctx.supabase.from("employees").update({ sonar_sync_error: summary }).eq("id", employeeId);
+      await ctx.supabase.from("employees").update({ sonar_sync_error: message.slice(0, 500) }).eq("id", employeeId);
     }
 
-    return Response.json({ ok: result.ok, message: summary, httpStatus: result.httpStatus });
+    return Response.json({ ok, message, httpStatus: result.httpStatus, sonar_id: despues?.dr_Id || null });
   }),
 };
