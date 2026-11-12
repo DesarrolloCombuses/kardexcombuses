@@ -145,10 +145,12 @@ function parseSoapXml(xml: string): Record<string, unknown> | null {
 
   const fault = findByLocalName(body, "Fault") as Record<string, unknown> | null;
   if (fault) {
-    return {
-      faultcode: fault.faultcode ?? "",
-      faultstring: fault.faultstring ?? "",
-    };
+    // Se devuelve el Fault COMPLETO. Antes se copiaban solo faultcode y
+    // faultstring, y eso perdia dos cosas: el <detail>, que es donde los
+    // ASMX ponen la excepcion real, y el <Reason> de SOAP 1.2. Sin eso, el
+    // unico dato que llegaba a la pantalla era "faultcode=s:Client", que
+    // significa "la peticion no le gusto al servidor" y nada mas.
+    return { ...fault, __esFault: true };
   }
 
   const keys = Object.keys(body);
@@ -159,18 +161,56 @@ function parseSoapXml(xml: string): Record<string, unknown> | null {
   return { [respKey]: respEl };
 }
 
+// El texto de un nodo que puede venir como string, como {"#text": ...} o
+// anidado (el <Reason><Text> de SOAP 1.2, el <detail> de un ASMX).
+function textoDeNodo(v: unknown, profundidad = 0): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string" || typeof v === "number") return String(v).trim();
+  if (profundidad > 4) return "";
+  if (Array.isArray(v)) {
+    return v.map((x) => textoDeNodo(x, profundidad + 1)).filter(Boolean).join(" | ");
+  }
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    if (typeof obj["#text"] === "string") return String(obj["#text"]).trim();
+    return Object.entries(obj)
+      .filter(([k]) => !k.startsWith("@_"))
+      .map(([, val]) => textoDeNodo(val, profundidad + 1))
+      .filter(Boolean)
+      .join(" | ");
+  }
+  return "";
+}
+
+function recorta(v: string): string {
+  return v.length > 300 ? v.slice(0, 300) + "…" : v;
+}
+
 function compactMessage(parsed: Record<string, unknown> | null, raw: string): string {
+  if (parsed && parsed.__esFault) {
+    // El motivo primero: faultstring (SOAP 1.1), Reason (1.2) o detail (lo
+    // que mete .NET). El faultcode va al final y entre parentesis, porque
+    // solo dice de quien fue la culpa, no que paso.
+    const motivo = ["faultstring", "Reason", "detail", "Detail"]
+      .map((k) => textoDeNodo(parsed[k]))
+      .find((t) => t !== "");
+    const codigo = textoDeNodo(parsed.faultcode) || textoDeNodo(parsed.Code);
+    if (motivo) return recorta(codigo ? `${motivo} (${codigo})` : motivo);
+    // Un Fault sin ningun texto util: mejor el XML crudo que un codigo solo.
+    const crudo = (raw || "").replace(/\s+/g, " ").trim();
+    if (crudo) return recorta(crudo);
+    return codigo ? `Sonar respondio un error sin explicacion (${codigo})` : "sin-detalle";
+  }
   if (parsed) {
     const keys = Object.keys(parsed);
     if (keys.length) {
       const k = keys[0];
-      let v = String(parsed[k]).trim();
-      if (v.length > 160) v = v.slice(0, 160) + "…";
-      return `${k}=${v}`;
+      const v = textoDeNodo(parsed[k]) || String(parsed[k]).trim();
+      return `${k}=${recorta(v)}`;
     }
   }
   const snip = (raw || "").replace(/\s+/g, " ").trim();
-  return snip ? (snip.length > 160 ? snip.slice(0, 160) + "…" : snip) : "sin-detalle";
+  return snip ? recorta(snip) : "sin-detalle";
 }
 
 interface SoapCallResult {
@@ -389,6 +429,13 @@ export default {
         .eq("id", employeeId);
     } else {
       await ctx.supabase.from("employees").update({ sonar_sync_error: message.slice(0, 500) }).eq("id", employeeId);
+      console.error("sonar-insert-driver rechazo", JSON.stringify({
+        employee_id: employeeId, cedula, ruta: empleado.ruta, rutaNormalizada,
+        cuenta: cuentaKey, fleetId, httpStatus: result.httpStatus,
+        // El XML crudo queda en los logs de la funcion: es donde esta el
+        // motivo completo cuando el mensaje de pantalla se queda corto.
+        raw: (result.raw || "").slice(0, 2000),
+      }));
     }
 
     return Response.json({ ok, message, httpStatus: result.httpStatus, sonar_id: despues?.dr_Id || null });
