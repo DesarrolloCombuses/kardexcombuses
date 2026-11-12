@@ -77,16 +77,16 @@ function valorCampoDetalle(campo, valor) {
 
 // Rutas cuyos conductores también deben quedar registrados en Sonar
 // Telematics -- mantener sincronizada con RUTA_A_CUENTA en
-// supabase/functions/sonar-insert-driver/index.ts (Combuses tiene más de
+// supabase/functions/sonar-consultar-conductor/index.ts (Combuses tiene más de
 // una cuenta/flota en Sonar, así que cada ruta nueva se agrega en los dos
-// lados: acá solo decide si se ofrece el envío, la Edge Function decide con
-// qué cuenta se envía).
+// lados: acá solo decide si se ofrece la consulta; la Edge Function busca
+// en todas las cuentas y dice en cuál quedó registrado).
 const RUTAS_SONAR = ['700', '2', '41', '313', 'AEROPUERTO', 'URBANAS ZAMORA-ARANJUEZ', 'ARANJUEZ - GUADALUPE'];
 
 // Nombres de ruta sin dígitos que son, en realidad, otra forma de escribir
 // una ruta que ya está en RUTAS_SONAR (en la flota la ruta 2 se llama
 // ZAMORA) -- alguien puede digitar el nombre en vez del código. También
-// debe repetirse en sonar-insert-driver/index.ts.
+// debe repetirse en sonar-consultar-conductor/index.ts.
 const ALIAS_RUTA = { ZAMORA: '2' };
 
 // La ruta puede quedar escrita como "700", "Ruta 700" o "R700" según quién
@@ -839,7 +839,7 @@ Router.register('empleados', {
     document.getElementById('empleado-detalle-editar').addEventListener('click', () => this._abrirModal(empleado));
 
     const sonarBtn = document.getElementById('empleado-sonar-btn');
-    if (sonarBtn) sonarBtn.addEventListener('click', () => this._reenviarSonar(empleado));
+    if (sonarBtn) sonarBtn.addEventListener('click', () => this._consultarSonarFicha(empleado));
 
     const inactivarBtn = document.getElementById('empleado-inactivar-btn');
     if (inactivarBtn) {
@@ -1793,38 +1793,54 @@ Router.register('empleados', {
   // Los conductores de ciertas rutas (RUTAS_SONAR) deben existir también en
   // Sonar Telematics (plataforma externa de rastreo GPS de los vehículos).
   // Este bloque solo aparece para ellos; el resto de empleados no lo ve.
+  //
+  // El ERP CONSULTA, no da de alta: Sonar no expone ninguna operación para
+  // crear conductores (ver sonar-consultar-conductor/index.ts). Antes este
+  // bloque decía "Enviar a Sonar" y mostraba "Sonar rechazó el envío", lo
+  // que mandaba a Gestión Humana a corregir perfiles buscando una falla que
+  // no estaba en los datos.
   _sonarBloqueHtml(empleado) {
     if (!esConductorRutaSonar(empleado)) return '';
-    let badge;
-    if (empleado.sonar_synced_at) {
-      badge = `<span class="tag completo">Sincronizado el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
-    } else if (empleado.sonar_sync_error) {
-      badge = `<span class="tag descartado">Error: ${empleado.sonar_sync_error}</span>`;
-    } else {
-      badge = `<span class="tag pendiente">Sin enviar a Sonar</span>`;
-    }
     return `
       <div class="modal-section">
         <h3 class="modal-section-title">Sonar Telematics</h3>
-        <p class="view-intro" style="margin:0 0 0.6rem">Este conductor pertenece a una ruta (${empleado.ruta || ''}) que también debe quedar registrada en Sonar Telematics.</p>
-        <div id="empleado-sonar-badge" style="margin-bottom:0.6rem">${badge}</div>
-        <button type="button" id="empleado-sonar-btn" class="btn-secondary">${empleado.sonar_synced_at ? 'Reenviar a Sonar' : 'Enviar a Sonar'}</button>
+        <p class="view-intro" style="margin:0 0 0.6rem">Este conductor pertenece a una ruta (${escapeHtml(empleado.ruta || '')}) que también debe estar registrada en Sonar Telematics. El registro se crea en la plataforma de Sonar; desde aquí se consulta si ya está, en qué flota y si quedó habilitado.</p>
+        <div id="empleado-sonar-badge" style="margin-bottom:0.6rem">${this._sonarBadgeHtml(empleado)}</div>
+        <button type="button" id="empleado-sonar-btn" class="btn-secondary">Consultar en Sonar</button>
         <p id="empleado-sonar-msg" class="form-msg"></p>
       </div>
     `;
   },
 
-  async _enviarASonar(employeeId, msgEl) {
-    msgEl.textContent = 'Conectando con Sonar…';
+  // El badge se arma aparte porque se vuelve a pintar tras cada consulta.
+  _sonarBadgeHtml(empleado) {
+    if (empleado.sonar_synced_at) {
+      return `<span class="tag completo">Verificado en Sonar el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
+    }
+    if (empleado.sonar_sync_error) {
+      // Ya no es siempre un error: puede ser "no está registrado" o "está en
+      // otra flota", que son respuestas buenas a la pregunta. Por eso no
+      // lleva el prefijo "Error:" que llevaba antes.
+      return `<span class="tag descartado">${escapeHtml(empleado.sonar_sync_error)}</span>`;
+    }
+    return `<span class="tag pendiente">Sin verificar en Sonar</span>`;
+  },
+
+  // El mensaje de la función ya viene redactado para Gestión Humana y dice
+  // qué hacer en cada caso, así que se muestra tal cual en vez de
+  // reescribirlo aquí: si no, el ERP tendría dos versiones de la misma
+  // explicación y una de las dos envejecería mal.
+  async _consultarEnSonar(employeeId, msgEl) {
+    msgEl.textContent = 'Consultando Sonar…';
     msgEl.className = 'form-msg';
-    Loading.show('Conectando con Sonar…');
+    Loading.show('Consultando Sonar…');
     try {
-      const res = await DB.enviarConductorASonar(employeeId);
-      msgEl.textContent = res.ok ? '✓ Conectado con Sonar: el conductor quedó creado.' : `No se pudo conectar con Sonar: ${res.message}`;
+      const res = await DB.consultarConductorEnSonar(employeeId);
+      msgEl.textContent = res.ok ? `✓ ${res.message}` : res.message;
       msgEl.className = res.ok ? 'form-msg success' : 'form-msg error';
       return res;
     } catch (err) {
-      msgEl.textContent = 'No se pudo conectar con Sonar: ' + err.message;
+      msgEl.textContent = 'No se pudo consultar Sonar: ' + err.message;
       msgEl.className = 'form-msg error';
       return null;
     } finally {
@@ -1832,20 +1848,18 @@ Router.register('empleados', {
     }
   },
 
-  async _reenviarSonar(empleado) {
-    const res = await this._enviarASonar(empleado.id, document.getElementById('empleado-sonar-msg'));
+  async _consultarSonarFicha(empleado) {
+    const res = await this._consultarEnSonar(empleado.id, document.getElementById('empleado-sonar-msg'));
     if (!res) return;
-    const badgeWrap = document.getElementById('empleado-sonar-badge');
-    const btn = document.getElementById('empleado-sonar-btn');
     if (res.ok) {
       empleado.sonar_synced_at = new Date().toISOString();
       empleado.sonar_sync_error = null;
-      if (badgeWrap) badgeWrap.innerHTML = `<span class="tag completo">Sincronizado el ${new Date(empleado.sonar_synced_at).toLocaleString('es-CO')}</span>`;
-      if (btn) btn.textContent = 'Reenviar a Sonar';
     } else {
+      empleado.sonar_synced_at = null;
       empleado.sonar_sync_error = res.message;
-      if (badgeWrap) badgeWrap.innerHTML = `<span class="tag descartado">Error: ${res.message}</span>`;
     }
+    const badgeWrap = document.getElementById('empleado-sonar-badge');
+    if (badgeWrap) badgeWrap.innerHTML = this._sonarBadgeHtml(empleado);
   },
 
   // Contactos de emergencia e hijos son listas de largo variable (0, 1 o
@@ -2259,14 +2273,15 @@ Router.register('empleados', {
       await DB.saveHijosEmpleado(id, hijos);
 
       // Primera vez que este conductor queda con cargo Conductor + una ruta
-      // de RUTAS_SONAR: se envía a Sonar automáticamente, sin pedir
-      // confirmación -- el mensaje deja explícito que se conectó con Sonar
-      // para que quede claro que sí pasó. Ediciones posteriores no vuelven
-      // a enviarse solas -- para eso queda el botón "Reenviar a Sonar" en
-      // el detalle.
+      // de RUTAS_SONAR: se consulta Sonar automáticamente, sin pedir
+      // confirmación, para avisar de una si todavía hay que crearlo allá (o
+      // si ya está, pero en la flota de su ruta anterior). No lo da de alta:
+      // eso Sonar no lo permite por webservice. Ediciones posteriores no
+      // vuelven a consultar solas -- para eso queda el botón "Consultar en
+      // Sonar" en el detalle.
       const requiereSonar = esConductorRutaSonar(basico);
       if (requiereSonar && !this._empleadoSonarSyncedAt) {
-        await this._enviarASonar(id, msg);
+        await this._consultarEnSonar(id, msg);
         await this._load();
         return;
       }

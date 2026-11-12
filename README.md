@@ -30,16 +30,24 @@ La *anon/publishable key* que está en `js/config.js` es segura de exponer en el
 
 **Importante**: el proyecto Supabase de Combuses es compartido con el sistema de flota, que ya tiene su propio ecosistema de Edge Functions y secrets de Sonar (`asignar-conductor-sonar*`, `sonar-dispatch`, `sonar-sync-positions`, etc. — no viven en este repo). Antes de tocar cualquier secret o función de Sonar desde aquí, correr `supabase secrets list` y `supabase functions list` para no pisar algo que ya está en producción.
 
-Cuando se guarda un empleado con cargo "Conductor" y una ruta configurada (ver `RUTAS_SONAR` en [js/views/empleados.js](js/views/empleados.js)), el ERP lo envía automáticamente a Sonar Telematics (registro del conductor vía `SET_InsertDriver`), mostrando el resultado en el formulario. Esto lo hace la Edge Function [supabase/functions/sonar-insert-driver](supabase/functions/sonar-insert-driver/index.ts), que:
+**El ERP consulta Sonar, no da de alta en Sonar.** El alta de un conductor se hace a mano en la plataforma de Sonar. No es una decisión de diseño: Sonar **no expone ninguna operación para crear conductores**. Está comprobado de dos formas, y conviene no volver a intentarlo sin leer esto:
+- Contra el WSDL: `Service.asmx` declara 54 operaciones y `sapps.asmx` 32. De conductores solo hay lectura (`GET_Drivers`, `GET_Drivers_v2`, `GET_DriversByStatus`, `GET_DriversHistory`); la única escritura relacionada es `SET_DriverAssign`, que asigna a un conductor **que ya existe** a un móvil. La cadena "InsertDriver" no aparece en ninguno de los dos.
+- Contra el servidor: mandando la petición con credenciales de prueba en las 5 combinaciones posibles de endpoint × SOAPAction (`tempuri/`, `sonaravl/`, `sonaravl/ServiceSoap/` en los dos endpoints), las 5 responden `No operation found for specified action`. La prueba es concluyente porque el servidor **sí distingue** los dos casos: a `GET_Drivers_v2` con esas mismas credenciales falsas responde "El nombre de usuario y/o la contraseña no son válidos", o sea que la operación existe y solo faltan credenciales.
+
+Hasta v1.148.0 hubo aquí una función `sonar-insert-driver` que intentaba el alta con `SET_InsertDriver` y nunca creó a nadie; su error ("Sonar rechazó el envío") mandaba a Gestión Humana a corregir perfiles buscando una falla que no estaba en los datos. Si Sonar llega a habilitar un webservice de alta, el envelope que se usaba está en el historial de git (`git show v1.148.0 -- supabase/functions/sonar-insert-driver/index.ts`).
+
+Lo que sí hace el ERP: cuando se guarda un empleado con cargo "Conductor" y una ruta configurada (ver `RUTAS_SONAR` en [js/views/empleados.js](js/views/empleados.js)) — y cada vez que se pulsa "Consultar en Sonar" en su ficha — consulta si esa cédula ya está registrada, con la Edge Function [supabase/functions/sonar-consultar-conductor](supabase/functions/sonar-consultar-conductor/index.ts), que:
 - Solo se puede invocar con una sesión autenticada del ERP (no expone las credenciales de Sonar al cliente).
+- **Busca en TODAS las flotas, no solo en la de su ruta.** Un conductor que cambió de ruta puede estar registrado en la flota de su ruta anterior; buscando solo en la que le toca hoy, el ERP diría "no está" cuando sí está. Eso es justo lo que explicaba el rechazo "Existe otro conductor con la misma identificación": Sonar lo encontraba en la otra flota y el ERP no.
+- Distingue "no está" de "no se pudo consultar", y dice en cada caso qué hacer (crearlo en Sonar, habilitarlo, o moverlo de flota).
 - **Combuses tiene más de una cuenta/flota en Sonar** — no todas las rutas comparten usuario ni flota. La función resuelve cada ruta a una "cuenta" (ver `RUTA_A_CUENTA` dentro del archivo):
-  - `urbana` (ruta 700): secrets `SONAR_USER` / `SONAR_PASSWORD` / `SONAR_FLEET_ID`, ya existentes en el proyecto (compartidos con `asignar-conductor-sonar-v2`).
-  - `urbana2` (rutas 2 y 41): secrets `SONAR_USER_2` / `SONAR_PASSWORD_2` / `SONAR_FLEET_ID_2`, creados para esta integración.
+  - `urbana` (rutas 700 y AEROPUERTO): secrets `SONAR_USER` / `SONAR_PASSWORD` / `SONAR_FLEET_ID`, ya existentes en el proyecto (compartidos con `asignar-conductor-sonar-v2`).
+  - `urbana2` (rutas 2, 41, 313, ZAMORA-ARANJUEZ y ARANJUEZ - GUADALUPE): secrets `SONAR_USER_2` / `SONAR_PASSWORD_2` / `SONAR_FLEET_ID_2`, creados para esta integración.
   - Para sumar una ruta nueva: si ya usa una cuenta existente, agregarla a `RUTA_A_CUENTA` (y a `RUTAS_SONAR` en `empleados.js`); si es una cuenta nueva, crear sus secrets con un sufijo nuevo (`_3`, etc.) y agregar la entrada en `SONAR_ACCOUNTS`.
 
 Para desplegarla o actualizarla:
 ```bash
-supabase functions deploy sonar-insert-driver --project-ref cbplebkmxrkaafqdhiyi
+supabase functions deploy sonar-consultar-conductor --project-ref cbplebkmxrkaafqdhiyi
 ```
 Las credenciales de Sonar se configuran con `supabase secrets set SONAR_USER_N=... SONAR_PASSWORD_N=... SONAR_FLEET_ID_N=... --project-ref cbplebkmxrkaafqdhiyi` — nunca se escriben en este repo.
 
@@ -101,8 +109,8 @@ js/pwa-update.js            Aviso de nueva versión disponible
 js/pwa-install.js            Botón "Instalar app" (evento beforeinstallprompt)
 js/app.js                    Bootstrap
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, aspirantes —selección de personal—, empleados —incluye el perfil sociodemográfico—, historial, facturas, ayuda)
-supabase/functions/sonar-insert-driver   Edge Function: registra en Sonar Telematics a los conductores de la ruta 700 (ver "Integración con Sonar Telematics" arriba)
-sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql, sql/update_base_vehiculo_*.sql, sql/add_factura_entrada.sql, sql/add_creado_por_nombre.sql, sql/perfil_sociodemografico.sql, sql/aspirantes.sql, sql/perfil_publico.sql (funciones RPC que usa perfil-publico.html para validar la cédula del lado del servidor sin necesitar sesión), sql/link_facturas_observaciones_*.sql (cruza a mano una sola vez el número de factura que haya quedado en Observaciones de entradas viejas contra facturas.numero_factura), sql/sync_empleados_*.sql (el más reciente es la última sincronización con RRHH, ver "Mantener actualizados los empleados" arriba), sql/sonar_conductores.sql (columnas de seguimiento del envío a Sonar)
+supabase/functions/sonar-consultar-conductor   Edge Function: consulta en qué flota de Sonar Telematics está registrado un conductor (ver "Integración con Sonar Telematics" arriba)
+sql/schema.sql, sql/seed_dotacion_javier.sql, sql/backfill_entrada_inicial.sql, sql/update_conductores_vehiculo.sql, sql/facturas.sql, sql/add_fecha_entrega.sql, sql/update_base_vehiculo_*.sql, sql/add_factura_entrada.sql, sql/add_creado_por_nombre.sql, sql/perfil_sociodemografico.sql, sql/aspirantes.sql, sql/perfil_publico.sql (funciones RPC que usa perfil-publico.html para validar la cédula del lado del servidor sin necesitar sesión), sql/link_facturas_observaciones_*.sql (cruza a mano una sola vez el número de factura que haya quedado en Observaciones de entradas viejas contra facturas.numero_factura), sql/sync_empleados_*.sql (el más reciente es la última sincronización con RRHH, ver "Mantener actualizados los empleados" arriba), sql/sonar_conductores.sql (columnas de seguimiento de la consulta a Sonar)
 ```
 
 ## 5. Publicar una nueva versión

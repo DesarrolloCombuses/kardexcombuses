@@ -865,11 +865,16 @@ const DB = {
     return data;
   },
 
-  // Llama a la Edge Function que inserta/actualiza al conductor en Sonar
-  // Telematics (SOAP). Las credenciales de Sonar viven como secrets de la
-  // función, nunca en el cliente. Requiere sesión activa (auth: 'user').
-  async enviarConductorASonar(employeeId) {
-    const { data, error } = await window.supabaseClient.functions.invoke('sonar-insert-driver', {
+  // Llama a la Edge Function que CONSULTA si el conductor ya está registrado
+  // en Sonar Telematics, buscando su cédula en todas las flotas de Combuses.
+  // No lo da de alta: Sonar no expone ninguna operación para crear
+  // conductores (el porqué, comprobado contra el WSDL y contra el servidor,
+  // está en la cabecera de sonar-consultar-conductor/index.ts). El alta se
+  // hace a mano en la plataforma de Sonar.
+  // Las credenciales de Sonar viven como secrets de la función, nunca en el
+  // cliente. Requiere sesión activa (auth: 'user').
+  async consultarConductorEnSonar(employeeId) {
+    const { data, error } = await window.supabaseClient.functions.invoke('sonar-consultar-conductor', {
       body: { employee_id: employeeId },
     });
     if (error) {

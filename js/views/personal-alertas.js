@@ -196,7 +196,7 @@ Router.register('personal-alertas', {
 
   // Cruce Empleados + vehículo asignado: conductores activos a los que
   // todavía no se les ha diligenciado la base (dato clave para bodega y
-  // para el envío a Sonar, ver sonar-insert-driver). Desglose por ruta en
+  // para la consulta a Sonar, ver sonar-consultar-conductor). Desglose por ruta en
   // vez de por cargo -- acá prácticamente todos son "Conductor", así que
   // ese desglose no aportaría nada.
   _renderConductoresSinBase(items) {
