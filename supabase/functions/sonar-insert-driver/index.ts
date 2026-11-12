@@ -218,6 +218,9 @@ interface SoapCallResult {
   httpStatus: number;
   raw: string;
   parsed: Record<string, unknown> | null;
+  // El otro intento, cuando los dos fallaron: se reporta uno pero al log
+  // van los dos, que es donde se mira cuando el elegido no alcanza.
+  alterno?: SoapCallResult;
 }
 
 async function doSoapCall(envelope: string, action: string, useSoap12: boolean): Promise<SoapCallResult> {
@@ -239,6 +242,13 @@ async function doSoapCall(envelope: string, action: string, useSoap12: boolean):
   return { ok: resp.ok, httpStatus: resp.status, raw: text, parsed };
 }
 
+// "No operation found for specified action" quiere decir que ESE binding no
+// existe en el servidor. Es una respuesta sobre el protocolo, no sobre el
+// conductor: nunca es la causa de que un envio se rechace.
+function esRuidoDeBinding(mensaje: string): boolean {
+  return /no operation found for specified action/i.test(mensaje);
+}
+
 async function sonarInsertDriver(user: string, password: string, driver: SonarDriver): Promise<SoapCallResult> {
   // Igual que el Apps Script original: primero intenta tempuri + SOAP 1.1,
   // y si no responde 2xx, cae a sonar + SOAP 1.2.
@@ -247,7 +257,20 @@ async function sonarInsertDriver(user: string, password: string, driver: SonarDr
   if (res1.httpStatus >= 200 && res1.httpStatus < 300) return res1;
 
   const env2 = buildSoapEnvelope(user, password, driver, NS_SONAR, true);
-  return await doSoapCall(env2, SOAP_ACTION_INSERT_SONAR, true);
+  const res2 = await doSoapCall(env2, SOAP_ACTION_INSERT_SONAR, true);
+  if (res2.httpStatus >= 200 && res2.httpStatus < 300) return res2;
+
+  // Fallaron los dos. Antes se devolvia el segundo por ser el ultimo, y eso
+  // tapaba el motivo: este endpoint no expone el binding de sonaravl, asi
+  // que el segundo intento contesta siempre "No operation found for
+  // specified action" -- un mensaje sobre el protocolo que no dice nada del
+  // conductor. El bueno es el primero, que es por donde salen los envios
+  // que si funcionan.
+  const msg1 = compactMessage(res1.parsed, res1.raw);
+  const msg2 = compactMessage(res2.parsed, res2.raw);
+  if (!esRuidoDeBinding(msg1)) return { ...res1, alterno: res2 };
+  if (!esRuidoDeBinding(msg2)) return { ...res2, alterno: res1 };
+  return { ...res1, alterno: res2 };
 }
 
 // Sonar responde HTTP 200 aunque rechace la operacion: el resultado real
@@ -435,6 +458,8 @@ export default {
         // El XML crudo queda en los logs de la funcion: es donde esta el
         // motivo completo cuando el mensaje de pantalla se queda corto.
         raw: (result.raw || "").slice(0, 2000),
+        httpStatusAlterno: result.alterno?.httpStatus ?? null,
+        rawAlterno: (result.alterno?.raw || "").slice(0, 2000),
       }));
     }
 
