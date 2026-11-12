@@ -1421,6 +1421,32 @@
             <div id="pr-col-chart" class="col-chart"></div>
           </div>
 
+          <div class="panel-card chart-card" style="margin-bottom:1.25rem">
+            <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+              <h2>Indicadores de Gestión Humana</h2>
+              <span class="muted" style="margin-left:auto">Fórmulas del documento de indicadores mensuales</span>
+            </div>
+            <p class="form-msg error hidden" id="pr-ind-cobertura"></p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th>Planta prom.</th>
+                    <th>Retiros</th>
+                    <th>Volunt. / Involunt.</th>
+                    <th>1. Rotación<br><span class="muted">meta ≤ 3%</span></th>
+                    <th>Cohorte<br><span class="muted">ingresos</span></th>
+                    <th>9. Retención 90d<br><span class="muted">meta ≥ 90%</span></th>
+                    <th>10. Rot. temprana<br><span class="muted">meta ≤ 10%</span></th>
+                  </tr>
+                </thead>
+                <tbody id="pr-ind-tbody"></tbody>
+              </table>
+            </div>
+            <p class="empty-note" id="pr-ind-nota"></p>
+          </div>
+
           <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
             <h2>Desglose</h2>
             <label class="filtro-inline" style="margin-left:auto">

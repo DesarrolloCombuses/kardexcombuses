@@ -28,6 +28,36 @@ function prFormatFecha(d) {
   return d ? d.toLocaleDateString('es-CO') : '—';
 }
 
+// Voluntario o involuntario, a partir del motivo de salida -- que es texto
+// libre: hay ~40 formas distintas de escribir cuatro motivos, con erratas
+// ("TERMINACIONDE", "CONTRTAO") y con narrativas largas pegadas al final.
+//
+// Se clasifica por COMO EMPIEZA, no por que palabras contiene: varios
+// motivos dicen "terminacion de contrato ... hace entrega de su carta de
+// renuncia", y buscar "renuncia" en cualquier parte los contaria al reves.
+//
+// Lo que no encaja en ninguno queda SIN CLASIFICAR y se muestra aparte. No
+// se reparte en el grupo mas probable: un indicador que se entrega a
+// Gerencia no puede llevar adivinanzas adentro.
+function prNormalizaMotivo(motivo) {
+  let t = String(motivo || '').toUpperCase();
+  t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // "TERMINACIONDE", "CONTRATOCON", "CONTRATOE N": faltan o sobran espacios.
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function prClasificaMotivo(motivo) {
+  const t = prNormalizaMotivo(motivo);
+  if (!t) return 'sin_clasificar';
+  // El arranque del texto manda. "TERMINACION" cubre tambien "TERMINACIONDE"
+  // y "TERMINACION DE CONTRTAO": basta con que la palabra empiece asi.
+  if (/^TERMINAC/.test(t)) return 'involuntario';
+  if (/^RENUNCIA|^RETIRO VOLUNTARIO|^VOLUNTARIA/.test(t)) return 'voluntario';
+  if (/VOLUNTAR/.test(t)) return 'voluntario';
+  return 'sin_clasificar';
+}
+
 function prEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -226,8 +256,133 @@ Router.register('personal-rotacion', {
     });
     this._sinFechaIngreso = sinFechaIngreso;
     this._activosHoy = empleados.filter((e) => e.activo).length;
+    this._totalEmpleados = empleados.length;
+
+    // Para los indicadores hace falta la pareja ingreso/salida de cada
+    // persona junta (la planta de un mes se reconstruye con las dos), no
+    // las dos listas por separado.
+    this._personas = empleados.map((e) => ({
+      ingreso: prParseFechaIso(e.perfil_sociodemografico?.fecha_ingreso),
+      salida: prParseFechaIso(e.fecha_salida),
+      activo: !!e.activo,
+      motivo: e.motivo_renuncia,
+    }));
 
     this._render();
+  },
+
+  // Cuanta gente habia trabajando en una fecha dada. Solo cuenta a quien
+  // tiene fecha de ingreso: sin ella no se sabe si ya estaba. Por eso la
+  // pantalla dice cuantos quedaron por fuera.
+  _plantaEn(fecha) {
+    return this._personas.filter((p) => {
+      if (!p.ingreso || p.ingreso > fecha) return false;
+      if (p.salida && p.salida <= fecha) return false;
+      return true;
+    }).length;
+  },
+
+  // Una fila por mes con los tres indicadores que salen solos de las fechas
+  // de ingreso y salida.
+  _indicadoresDe(key) {
+    const [anio, mes] = key.split('-').map(Number);
+    const primero = new Date(anio, mes - 1, 1);
+    const ultimo = new Date(anio, mes, 0);
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+
+    // ---- 1. Rotacion ----
+    // Planta promedio = (al inicio + al cierre) / 2, como pide la formula.
+    // "Al inicio" es el dia 1 antes de los movimientos del mes; por eso se
+    // mide con el dia anterior.
+    const diaAntes = new Date(anio, mes - 1, 0);
+    const plantaInicio = this._plantaEn(diaAntes);
+    const plantaCierre = this._plantaEn(ultimo);
+    const plantaProm = (plantaInicio + plantaCierre) / 2;
+
+    const retiros = this._personas.filter((p) => p.salida && p.salida >= primero && p.salida <= ultimo);
+    const voluntarios = retiros.filter((p) => prClasificaMotivo(p.motivo) === 'voluntario').length;
+    const involuntarios = retiros.filter((p) => prClasificaMotivo(p.motivo) === 'involuntario').length;
+    const sinClasificar = retiros.length - voluntarios - involuntarios;
+    const rotacion = plantaProm > 0 ? (retiros.length / plantaProm) * 100 : null;
+
+    // ---- 9 y 10. Cohorte de los que ingresaron ese mes ----
+    // Solo cuenta si ya esta CERRADA: todos sus integrantes tuvieron que
+    // alcanzar el dia 90. Si no, se mostraria una retencion alta solo
+    // porque a la gente no le ha dado tiempo de irse.
+    const cohorte = this._personas.filter((p) => p.ingreso && p.ingreso >= primero && p.ingreso <= ultimo);
+    const dia90DelUltimo = new Date(ultimo.getFullYear(), ultimo.getMonth(), ultimo.getDate() + 90);
+    const cerrada = cohorte.length > 0 && hoy >= dia90DelUltimo;
+
+    let retencion = null;
+    let temprana = null;
+    if (cerrada) {
+      const seFueronAntes = cohorte.filter((p) => {
+        if (!p.salida) return false;
+        const dias = Math.round((p.salida - p.ingreso) / 86400000);
+        return dias < 90;
+      }).length;
+      temprana = (seFueronAntes / cohorte.length) * 100;
+      retencion = 100 - temprana;
+    }
+
+    return {
+      key, plantaInicio, plantaCierre, plantaProm,
+      retiros: retiros.length, voluntarios, involuntarios, sinClasificar, rotacion,
+      cohorte: cohorte.length, cerrada, retencion, temprana,
+    };
+  },
+
+  _renderIndicadores() {
+    const tbody = document.getElementById('pr-ind-tbody');
+    if (!tbody) return;
+
+    // Cronologico al reves: el mes mas reciente arriba, que es el que se
+    // esta reportando.
+    const filas = this._meses12.map((k) => this._indicadoresDe(k));
+
+    const pct = (v) => (v === null ? '—' : v.toFixed(1).replace('.', ',') + '%');
+    const tag = (v, ok) => {
+      if (v === null) return '<span class="muted">—</span>';
+      return `<span class="tag ${ok ? 'activo' : 'pendiente'}">${pct(v)}</span>`;
+    };
+    // Un mes sin ingresos no tiene cohorte: decir "sin cerrar" ahi se lee
+    // como "todavia lo estamos esperando", y no hay nada que esperar.
+    const celdaCohorte = (f, valor, ok) => {
+      if (!f.cohorte) return '<span class="muted">—</span>';
+      if (!f.cerrada) return '<span class="muted">sin cerrar</span>';
+      return tag(valor, ok);
+    };
+
+    tbody.innerHTML = filas.map((f) => `
+      <tr>
+        <td>${prEscapeHtml(prEtiquetaMesLarga(f.key))}</td>
+        <td>${f.plantaProm % 1 === 0 ? f.plantaProm : f.plantaProm.toFixed(1).replace('.', ',')}</td>
+        <td>${f.retiros}</td>
+        <td>${f.voluntarios} / ${f.involuntarios}${f.sinClasificar ? ` <span class="muted">(+${f.sinClasificar} sin clasificar)</span>` : ''}</td>
+        <td>${tag(f.rotacion, f.rotacion !== null && f.rotacion <= 3)}</td>
+        <td>${f.cohorte || '—'}</td>
+        <td>${celdaCohorte(f, f.retencion, f.retencion >= 90)}</td>
+        <td>${celdaCohorte(f, f.temprana, f.temprana <= 10)}</td>
+      </tr>
+    `).join('');
+
+    // La cobertura va arriba y en rojo: una tasa calculada sobre una planta
+    // incompleta se ve igual de confiable que una buena, y no lo es.
+    const cob = document.getElementById('pr-ind-cobertura');
+    if (this._sinFechaIngreso) {
+      const pctFuera = ((this._sinFechaIngreso / this._totalEmpleados) * 100).toFixed(0);
+      cob.textContent = `${this._sinFechaIngreso} de ${this._totalEmpleados} empleados (${pctFuera}%) no tienen fecha de ingreso en su perfil sociodemográfico. `
+        + 'No entran en la planta ni en las cohortes, así que estas cifras salen bajas. Completar esas fechas es lo que las vuelve confiables.';
+      cob.classList.remove('hidden');
+    } else {
+      cob.classList.add('hidden');
+    }
+
+    const sinCerrar = filas.filter((f) => f.cohorte > 0 && !f.cerrada).length;
+    document.getElementById('pr-ind-nota').textContent =
+      'La planta promedio es (personal al inicio + al cierre) ÷ 2. Una cohorte queda "sin cerrar" mientras alguno de sus ingresos no haya cumplido 90 días'
+      + (sinCerrar ? ` — hoy son ${sinCerrar} mes(es).` : '.')
+      + ' Retención y rotación temprana son complementarias: suman 100%.';
   },
 
   _porMes(items) {
@@ -285,6 +440,7 @@ Router.register('personal-rotacion', {
       + this._meses12.map((k) => `<option value="${k}">${prEtiquetaMesLarga(k)}</option>`).join('');
     sel.value = (seleccionPrevia === 'todos' || this._meses12.includes(seleccionPrevia)) ? seleccionPrevia : 'todos';
 
+    this._renderIndicadores();
     this._renderPeriodo();
   },
 
