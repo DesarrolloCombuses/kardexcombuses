@@ -921,6 +921,36 @@
               <svg viewBox="0 0 20 20" fill="none"><path d="M8.5 11.5a3 3 0 000 4.24l.7.7a3 3 0 004.24-4.24l-.6-.6M11.5 8.5a3 3 0 000-4.24l-.7-.7a3 3 0 00-4.24 4.24l.6.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Link para actualizar datos
             </button>
+            <button type="button" id="empleados-sonar-btn" class="btn-secondary hidden" title="Revisar de una vez a todos los conductores de rutas con flota en Sonar">
+              <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5v4l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Revisar en Sonar
+            </button>
+          </div>
+
+          <div class="panel-card hidden" id="emp-sonar-panel" style="margin-bottom:1.25rem">
+            <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+              <h2>Conductores en Sonar Telematics</h2>
+              <button type="button" id="emp-sonar-cerrar-btn" class="btn-secondary" style="margin-left:auto">Cerrar</button>
+            </div>
+            <p class="view-intro" style="margin:0 0 0.6rem">
+              Primero se consulta —eso no escribe nada en Sonar— y solo después se ofrece registrar a los que falten.
+              La columna "Sonar" de la ficha no sirve para contarlos: la ponía una versión anterior que daba por enviado sin comprobar.
+            </p>
+            <div class="toolbar" style="margin-bottom:0.6rem">
+              <button type="button" id="emp-sonar-consultar-btn">Consultar</button>
+              <button type="button" id="emp-sonar-registrar-btn" class="btn-secondary hidden">Registrar los que faltan</button>
+              <button type="button" id="emp-sonar-parar-btn" class="btn-secondary hidden">Detener</button>
+              <span class="muted" id="emp-sonar-progreso"></span>
+            </div>
+            <p class="empty-note" id="emp-sonar-resumen"></p>
+            <div class="table-wrap" style="max-height:26rem; overflow-y:auto">
+              <table>
+                <thead>
+                  <tr><th>Conductor</th><th>Ruta</th><th>Sonar</th><th>Detalle</th></tr>
+                </thead>
+                <tbody id="emp-sonar-tbody"></tbody>
+              </table>
+            </div>
           </div>
 
           <details class="filtros-avanzados" id="empleados-filtros-avanzados">
@@ -3443,6 +3473,7 @@
   <script src="js/views/entrada.js"></script>
   <script src="js/views/salida.js"></script>
   <script src="js/views/aspirantes.js"></script>
+  <script src="js/sonar-barrido.js"></script>
   <script src="js/views/empleados.js"></script>
   <script src="js/views/personal-cumpleanos.js"></script>
   <script src="js/contratos-alertas.js"></script>

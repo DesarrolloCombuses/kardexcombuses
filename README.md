@@ -43,6 +43,7 @@ Lo que hace el ERP: cuando se guarda por primera vez un empleado con cargo "Cond
 - Solo se puede invocar con una sesión autenticada del ERP (no expone las credenciales de Sonar al cliente).
 - **Busca en TODAS las flotas, no solo en la de su ruta.** Un conductor que cambió de ruta puede estar registrado en la flota de su ruta anterior; buscando solo en la que le toca hoy, el ERP diría "no está" cuando sí está. Eso es justo lo que explicaba el rechazo "Existe otro conductor con la misma identificación": Sonar lo encontraba en la otra flota y el ERP no.
 - Distingue "no está" de "no se pudo consultar", y dice en cada caso qué hacer (registrarlo, habilitarlo, o moverlo de flota).
+- En **Empleados** hay además un botón **"Revisar en Sonar"** (solo admin) que hace el barrido de todos los conductores de rutas con flota: primero consulta — eso no escribe nada — y solo después ofrece registrar a los que falten, de a 3 a la vez y con botón de detener. No toca a quien ya está, ni a quien aparece en otra flota, ni a quien no se pudo revisar.
 - Con el botón **"Registrar en Sonar"** (que pide confirmación) lo da de alta, pero **solo si la consulta previa confirmó que no está en ninguna flota**. Si ya existe, aunque sea en otra, no lo intenta: crear un duplicado es justo lo que Sonar rechaza con "Existe otro conductor con la misma identificación". Y no se fía del "OK" de Sonar: vuelve a consultar para confirmar que quedó, y en qué estado.
 - **Combuses tiene más de una cuenta/flota en Sonar** — no todas las rutas comparten usuario ni flota. La función resuelve cada ruta a una "cuenta" (ver `RUTA_A_CUENTA` dentro del archivo):
   - `urbana` (rutas 700 y AEROPUERTO): secrets `SONAR_USER` / `SONAR_PASSWORD` / `SONAR_FLEET_ID`, ya existentes en el proyecto (compartidos con `asignar-conductor-sonar-v2`).
@@ -114,6 +115,7 @@ js/router.js                Navegación por hash entre vistas
 js/pwa-update.js            Aviso de nueva versión disponible
 js/pwa-install.js            Botón "Instalar app" (evento beforeinstallprompt)
 js/app.js                    Bootstrap
+js/sonar-barrido.js          Barrido masivo de conductores contra Sonar (dos pasos: consultar y luego registrar los que falten)
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, aspirantes —selección de personal—, empleados —incluye el perfil sociodemográfico—, historial, facturas, ayuda)
 supabase/functions/gh-ausentismo   Edge Function: ausentismo operativo por mes (indicador 2 de GH). Lee las tablas de turnos y asistencia del sistema de flota con el service role y devuelve solo el agregado por mes
 supabase/functions/sonar-consultar-conductor   Edge Function: consulta en qué flota de Sonar Telematics está registrado un conductor (ver "Integración con Sonar Telematics" arriba)

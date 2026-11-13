@@ -295,6 +295,28 @@ Router.register('empleados', {
         document.getElementById(id).addEventListener('change', () => this._render());
       });
       document.getElementById('empleados-nuevo-btn').addEventListener('click', () => this._abrirModal(null));
+
+      // Barrido de Sonar: solo admin. Dispara altas en un sistema externo
+      // que ve toda la flota, no es algo para una cuenta de consulta.
+      const sonarBtn = document.getElementById('empleados-sonar-btn');
+      if (sonarBtn && window.APP_ROLE === 'admin') {
+        sonarBtn.classList.remove('hidden');
+        sonarBtn.addEventListener('click', () => {
+          const conductores = (this._employees || [])
+            .filter((e) => e.activo && esConductorRutaSonar(e))
+            .sort((a, b) => String(a.ruta || '').localeCompare(String(b.ruta || ''), 'es')
+              || String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+          SonarBarrido.abrir(conductores);
+        });
+        document.getElementById('emp-sonar-consultar-btn')
+          ?.addEventListener('click', () => SonarBarrido.consultarTodos());
+        document.getElementById('emp-sonar-registrar-btn')
+          ?.addEventListener('click', () => SonarBarrido.registrarFaltantes());
+        document.getElementById('emp-sonar-parar-btn')
+          ?.addEventListener('click', () => SonarBarrido.parar());
+        document.getElementById('emp-sonar-cerrar-btn')
+          ?.addEventListener('click', () => SonarBarrido.cerrar());
+      }
       document.getElementById('empleados-filtros-limpiar').addEventListener('click', () => this._limpiarFiltros());
       document.getElementById('empleados-export-btn').addEventListener('click', () => this._exportExcel());
       document.getElementById('empleados-links-btn').addEventListener('click', () => this._mostrarLinkActualizacionModal());
