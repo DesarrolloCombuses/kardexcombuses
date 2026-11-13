@@ -15,6 +15,11 @@
   // despliegue, sin depender de que aparezca el banner de actualización.
   document.getElementById('sidebar-version').textContent = `v${window.APP_CONFIG.APP_VERSION}`;
 
+  // El logo de la empresa, si ya lo subieron. Reemplaza el SVG dibujado a
+  // mano solo cuando la imagen carga de verdad (ver js/logo-empresa.js),
+  // asi que no hace falta saber de antemano si hay logo o no.
+  LogoEmpresa.pintarShell();
+
   if (window.APP_ROLE === 'empleado') {
     // Autoservicio de un colaborador: no es una cuenta administrativa, así
     // que se le quita TODO el menú salvo "Mis permisos" -- lista blanca en

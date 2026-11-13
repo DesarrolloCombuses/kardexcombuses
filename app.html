@@ -2014,6 +2014,17 @@
           </form>
 
           <div class="person-list" id="us-superadmins"></div>
+
+          <div class="section-heading" style="margin-top:1.6rem"><h2>Logo de la empresa</h2></div>
+          <p class="view-intro">El mismo archivo se usa en el encabezado de la aplicación, en la pantalla de entrada y en el membrete de los documentos que emite Gestión Humana: certificado laboral e informe técnico disciplinario. Mientras no haya ninguno subido se dibuja un logo provisional.</p>
+          <div class="panel-card" style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap">
+            <div class="logo-tablero" id="us-logo-tablero">
+              <div class="logo-muestra clara"><img id="us-logo-claro" alt="Logo actual" /></div>
+              <div class="logo-muestra oscura"><img id="us-logo-oscuro" alt="" /></div>
+            </div>
+            <p class="empty-note hidden" id="us-logo-vacio" style="margin:0">Todavía no hay logo subido.</p>
+            <button type="button" id="us-logo-btn" class="btn-secondary">Subir o cambiar el logo</button>
+          </div>
         </section>
 
         <!-- ================= SINIESTROS DE TRANSITO ================= -->
@@ -3432,6 +3443,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="js/config.js"></script>
+  <!-- El logo de la empresa: el encabezado de aca y el membrete de los
+       documentos salen del mismo archivo subido una sola vez. -->
+  <script src="js/logo-empresa.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/connectivity.js"></script>
   <script src="js/loading-overlay.js"></script>

@@ -36,7 +36,8 @@ const VisorDocumento = {
   // alFirmar: se llama con el valor de data-firmar del espacio de firma que
   // se pulse dentro del documento. Es lo que permite poner la firma donde
   // va, en vez de tener que salir a buscar la ficha de esa persona.
-  mostrar({ titulo, subtitulo, estilos, cuerpoHtml, archivo, avisos = [], alCorregir = null, alCerrar = null, alFirmar = null }) {
+  // alLogo: lo mismo para el membrete, marcado con data-logo.
+  mostrar({ titulo, subtitulo, estilos, cuerpoHtml, archivo, avisos = [], alCorregir = null, alCerrar = null, alFirmar = null, alLogo = null }) {
     const caja = document.getElementById('modal-box');
     if (caja) caja.classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
@@ -93,9 +94,20 @@ const VisorDocumento = {
     const alCargar = () => {
       ajustar();
       const doc = marco.contentDocument;
-      if (!doc || !alFirmar) return;
+      if (!doc || (!alFirmar && !alLogo)) return;
       doc.addEventListener('click', (e) => {
-        const zona = e.target.closest && e.target.closest('[data-firmar]');
+        const cerca = (sel) => (e.target.closest ? e.target.closest(sel) : null);
+        // El logo primero: esta en el membrete y nunca se solapa con una
+        // firma, pero si algun dia uno quedara dentro del otro, mandaria el
+        // mas especifico y no el orden en que se escribieron los ifs.
+        const logo = alLogo ? cerca('[data-logo]') : null;
+        if (logo) {
+          e.preventDefault();
+          soltar();
+          alLogo();
+          return;
+        }
+        const zona = alFirmar ? cerca('[data-firmar]') : null;
         if (!zona) return;
         e.preventDefault();
         soltar();

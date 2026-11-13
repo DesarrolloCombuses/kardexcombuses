@@ -1798,3 +1798,56 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
   border: 0; display: block; background: #fff;
   transform-origin: top left;
 }
+
+/* --- Logo de la empresa (subirlo y verlo) -------------------------------- */
+/* Ver js/logo-empresa.js. Se muestra siempre sobre DOS fondos, claro y
+   oscuro, porque la pregunta que hay que poder contestar de un vistazo es
+   si el fondo quedó transparente de verdad: un PNG con fondo blanco se ve
+   igual de bien sobre el cuadro claro y delata el recuadro en el oscuro. */
+.logo-tablero { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.logo-muestra {
+  width: 190px; height: 92px; border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  display: flex; align-items: center; justify-content: center; padding: 8px;
+}
+/* width/height al 100% y no max-*: dentro de un contenedor flex, un
+   max-width se resuelve contra la base del item y el logo se salia del
+   recuadro. object-fit hace el resto sin deformarlo. */
+.logo-muestra img { width: 100%; height: 100%; object-fit: contain; }
+.logo-muestra.clara { background: #fff; }
+.logo-muestra.oscura { background: #0a1930; border-color: #0a1930; }
+.logo-check {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  margin-top: 0.6rem; font-size: 0.92rem; cursor: pointer;
+}
+.logo-check input { width: auto; margin: 0; }
+
+/* Una miniatura del membrete real, para juzgar el tamaño del logo donde de
+   verdad importa: dentro de la celda del documento, no flotando suelto. */
+.logo-membrete {
+  display: flex; margin-top: 0.8rem; border: 1.6px solid #000;
+  background: #fff; color: #111; max-width: 520px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.logo-membrete > div { border-right: 1.6px solid #000; padding: 10px 12px; }
+.logo-membrete > div:last-child { border-right: 0; }
+.logo-membrete-celda {
+  width: 26%; display: flex; align-items: center; justify-content: flex-start;
+}
+.logo-membrete-celda img { max-height: 46px; max-width: 100%; object-fit: contain; }
+.logo-membrete-titulo {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  text-align: center; font-weight: 800; font-size: 13px;
+}
+.logo-membrete-meta { width: 26%; font-size: 10px; line-height: 1.5; }
+
+/* El distintivo del encabezado con el logo de verdad dentro. Deja de ser un
+   cuadro de 34px y se ensancha a lo que pida el logo, con tope: el logo de
+   una empresa casi nunca es un icono cuadrado -- es la marca con el nombre
+   al lado -- y metido en el cuadro saldria de 34x11 px. La altura se queda
+   fija para que no mueva el resto del encabezado. */
+.brand-mark img { display: block; }
+.brand-mark.brand-mark--logo { width: auto; max-width: 168px; padding: 0 7px; }
+.brand-mark.brand-mark--logo img {
+  width: auto; height: 22px; max-width: 154px; object-fit: contain;
+}

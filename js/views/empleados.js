@@ -1785,8 +1785,12 @@ Router.register('empleados', {
         return { dataUri: null, motivo: 'error', detalle: err.message };
       }
     };
-    const [firmaGerente, firmaCoordAdmin, firmaCoordGH] = await Promise.all([
+    // El logo va en el mismo Promise.all que las firmas y no en serie
+    // despues: son cuatro descargas independientes, y encadenarlas solo
+    // haria esperar mas a quien emite el certificado.
+    const [firmaGerente, firmaCoordAdmin, firmaCoordGH, logoUri] = await Promise.all([
       resolverFirma(gerente), resolverFirma(coordAdmin), resolverFirma(coordGH),
+      LogoEmpresa.dataUri(),
     ]);
     const gerenteFirma = firmaGerente.dataUri;
     const coordAdminFirma = firmaCoordAdmin.dataUri;
@@ -1858,14 +1862,7 @@ Router.register('empleados', {
   <table>
     <tr class="doc-header">
       <td class="brand-cell">
-        <div class="brand">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="8.5" stroke="#1c4fa0" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(-15 12 12)"/>
-            <circle cx="12" cy="12" r="8.5" stroke="#2fa84f" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(105 12 12)"/>
-            <circle cx="12" cy="12" r="8.5" stroke="#f2941d" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(225 12 12)"/>
-          </svg>
-          COMBUSES
-        </div>
+        ${LogoEmpresa.espacioLogo(`<div class="brand">${LogoEmpresa.marcaHtml(logoUri)}</div>`, !!logoUri)}
       </td>
       <td class="title-cell">CERTIFICACIÓN LABORAL</td>
       <td class="meta-cell">
@@ -1926,6 +1923,11 @@ Router.register('empleados', {
   .doc-header .brand-cell { width: 24%; }
   .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: #0a1930; }
   .doc-header .brand svg { flex: none; }
+  /* max-width es lo que mantiene el membrete en su sitio. Sin el, la celda
+     del logo NO recorta la imagen: crece con ella. Medido con un logo
+     apaisado de 10:1, la celda pasaba de 176px a 549px de 748 y dejaba al
+     titulo del documento sin espacio. */
+  .doc-header .brand .logo-img { max-height: 52px; max-width: 100%; object-fit: contain; }
   .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 16px; letter-spacing: 0.02em; }
   .doc-header .meta-cell { width: 22%; font-size: 12px; line-height: 1.6; }
   .doc-header .meta-cell b { font-weight: 700; }
@@ -1965,6 +1967,12 @@ Router.register('empleados', {
         if (!persona) return;
         this._abrirFirma(persona, () => this._generarDocumentoCertificado(empleado, datos));
       },
+      // El logo, igual: se sube desde el membrete y el certificado se vuelve
+      // a armar con el logo nuevo ya incrustado.
+      alLogo: () => LogoEmpresa.abrirDialogo({
+        alVolver: () => this._generarDocumentoCertificado(empleado, datos),
+        textoCancelar: 'Volver sin guardar',
+      }),
     });
   },
 

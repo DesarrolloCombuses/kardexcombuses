@@ -761,6 +761,11 @@ Router.register('informes-disciplinarios', {
       Loading.hide();
     }
 
+    // El logo de la empresa, incrustado igual que las evidencias (ver
+    // js/logo-empresa.js). Si todavia no hay ninguno subido devuelve null y
+    // el membrete sale con el SVG de respaldo de siempre.
+    const logoUri = await LogoEmpresa.dataUri();
+
     const caja = (texto) => `<div class="caja">${texto ? escapeHtml(texto) : ''}</div>`;
 
     const evidenciaHtml = `
@@ -779,14 +784,7 @@ Router.register('informes-disciplinarios', {
   <table>
     <tr class="doc-header">
       <td class="brand-cell">
-        <div class="brand">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="8.5" stroke="#1c4fa0" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(-15 12 12)"/>
-            <circle cx="12" cy="12" r="8.5" stroke="#2fa84f" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(105 12 12)"/>
-            <circle cx="12" cy="12" r="8.5" stroke="#f2941d" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="15 39" transform="rotate(225 12 12)"/>
-          </svg>
-          COMBUSES
-        </div>
+        <div class="brand">${LogoEmpresa.marcaHtml(logoUri)}</div>
       </td>
       <td class="title-cell">FORMATO INFORME TÉCNICO DISCIPLINARIO</td>
       <td class="meta-cell">
@@ -853,6 +851,9 @@ Router.register('informes-disciplinarios', {
   .doc-header .brand-cell { width: 24%; }
   .doc-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: #0a1930; }
   .doc-header .brand svg { flex: none; }
+  /* max-width: sin el, la celda del logo crece con la imagen y deja al
+     titulo del formato sin ancho (ver el mismo estilo en empleados.js). */
+  .doc-header .brand .logo-img { max-height: 48px; max-width: 100%; object-fit: contain; }
   .doc-header .title-cell { text-align: center; font-weight: 800; font-size: 14px; letter-spacing: 0.02em; }
   .doc-header .meta-cell { width: 22%; font-size: 11.5px; line-height: 1.5; }
   .punto { font-size: 12.5px; font-weight: 800; margin: 20px 0 6px; letter-spacing: 0.02em; }

@@ -82,6 +82,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
+  <!-- El logo de la empresa. Va aca arriba, antes de todo lo demas, porque
+       esta pantalla todavia no tiene sesion: el bucket "marca" es publico
+       justamente para que el login pueda mostrar el logo de verdad. -->
+  <script src="js/logo-empresa.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/connectivity.js"></script>
   <script src="js/loading-overlay.js"></script>
@@ -90,6 +94,7 @@
   <script src="js/auth.js"></script>
   <script>
     document.getElementById('login-year').textContent = new Date().getFullYear();
+    LogoEmpresa.pintarShell();
 
     Auth.redirectIfAuthenticated().catch(() => {});
 

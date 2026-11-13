@@ -98,10 +98,36 @@ Router.register('usuarios', {
     if (!this._bound) {
       document.getElementById('us-form').addEventListener('submit', (e) => this._submit(e));
       document.getElementById('us-superadmin-form').addEventListener('submit', (e) => this._submitSuperadmin(e));
+      document.getElementById('us-logo-btn').addEventListener('click', () => LogoEmpresa.abrirDialogo({
+        alCerrar: () => { LogoEmpresa._cerrar(); this._pintarLogo(); },
+      }));
       this._setupEmpleadoCombobox();
       this._bound = true;
     }
+    this._pintarLogo();
     await this._load();
+  },
+
+  // El logo actual, sobre fondo claro y oscuro: asi se ve de una si el
+  // archivo que subieron tiene el fondo transparente de verdad o trae un
+  // recuadro blanco pegado. Si no hay logo, las dos imagenes fallan al
+  // cargar y en su lugar queda el aviso de que no hay ninguno.
+  _pintarLogo() {
+    const tablero = document.getElementById('us-logo-tablero');
+    const vacio = document.getElementById('us-logo-vacio');
+    if (!tablero || !vacio) return;
+    const url = LogoEmpresa.url();
+    const prueba = new Image();
+    prueba.onload = () => {
+      ['us-logo-claro', 'us-logo-oscuro'].forEach((id) => { document.getElementById(id).src = url; });
+      tablero.classList.remove('hidden');
+      vacio.classList.add('hidden');
+    };
+    prueba.onerror = () => {
+      tablero.classList.add('hidden');
+      vacio.classList.remove('hidden');
+    };
+    prueba.src = url;
   },
 
   async _load() {
