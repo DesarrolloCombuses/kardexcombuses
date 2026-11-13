@@ -53,7 +53,11 @@ function conLimite(promesa, ms, queEs) {
   ]);
 }
 
-async function imagenComoDataUri(url, maxLado = 1100, calidad = 0.82) {
+// formato: JPEG para fotos (pesa mucho menos), pero PNG obligatorio para las
+// firmas -- vienen con el fondo transparente y un JPEG no guarda
+// transparencia: el canvas vacío se vuelve NEGRO al exportarlo, así que la
+// firma saldría como un rectángulo negro encima del texto del certificado.
+async function imagenComoDataUri(url, maxLado = 1100, calidad = 0.82, formato = 'image/jpeg') {
   const respuesta = await conLimite(fetch(url), limiteImagenMs(), 'descarga');
   if (!respuesta.ok) throw new Error('No se pudo descargar la imagen (' + respuesta.status + ')');
   const bitmap = await conLimite(createImageBitmap(await respuesta.blob()), limiteImagenMs(), 'lectura');
@@ -63,16 +67,22 @@ async function imagenComoDataUri(url, maxLado = 1100, calidad = 0.82) {
   lienzo.height = Math.round(bitmap.height * escala);
   lienzo.getContext('2d').drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
   bitmap.close?.();
-  return lienzo.toDataURL('image/jpeg', calidad);
+  return lienzo.toDataURL(formato, calidad);
 }
 
-function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
+// acciones=false devuelve la MISMA hoja pero sin la barra de botones y sin
+// html2pdf: es la que se mete en el <iframe> de la vista previa (ver
+// js/visor-documento.js). Importa que sea el mismo generador y no una copia
+// parecida -- si la vista previa se armara aparte, mostraría un documento
+// que no es el que después se imprime, que es justo lo que no puede pasar
+// en algo que se revisa antes de emitirlo.
+function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo, acciones = true }) {
     return `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
 <title>${titulo}</title>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+${acciones ? '<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></scr' + 'ipt>' : ''}
 <style>
   * { box-sizing: border-box; }
   html, body { background: #dde3ec; margin: 0; }
@@ -85,6 +95,13 @@ function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
   .print-actions .estado { font-size: 12.5px; color: #445; }
   .page { background: #fff; width: 8.5in; min-height: 11in; margin: 0 auto; box-shadow: 0 4px 24px rgba(15,23,42,.16); }
   ${estilos}
+  ${acciones ? '' : `
+  /* Vista previa dentro de la app: la hoja llena el iframe, sin fondo gris
+     ni sombra ni márgenes, porque el marco ya lo pone el visor. */
+  html, body { background: #fff; }
+  body { padding: 0; }
+  .page { box-shadow: none; margin: 0; width: 100%; }
+  `}
   @page { size: letter; margin: 0; }
   @media print {
     html, body { background: #fff; }
@@ -95,13 +112,13 @@ function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
 </style>
 </head>
 <body>
-  <div class="print-actions">
+  ${acciones ? `<div class="print-actions">
     <button type="button" class="btn-pdf" id="btn-descargar-pdf">Descargar PDF</button>
     <button type="button" class="btn-print" onclick="window.print()">Imprimir</button>
     <span class="estado" id="pdf-estado"></span>
-  </div>
+  </div>` : ''}
   <div class="page">${cuerpoHtml}</div>
-  <script>
+  ${acciones ? `<script>
     document.getElementById('btn-descargar-pdf').addEventListener('click', function () {
       var boton = document.getElementById('btn-descargar-pdf');
       var estado = document.getElementById('pdf-estado');
@@ -120,7 +137,7 @@ function paginaImprimible({ titulo, estilos, cuerpoHtml, archivo }) {
         .catch(function () { estado.textContent = 'No se pudo generar el PDF -- prueba con "Imprimir" y elige "Guardar como PDF".'; })
         .finally(function () { boton.disabled = false; });
     });
-  </script>
+  </scr` + `ipt>` : ''}
 </body>
 </html>`;
 }

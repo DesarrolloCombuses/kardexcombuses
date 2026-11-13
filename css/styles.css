@@ -1771,3 +1771,30 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
   .ac-tira-foto { width: 46px; height: 34px; }
   .ac-lightbox { padding: 1rem; }
 }
+
+/* --- Visor de documentos (vista previa antes de emitir) ------------------ */
+/* Ver js/visor-documento.js. Los avisos y los botones van ARRIBA del
+   documento a propósito: si estuvieran debajo habría que recorrer una hoja
+   entera para enterarse de que al certificado le falta la firma. */
+.visor-avisos { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.9rem; }
+.visor-aviso {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+  flex-wrap: wrap;
+  background: #fef6e7; border: 1px solid #f0c674; border-left: 4px solid #e0a106;
+  border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.9rem; color: #6b4a00;
+}
+.visor-aviso-btn { flex: none; padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+.visor-acciones {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.visor-estado { font-size: 0.85rem; color: var(--slate-500, #64748b); }
+.visor-estado.error { color: #b42318; }
+.visor-lienzo {
+  overflow: hidden; border: 1px solid var(--slate-200);
+  border-radius: 8px; background: #fff;
+}
+.visor-lienzo iframe {
+  border: 0; display: block; background: #fff;
+  transform-origin: top left;
+}

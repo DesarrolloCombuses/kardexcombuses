@@ -1638,39 +1638,52 @@ Router.register('empleados', {
   // (cargo, cédula, salario) no se puede corregir después de entregado.
   // Prellenado con lo que ya hay en el empleado/perfil, pero todo editable
   // solo para este documento (no toca la ficha real del empleado).
-  _abrirCertificadoLaboral(empleado) {
+  // valores: lo que ya se había escrito, cuando se vuelve desde el visor con
+  // "Corregir datos" -- sin esto, corregir un campo borraría las
+  // correcciones anteriores.
+  _abrirCertificadoLaboral(empleado, valores = null) {
     const perfil = empleado.perfil_sociodemografico || {};
     const hoy = new Date().toISOString().slice(0, 10);
+    const v = valores || {};
+    const previo = (campo, porDefecto) => (valores && v[campo] != null ? v[campo] : porDefecto);
+    const vNombre = previo('nombre', empleado.nombre || '');
+    const vCedula = previo('cedula', empleado.cedula || '');
+    const vCargo = previo('cargo', empleado.cargo || '');
+    const vSexo = previo('sexo', perfil.sexo || '');
+    const vIngreso = previo('fechaIngreso', perfil.fecha_ingreso || '') || '';
+    const vSalida = previo('fechaSalida', empleado.fecha_salida || '') || '';
+    const vSalario = previo('salario', empleado.salario ?? '');
+    const vExpedicion = previo('fechaExpedicion', hoy) || hoy;
     document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
     document.getElementById('modal-body').innerHTML = `
       <div class="detalle-header">
         <div class="detalle-header-info">
           <div class="detalle-nombre">Certificado laboral — ${empleado.nombre}</div>
-          <div class="detalle-sub">Revisa y corrige lo que haga falta antes de generar el documento: queda impreso tal cual.</div>
+          <div class="detalle-sub">Revisa y corrige lo que haga falta: el documento queda impreso tal cual. Primero se muestra para revisarlo, todavía no se imprime nada.</div>
         </div>
       </div>
       <form id="certificado-form" class="form">
         <div class="fieldset-grid">
-          <label>Nombre completo <span class="req-star">*</span><input type="text" id="certificado-nombre" value="${empleado.nombre || ''}" required /></label>
-          <label>Cédula <span class="req-star">*</span><input type="text" id="certificado-cedula" value="${empleado.cedula || ''}" required /></label>
-          <label>Cargo<input type="text" id="certificado-cargo" value="${empleado.cargo || ''}" /></label>
+          <label>Nombre completo <span class="req-star">*</span><input type="text" id="certificado-nombre" value="${vNombre}" required /></label>
+          <label>Cédula <span class="req-star">*</span><input type="text" id="certificado-cedula" value="${vCedula}" required /></label>
+          <label>Cargo<input type="text" id="certificado-cargo" value="${vCargo}" /></label>
           <label>Sexo (define "El señor" / "La señora" en el texto)
             <select id="certificado-sexo">
               <option value="">No especificado</option>
-              <option value="Masculino" ${perfil.sexo === 'Masculino' ? 'selected' : ''}>Masculino</option>
-              <option value="Femenino" ${perfil.sexo === 'Femenino' ? 'selected' : ''}>Femenino</option>
+              <option value="Masculino" ${vSexo === 'Masculino' ? 'selected' : ''}>Masculino</option>
+              <option value="Femenino" ${vSexo === 'Femenino' ? 'selected' : ''}>Femenino</option>
             </select>
           </label>
-          <label>Fecha de ingreso<input type="date" id="certificado-fecha-ingreso" value="${perfil.fecha_ingreso || ''}" /></label>
+          <label>Fecha de ingreso<input type="date" id="certificado-fecha-ingreso" value="${vIngreso}" /></label>
           ${empleado.activo
             ? '<label>Vinculación<input type="text" value="Vigente (el documento dirá &quot;hasta la fecha&quot;)" disabled /></label>'
-            : `<label>Fecha de salida<input type="date" id="certificado-fecha-salida" value="${empleado.fecha_salida || ''}" /></label>`}
-          <label>Salario mensual<input type="number" id="certificado-salario" min="0" value="${empleado.salario ?? ''}" /></label>
-          <label>Fecha de expedición<input type="date" id="certificado-fecha-expedicion" value="${hoy}" /></label>
+            : `<label>Fecha de salida<input type="date" id="certificado-fecha-salida" value="${vSalida}" /></label>`}
+          <label>Salario mensual<input type="number" id="certificado-salario" min="0" value="${vSalario}" /></label>
+          <label>Fecha de expedición<input type="date" id="certificado-fecha-expedicion" value="${vExpedicion}" /></label>
         </div>
         <div style="display:flex;gap:0.5rem">
-          <button type="submit">Generar certificado</button>
+          <button type="submit">Ver el certificado</button>
           <button type="button" id="certificado-cancelar" class="btn-secondary">Cancelar</button>
         </div>
         <p id="certificado-msg" class="form-msg"></p>
@@ -1731,16 +1744,10 @@ Router.register('empleados', {
   // editable acá): decide si el texto dice "está" o "estuvo" vinculado, que
   // es un hecho, no un dato a corregir.
   async _generarDocumentoCertificado(empleado, datos) {
-    // El popup hay que abrirlo YA, en el mismo tick del clic -- si se abre
-    // después de un await, el navegador lo trata como si no viniera de una
-    // acción del usuario y lo bloquea. Se llena con un mensaje de espera y
-    // se reemplaza más abajo cuando ya está todo listo.
-    const ventana = window.open('', '_blank');
-    if (!ventana) {
-      alert('El navegador bloqueó la ventana emergente. Habilítala para este sitio e intenta de nuevo.');
-      return;
-    }
-    ventana.document.write('<p style="font-family:Arial,Helvetica,sans-serif;padding:2rem;color:#445">Generando certificado…</p>');
+    // No se abre ninguna ventana todavía: el documento se arma y se muestra
+    // en el visor (ver js/visor-documento.js), y solo desde ahí se pasa a
+    // imprimir. Así, si le falta la firma de quien certifica, se ve antes de
+    // emitirlo y no con la hoja ya impresa en la mano.
 
     // Las firmas se resuelven por cargo (no por nombre fijo) para que el
     // documento quede siempre con quien está hoy en cada cargo -- si mañana
@@ -1750,24 +1757,65 @@ Router.register('empleados', {
     const coordAdmin = this._empleadoPorCargo(/coordinador(a)?\s+administrativo/i);
     const coordGH = this._empleadoPorCargo(/gesti[oó]n\s+humana/i);
 
-    // Firma dibujada y guardada desde "Agregar firma" en la ficha del
-    // empleado (ver _abrirFirma) -- si alguno de los 3 cargos no tiene firma
-    // guardada todavía, simplemente se deja el espacio en blanco de siempre
-    // para firmar a mano.
+    // Firma subida o dibujada desde "Agregar firma" en la ficha del empleado
+    // (ver _abrirFirma) -- si alguno de los 3 cargos no tiene firma guardada
+    // todavía, se deja el espacio en blanco de siempre para firmar a mano y
+    // el visor lo avisa arriba, con nombre y apellido.
+    //
+    // La imagen se incrusta como data URI en vez de enlazarla, por dos
+    // razones ya vividas con los anexos del informe disciplinario: el enlace
+    // firmado del bucket EXPIRA (un documento reabierto al día siguiente se
+    // queda sin firma) y html2canvas, que es quien dibuja el PDF, deja en
+    // blanco cualquier imagen de otro dominio -- el PDF saldría con el texto
+    // y sin la firma, que es media razón de ser del documento.
     const resolverFirma = async (persona) => {
-      if (!persona?.firma_url) return null;
+      if (!persona) return { dataUri: null, motivo: 'sin_persona' };
+      if (!persona.firma_url) return { dataUri: null, motivo: 'sin_firma' };
       try {
-        return await DB.getSignedUrl('firmas', persona.firma_url);
-      } catch {
-        return null;
+        const url = await DB.getSignedUrl('firmas', persona.firma_url);
+        // PNG: la firma viene con el fondo transparente y un JPEG lo pintaría
+        // de negro encima del texto.
+        return { dataUri: await imagenComoDataUri(url, 900, 0.92, 'image/png'), motivo: null };
+      } catch (err) {
+        return { dataUri: null, motivo: 'error', detalle: err.message };
       }
     };
-    const [gerenteFirma, coordAdminFirma, coordGHFirma] = await Promise.all([
+    const [firmaGerente, firmaCoordAdmin, firmaCoordGH] = await Promise.all([
       resolverFirma(gerente), resolverFirma(coordAdmin), resolverFirma(coordGH),
     ]);
+    const gerenteFirma = firmaGerente.dataUri;
+    const coordAdminFirma = firmaCoordAdmin.dataUri;
+    const coordGHFirma = firmaCoordGH.dataUri;
     const imgFirma = (url, alto) => url
-      ? `<img src="${url}" crossorigin="anonymous" alt="Firma" style="max-height:${alto}px;display:block;margin-bottom:4px" />`
+      ? `<img src="${url}" alt="Firma" style="max-height:${alto}px;display:block;margin-bottom:4px" />`
       : '';
+
+    // Lo que el visor muestra arriba del documento. Cada aviso dice qué le
+    // falta y, cuando se puede arreglar desde aquí, trae el botón que lleva
+    // justo a esa pantalla.
+    const avisos = [];
+    const revisarFirmante = (persona, resultado, rol, cargoEsperado) => {
+      if (resultado.motivo === 'sin_persona') {
+        avisos.push({ texto: `No hay ningún empleado activo con el cargo de <strong>${cargoEsperado}</strong>, así que en "${rol}" el documento sale con el cargo genérico y sin nombre.` });
+        return;
+      }
+      if (resultado.motivo === 'sin_firma') {
+        avisos.push({
+          texto: `<strong>${persona.nombre}</strong> (${rol}) no tiene firma guardada: su espacio queda en blanco para firmar a mano.`,
+          etiqueta: 'Subir su firma',
+          accion: () => this._abrirFirma(persona),
+        });
+        return;
+      }
+      if (resultado.motivo === 'error') {
+        avisos.push({ texto: `No se pudo cargar la firma de <strong>${persona.nombre}</strong> (${rol}): ${resultado.detalle || 'error al leer la imagen'}. El documento sale con el espacio en blanco.` });
+      }
+    };
+    revisarFirmante(coordGH, firmaCoordGH, 'quien certifica', 'Gestión Humana');
+    revisarFirmante(coordAdmin, firmaCoordAdmin, 'elaborado por', 'Coordinador Administrativo');
+    revisarFirmante(gerente, firmaGerente, 'aprobado por', 'Gerente General');
+    if (!datos.salario) avisos.push({ texto: 'El empleado no tiene salario registrado: el documento deja la frase marcada para completarla a mano.' });
+    if (!datos.fechaIngreso) avisos.push({ texto: 'No hay fecha de ingreso: el documento dice "N/N" donde va la fecha.' });
 
     const esFemenino = datos.sexo === 'Femenino';
     const esMasculino = datos.sexo === 'Masculino';
@@ -1869,16 +1917,20 @@ Router.register('empleados', {
   .aprobacion th { background: #f3f4f6; font-weight: 700; text-align: left; }
 `;
 
-    const html = this._paginaImprimible({
+    VisorDocumento.mostrar({
       titulo: `Certificación laboral — ${datos.nombre}`,
+      subtitulo: 'Revísalo antes de imprimirlo: un certificado laboral entregado ya no se corrige.'
+        + (avisos.some((a) => a.accion) ? ' Si subes una firma que falta, vuelve a generar el certificado para que salga estampada.' : ''),
       estilos,
       cuerpoHtml,
       archivo: `certificado-laboral-${slugArchivo(datos.nombre)}.pdf`,
+      avisos,
+      // Vuelve al formulario con lo que ya había escrito, no con los datos
+      // del empleado otra vez: si corrigió el cargo y quiere además cambiar
+      // el salario, perder la primera corrección sería ridículo.
+      alCorregir: () => this._abrirCertificadoLaboral(empleado, datos),
+      alCerrar: () => this._verDetalle(empleado),
     });
-
-    ventana.document.open();
-    ventana.document.write(html);
-    ventana.document.close();
   },
 
   async _cambiarEstado(empleado, activo, fechaSalida, motivoRenuncia) {
