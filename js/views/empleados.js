@@ -1522,20 +1522,21 @@ Router.register('empleados', {
         </p>
         <input type="file" id="firma-archivo" accept="image/*" />
         <div id="firma-preview-wrap" class="hidden" style="margin-top:0.7rem">
-          <p class="empty-note" style="margin:0 0 0.4rem">Así va a quedar impresa:</p>
+          <p class="empty-note" style="margin:0 0 0.4rem">Así va a quedar impresa. Pulsa <strong>Guardar firma</strong> abajo para dejarla.</p>
           <img id="firma-preview" alt="Firma preparada" style="max-height:110px;background:#fff;border:1px solid var(--slate-200,#e5e7eb);border-radius:6px;padding:6px" />
-          <div style="margin-top:0.6rem">
-            <button type="button" id="firma-subir-btn">Guardar esta firma</button>
-          </div>
         </div>
       </div>
       <div class="modal-section">
         <h3 class="modal-section-title">${empleado.firma_url ? 'O dibujarla aquí' : 'O dibujarla aquí'}</h3>
         <p class="view-intro" style="margin:0 0 0.6rem">Dibuja con el mouse o el dedo, tal como quieres que salga impresa.</p>
         <canvas id="firma-canvas" class="signature-canvas"></canvas>
-        <div style="display:flex;gap:0.5rem;margin-top:0.7rem;flex-wrap:wrap">
+        <div style="margin-top:0.7rem">
+          <button type="button" id="firma-limpiar-btn" class="btn-secondary">Limpiar el dibujo</button>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button type="button" id="firma-guardar-btn">Guardar firma</button>
-          <button type="button" id="firma-limpiar-btn" class="btn-secondary">Limpiar</button>
           <button type="button" id="firma-cancelar-btn" class="btn-secondary">Cancelar</button>
         </div>
         <p id="firma-msg" class="form-msg"></p>
@@ -1545,6 +1546,7 @@ Router.register('empleados', {
     // Subir una imagen: se limpia al elegirla (no al guardar) para que se
     // vea ANTES de confirmar como va a quedar impresa.
     let firmaSubida = null;
+    let padRef = null;   // se asigna abajo; el listener se registra antes de crearlo
     const archivoInput = document.getElementById('firma-archivo');
     archivoInput?.addEventListener('change', async () => {
       const msg = document.getElementById('firma-msg');
@@ -1558,6 +1560,7 @@ Router.register('empleados', {
       try {
         const limpia = await FirmaImagen.limpiar(file);
         firmaSubida = limpia.blob;
+        padRef?.clear();   // la imagen manda: se descarta lo que hubiera dibujado
         document.getElementById('firma-preview').src = limpia.dataUrl;
         wrap.classList.remove('hidden');
         msg.textContent = `Lista: ${limpia.ancho}×${limpia.alto} píxeles, sin fondo.`;
@@ -1585,17 +1588,37 @@ Router.register('empleados', {
       }
     };
 
-    document.getElementById('firma-subir-btn')?.addEventListener('click', () => {
-      if (firmaSubida) guardarBlob(firmaSubida);
+    const lienzo = document.getElementById('firma-canvas');
+    const pad = new SignaturePad(lienzo);
+    padRef = pad;
+
+    // Una sola fuente activa a la vez. Antes había dos botones de guardar y
+    // era facil pulsar el que no era: se subía la imagen y el boton de
+    // abajo respondía "dibuja la firma antes de guardar", con la imagen ya
+    // cargada en pantalla. Ahora subir una imagen borra el dibujo, y
+    // empezar a dibujar descarta la imagen.
+    lienzo.addEventListener('pointerdown', () => {
+      if (!firmaSubida) return;
+      firmaSubida = null;
+      if (archivoInput) archivoInput.value = '';
+      document.getElementById('firma-preview-wrap').classList.add('hidden');
+      const msg = document.getElementById('firma-msg');
+      msg.textContent = 'Se va a guardar el dibujo; la imagen que habías subido se descartó.';
+      msg.className = 'form-msg';
     });
 
-    const pad = new SignaturePad(document.getElementById('firma-canvas'));
     document.getElementById('firma-limpiar-btn').addEventListener('click', () => pad.clear());
     document.getElementById('firma-cancelar-btn').addEventListener('click', () => this._verDetalle(empleado));
+
     document.getElementById('firma-guardar-btn').addEventListener('click', async () => {
       const msg = document.getElementById('firma-msg');
+      // La imagen subida manda; si no hay, se usa el dibujo.
+      if (firmaSubida) {
+        await guardarBlob(firmaSubida);
+        return;
+      }
       if (pad.isEmpty()) {
-        msg.textContent = 'Dibuja la firma antes de guardar.';
+        msg.textContent = 'Sube una imagen de la firma o dibújala aquí antes de guardar.';
         msg.className = 'form-msg error';
         return;
       }
