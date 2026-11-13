@@ -94,6 +94,14 @@ ${acciones ? '<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/
   .print-actions .btn-print { background: #fff; color: #2f6fed; border: 1.5px solid #2f6fed; }
   .print-actions .estado { font-size: 12.5px; color: #445; }
   .page { background: #fff; width: 8.5in; min-height: 11in; margin: 0 auto; box-shadow: 0 4px 24px rgba(15,23,42,.16); }
+  /* Un espacio de firma marcado con data-firmar se puede pulsar en la vista
+     previa para poner la firma ahí mismo. En el documento de verdad no
+     queda rastro: ni el aviso ni el recuadro punteado se imprimen, porque
+     esto se define solo en el modo vista previa de abajo. */
+  [data-firmar] .firma-sugerencia { display: none; }
+  /* En bloque, para que el nombre de quien firma siga cayendo DEBAJO de la
+     línea y no a su derecha: el envoltorio no puede cambiar la hoja. */
+  [data-firmar] { display: block; }
   ${estilos}
   ${acciones ? '' : `
   /* Vista previa dentro de la app: la hoja llena el iframe, sin fondo gris
@@ -101,6 +109,19 @@ ${acciones ? '<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/
   html, body { background: #fff; }
   body { padding: 0; }
   .page { box-shadow: none; margin: 0; width: 100%; }
+  [data-firmar] {
+    width: fit-content; cursor: pointer; border-radius: 6px;
+    /* Sin margen negativo abajo: el recuadro se montaba sobre el nombre de
+       quien firma y parecía tachado. */
+    padding: 6px 8px 3px; margin: -6px -8px 2px;
+    outline: 1.5px dashed #9fb6e8; outline-offset: 0;
+    transition: background .12s, outline-color .12s;
+  }
+  [data-firmar]:hover { background: #eaf1ff; outline-color: #2f6fed; }
+  [data-firmar] .firma-sugerencia {
+    display: block; font-size: 11.5px; color: #2f6fed; font-weight: 700;
+    margin-bottom: 3px; font-family: Arial, Helvetica, sans-serif;
+  }
   `}
   @page { size: letter; margin: 0; }
   @media print {

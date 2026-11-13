@@ -60,6 +60,14 @@ const FirmaImagen = {
     lienzo.width = ancho;
     lienzo.height = alto;
     const ctx = lienzo.getContext('2d');
+    // Fondo blanco ANTES de dibujar. Un canvas nuevo es transparente, y un
+    // píxel transparente se lee como rgb(0,0,0): un PNG que ya venga con el
+    // fondo recortado (los que salen de quitar el fondo en otra herramienta)
+    // se leería entero como trazo negrísimo y la "firma" saldría como un
+    // rectángulo negro tapando el texto del certificado. Componiéndolo sobre
+    // blanco, ese PNG se trata igual que un escaneo y vuelve a salir bien.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, ancho, alto);
     ctx.drawImage(img, 0, 0, ancho, alto);
 
     const datos = ctx.getImageData(0, 0, ancho, alto);

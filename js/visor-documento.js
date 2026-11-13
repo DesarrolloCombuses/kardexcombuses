@@ -33,7 +33,10 @@ const VisorDocumento = {
   // avisos: [{ texto, etiqueta?, accion? }] -- lo que le falta al documento.
   // alCorregir / alCerrar: funciones opcionales; si no vienen, no se pinta
   // ese botón.
-  mostrar({ titulo, subtitulo, estilos, cuerpoHtml, archivo, avisos = [], alCorregir = null, alCerrar = null }) {
+  // alFirmar: se llama con el valor de data-firmar del espacio de firma que
+  // se pulse dentro del documento. Es lo que permite poner la firma donde
+  // va, en vez de tener que salir a buscar la ficha de esa persona.
+  mostrar({ titulo, subtitulo, estilos, cuerpoHtml, archivo, avisos = [], alCorregir = null, alCerrar = null, alFirmar = null }) {
     const caja = document.getElementById('modal-box');
     if (caja) caja.classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
@@ -69,13 +72,6 @@ const VisorDocumento = {
     const lienzo = document.getElementById('visor-lienzo');
     const marco = document.getElementById('visor-iframe');
 
-    // srcdoc por propiedad y no como atributo del innerHTML: el documento
-    // lleva comillas dobles por todas partes (atributos, estilos, data URIs
-    // de las firmas) y meterlo dentro de un atributo obliga a escaparlo
-    // entero, con una sola comilla mal escapada bastando para partir la
-    // página en dos.
-    marco.srcdoc = paginaImprimible({ titulo, estilos, cuerpoHtml, archivo, acciones: false });
-
     // El alto del documento no se sabe hasta que el navegador lo dibuja: un
     // certificado cabe en una hoja, un informe disciplinario con anexos
     // puede ocupar cuatro. Se mide al cargar y se vuelve a medir si cambia
@@ -90,7 +86,34 @@ const VisorDocumento = {
       marco.style.transform = `scale(${k})`;
       lienzo.style.height = Math.round(alto * k) + 'px';
     };
-    marco.addEventListener('load', ajustar);
+
+    // El documento va dentro de un iframe, así que el clic ocurre en OTRO
+    // documento: hay que escucharlo allá dentro. srcdoc hereda el origen de
+    // la app, por eso se puede. Se engancha al cargar, junto con la medida.
+    const alCargar = () => {
+      ajustar();
+      const doc = marco.contentDocument;
+      if (!doc || !alFirmar) return;
+      doc.addEventListener('click', (e) => {
+        const zona = e.target.closest && e.target.closest('[data-firmar]');
+        if (!zona) return;
+        e.preventDefault();
+        soltar();
+        alFirmar(zona.getAttribute('data-firmar'));
+      });
+    };
+
+    // El listener va ANTES de asignar el srcdoc: si el documento es corto,
+    // el load puede llegar antes de que termine esta función.
+    marco.addEventListener('load', alCargar);
+
+    // srcdoc por propiedad y no como atributo del innerHTML: el documento
+    // lleva comillas dobles por todas partes (atributos, estilos, data URIs
+    // de las firmas) y meterlo dentro de un atributo obliga a escaparlo
+    // entero, con una sola comilla mal escapada bastando para partir la
+    // página en dos.
+    marco.srcdoc = paginaImprimible({ titulo, estilos, cuerpoHtml, archivo, acciones: false });
+
     const alRedimensionar = () => ajustar();
     window.addEventListener('resize', alRedimensionar);
 

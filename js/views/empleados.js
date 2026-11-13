@@ -1489,7 +1489,10 @@ Router.register('empleados', {
   // toca firmar por su cargo (Gerente General, Coordinador Administrativo o
   // Gestión Humana) -- se guarda en la ficha del empleado, no por cargo, así
   // que si la persona cambia de cargo su firma la sigue acompañando.
-  async _abrirFirma(empleado) {
+  // alVolver: a dónde ir al terminar, tanto si se guardó como si se canceló.
+  // Sin esto, firmar desde el certificado dejaba al usuario en la ficha de
+  // OTRA persona (la que firma), lejos del documento que estaba revisando.
+  async _abrirFirma(empleado, alVolver = null) {
     document.getElementById('modal-box').classList.add('modal-wide');
     document.getElementById('modal-backdrop').classList.remove('hidden');
 
@@ -1537,7 +1540,7 @@ Router.register('empleados', {
       <div class="modal-section">
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button type="button" id="firma-guardar-btn">Guardar firma</button>
-          <button type="button" id="firma-cancelar-btn" class="btn-secondary">Cancelar</button>
+          <button type="button" id="firma-cancelar-btn" class="btn-secondary">${alVolver ? 'Volver sin guardar' : 'Cancelar'}</button>
         </div>
         <p id="firma-msg" class="form-msg"></p>
       </div>
@@ -1578,6 +1581,7 @@ Router.register('empleados', {
         const path = await DB.uploadToBucket('firmas', blob, 'png', 'certificados');
         await DB.updateEmployee(empleado.id, { firma_url: path });
         await this._load();
+        if (alVolver) { await alVolver(); return; }
         const actualizado = this._employees.find((e) => e.id === empleado.id) || empleado;
         this._verDetalle(actualizado);
       } catch (err) {
@@ -1608,7 +1612,8 @@ Router.register('empleados', {
     });
 
     document.getElementById('firma-limpiar-btn').addEventListener('click', () => pad.clear());
-    document.getElementById('firma-cancelar-btn').addEventListener('click', () => this._verDetalle(empleado));
+    document.getElementById('firma-cancelar-btn').addEventListener('click',
+      () => (alVolver ? alVolver() : this._verDetalle(empleado)));
 
     document.getElementById('firma-guardar-btn').addEventListener('click', async () => {
       const msg = document.getElementById('firma-msg');
@@ -1790,6 +1795,21 @@ Router.register('empleados', {
       ? `<img src="${url}" alt="Firma" style="max-height:${alto}px;display:block;margin-bottom:4px" />`
       : '';
 
+    // El espacio de firma, envuelto para que se pueda pulsar en la vista
+    // previa y poner la firma justo donde va (ver js/visor-documento.js).
+    // En el documento impreso no queda rastro del envoltorio: el recuadro
+    // punteado y el "Pulsa aquí" solo existen en el modo vista previa.
+    //
+    // Se marca tanto el espacio vacío como la firma ya puesta: si está mal
+    // o es la de quien ya no ocupa el cargo, cambiarla no deberia obligar a
+    // salir a buscar la ficha de esa persona.
+    const espacioFirma = (persona, dentro, hayFirma) => {
+      if (!persona) return dentro;
+      const sugerencia = hayFirma ? 'Pulsa para cambiar la firma' : '+ Pulsa aquí para poner la firma';
+      return `<span data-firmar="${persona.id}" title="${sugerencia}">`
+        + `<span class="firma-sugerencia">${sugerencia}</span>${dentro}</span>`;
+    };
+
     // Lo que el visor muestra arriba del documento. Cada aviso dice qué le
     // falta y, cuando se puede arreglar desde aquí, trae el botón que lleva
     // justo a esa pantalla.
@@ -1866,7 +1886,7 @@ Router.register('empleados', {
   <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
 
   <div class="firma">
-    ${coordGHFirma ? imgFirma(coordGHFirma, 70) : '<span class="linea"></span>'}
+    ${espacioFirma(coordGH, coordGHFirma ? imgFirma(coordGHFirma, 70) : '<span class="linea"></span>', !!coordGHFirma)}
     <span class="nombre">${coordGH ? coordGH.nombre : 'COORDINACIÓN DE GESTIÓN HUMANA'}</span><br>
     ${coordGH ? coordGH.cargo : 'Coordinador(a) Gestión Humana'}<br>
     COMPAÑÍA METROPOLITANA DE BUSES S.A.
@@ -1881,9 +1901,9 @@ Router.register('empleados', {
       <th>Aprobado por:</th>
     </tr>
     <tr>
-      <td>${imgFirma(coordAdminFirma, 36)}${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
+      <td>${espacioFirma(coordAdmin, imgFirma(coordAdminFirma, 36), !!coordAdminFirma)}${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
       <td>Bravo Restrepo Abogados<br>Asesoría legal y jurídica</td>
-      <td>${imgFirma(gerenteFirma, 36)}${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
+      <td>${espacioFirma(gerente, imgFirma(gerenteFirma, 36), !!gerenteFirma)}${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
     </tr>
     <tr>
       <td>Fecha: 13/04/2026</td>
@@ -1930,6 +1950,15 @@ Router.register('empleados', {
       // el salario, perder la primera corrección sería ridículo.
       alCorregir: () => this._abrirCertificadoLaboral(empleado, datos),
       alCerrar: () => this._verDetalle(empleado),
+      // Firmar desde el documento: se abre la firma de quien corresponda y,
+      // al guardar (o al cancelar), se vuelve a armar el certificado. Hay
+      // que volver a armarlo y no solo repintar: la firma recién guardada
+      // tiene que bajarse del bucket e incrustarse.
+      alFirmar: (id) => {
+        const persona = (this._employees || []).find((e) => String(e.id) === String(id));
+        if (!persona) return;
+        this._abrirFirma(persona, () => this._generarDocumentoCertificado(empleado, datos));
+      },
     });
   },
 
