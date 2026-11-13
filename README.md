@@ -39,7 +39,7 @@ Tres detalles del contrato que el código viejo tenía mal, todos sacados de ese
 
 Hasta v1.148.0 hubo aquí una función `sonar-insert-driver` que apuntaba a `Service.asmx` con namespace `tempuri`, y por eso nunca creó a nadie; su error ("Sonar rechazó el envío") mandaba a Gestión Humana a corregir perfiles buscando una falla que no estaba en los datos.
 
-Lo que hace el ERP: cuando se guarda un empleado con cargo "Conductor" y una ruta configurada (ver `RUTAS_SONAR` en [js/views/empleados.js](js/views/empleados.js)) — y cada vez que se pulsa "Consultar en Sonar" en su ficha — consulta si esa cédula ya está registrada, con la Edge Function [supabase/functions/sonar-consultar-conductor](supabase/functions/sonar-consultar-conductor/index.ts), que:
+Lo que hace el ERP: cuando se guarda por primera vez un empleado con cargo "Conductor" y una ruta configurada (ver `RUTAS_SONAR` en [js/views/empleados.js](js/views/empleados.js)) lo **registra en Sonar automáticamente**, sin preguntar — es seguro porque antes busca en todas las flotas y no crea nada si ya existe. Desde la ficha quedan además los botones "Consultar en Sonar" y "Registrar en Sonar". Todo lo hace la Edge Function [supabase/functions/sonar-consultar-conductor](supabase/functions/sonar-consultar-conductor/index.ts), que:
 - Solo se puede invocar con una sesión autenticada del ERP (no expone las credenciales de Sonar al cliente).
 - **Busca en TODAS las flotas, no solo en la de su ruta.** Un conductor que cambió de ruta puede estar registrado en la flota de su ruta anterior; buscando solo en la que le toca hoy, el ERP diría "no está" cuando sí está. Eso es justo lo que explicaba el rechazo "Existe otro conductor con la misma identificación": Sonar lo encontraba en la otra flota y el ERP no.
 - Distingue "no está" de "no se pudo consultar", y dice en cada caso qué hacer (registrarlo, habilitarlo, o moverlo de flota).
@@ -52,6 +52,8 @@ Lo que hace el ERP: cuando se guarda un empleado con cargo "Conductor" y una rut
 Para desplegarla o actualizarla:
 ```bash
 supabase functions deploy sonar-consultar-conductor --project-ref cbplebkmxrkaafqdhiyi
+# sonar-insert-driver quedo como alias por compatibilidad (reenvia con registrar:true); no tiene logica propia
+supabase functions deploy sonar-insert-driver --project-ref cbplebkmxrkaafqdhiyi
 ```
 Las credenciales de Sonar se configuran con `supabase secrets set SONAR_USER_N=... SONAR_PASSWORD_N=... SONAR_FLEET_ID_N=... --project-ref cbplebkmxrkaafqdhiyi` — nunca se escriben en este repo.
 

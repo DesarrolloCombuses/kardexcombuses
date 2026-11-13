@@ -2291,15 +2291,15 @@ Router.register('empleados', {
       await DB.saveHijosEmpleado(id, hijos);
 
       // Primera vez que este conductor queda con cargo Conductor + una ruta
-      // de RUTAS_SONAR: se consulta Sonar automáticamente, sin pedir
-      // confirmación, para avisar de una si todavía hay que crearlo allá (o
-      // si ya está, pero en la flota de su ruta anterior). No lo da de alta:
-      // eso Sonar no lo permite por webservice. Ediciones posteriores no
-      // vuelven a consultar solas -- para eso queda el botón "Consultar en
-      // Sonar" en el detalle.
+      // de RUTAS_SONAR: se REGISTRA en Sonar automáticamente, sin pedir
+      // confirmación. Es seguro hacerlo sin preguntar porque el registro
+      // busca antes en todas las flotas y no crea nada si el conductor ya
+      // existe: lo peor que puede pasar es que informe que ya estaba.
+      // Ediciones posteriores no vuelven a intentarlo solas -- para eso
+      // quedan los botones del detalle.
       const requiereSonar = esConductorRutaSonar(basico);
       if (requiereSonar && !this._empleadoSonarSyncedAt) {
-        await this._consultarEnSonar(id, msg);
+        await this._consultarEnSonar(id, msg, true);
         await this._load();
         return;
       }
