@@ -325,9 +325,18 @@ Router.register('personal-rotacion', {
       retencion = 100 - temprana;
     }
 
+    // Ingresos y egresos como PORCENTAJE de la misma planta promedio, para
+    // poder compararlos entre si: 8 retiros no quieren decir lo mismo en un
+    // mes de 90 personas que en uno de 300. El neto dice si la planta
+    // crecio o se encogio.
+    const ingresos = cohorte.length;
+    const tasaIngreso = plantaProm > 0 ? (ingresos / plantaProm) * 100 : null;
+    const neto = ingresos - retiros.length;
+
     return {
       key, plantaInicio, plantaCierre, plantaProm,
       retiros: retiros.length, voluntarios, involuntarios, sinClasificar, rotacion,
+      ingresos, tasaIngreso, neto,
       cohorte: cohorte.length, cerrada, retencion, temprana,
     };
   },
@@ -353,14 +362,28 @@ Router.register('personal-rotacion', {
       return tag(valor, ok);
     };
 
+    // El numero y su porcentaje juntos: el porcentaje solo esconde si son 2
+    // personas o 40, y el numero solo esconde si eso es mucho o poco.
+    const conPct = (n, tasa) => (n
+      ? `${n} <span class="muted">(${pct(tasa)})</span>`
+      : '<span class="muted">0</span>');
+    // El neto lleva signo siempre: un "+3" y un "3" se leen distinto cuando
+    // lo que se quiere saber es si la planta crecio.
+    const celdaNeto = (v) => {
+      if (v === 0) return '<span class="muted">0</span>';
+      const signo = v > 0 ? '+' : '−';
+      return `<span class="tag ${v > 0 ? 'activo' : 'pendiente'}">${signo}${Math.abs(v)}</span>`;
+    };
+
     tbody.innerHTML = filas.map((f) => `
       <tr>
         <td>${prEscapeHtml(prEtiquetaMesLarga(f.key))}</td>
         <td>${f.plantaProm % 1 === 0 ? f.plantaProm : f.plantaProm.toFixed(1).replace('.', ',')}</td>
-        <td>${f.retiros}</td>
+        <td>${conPct(f.ingresos, f.tasaIngreso)}</td>
+        <td>${conPct(f.retiros, f.rotacion)}</td>
+        <td>${celdaNeto(f.neto)}</td>
         <td>${f.voluntarios} / ${f.involuntarios}${f.sinClasificar ? ` <span class="muted">(+${f.sinClasificar} sin clasificar)</span>` : ''}</td>
         <td>${tag(f.rotacion, f.rotacion !== null && f.rotacion <= 3)}</td>
-        <td>${f.cohorte || '—'}</td>
         <td>${celdaCohorte(f, f.retencion, f.retencion >= 90)}</td>
         <td>${celdaCohorte(f, f.temprana, f.temprana <= 10)}</td>
       </tr>
@@ -380,7 +403,8 @@ Router.register('personal-rotacion', {
 
     const sinCerrar = filas.filter((f) => f.cohorte > 0 && !f.cerrada).length;
     document.getElementById('pr-ind-nota').textContent =
-      'La planta promedio es (personal al inicio + al cierre) ÷ 2. Una cohorte queda "sin cerrar" mientras alguno de sus ingresos no haya cumplido 90 días'
+      'La planta promedio es (personal al inicio + al cierre) ÷ 2, y los porcentajes de ingresos y egresos se calculan sobre ella. '
+      + 'El neto es ingresos − egresos: positivo, la planta creció ese mes. Una cohorte queda "sin cerrar" mientras alguno de sus ingresos no haya cumplido 90 días'
       + (sinCerrar ? ` — hoy son ${sinCerrar} mes(es).` : '.')
       + ' Retención y rotación temprana son complementarias: suman 100%.';
   },
