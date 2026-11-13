@@ -385,6 +385,77 @@ Router.register('personal-rotacion', {
       + ' Retención y rotación temprana son complementarias: suman 100%.';
   },
 
+  // El ausentismo sale de otra fuente (turnos y asistencia del sistema de
+  // flota, vía Edge Function), así que se pinta aparte y puede fallar solo:
+  // si esa consulta no responde, el resto de la pantalla sigue sirviendo.
+  async _renderAusentismo() {
+    const tbody = document.getElementById('pr-aus-tbody');
+    const msg = document.getElementById('pr-aus-msg');
+    if (!tbody || !msg) return;
+
+    let res;
+    try {
+      res = await DB.consultarAusentismo(12);
+    } catch (err) {
+      msg.textContent = 'No se pudo consultar el ausentismo: ' + err.message;
+      msg.className = 'form-msg error';
+      return;
+    }
+    if (!res || !res.ok) {
+      msg.textContent = (res && res.message) || 'No se pudo consultar el ausentismo.';
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    const filas = res.meses || [];
+    if (!filas.length) {
+      msg.textContent = 'Todavía no hay turnos programados en este periodo.';
+      msg.className = 'form-msg';
+      tbody.innerHTML = '';
+      return;
+    }
+    msg.className = 'form-msg hidden';
+
+    const dec = (v, n) => (v === null || v === undefined
+      ? '—'
+      : Number(v).toFixed(n).replace('.', ','));
+    const mesActual = new Date().toISOString().slice(0, 7);
+
+    tbody.innerHTML = filas.map((f) => {
+      const enCurso = f.key === mesActual;
+      const ok = f.pct !== null && f.pct <= 3;
+      const tag = f.pct === null
+        ? '<span class="muted">—</span>'
+        : `<span class="tag ${ok ? 'activo' : 'pendiente'}">${dec(f.pct, 2)}%</span>`;
+      return `
+      <tr>
+        <td>${prEscapeHtml(prEtiquetaMesLarga(f.key))}${enCurso ? ' <span class="muted">(en curso)</span>' : ''}</td>
+        <td>${dec(f.horasProgramadas, 1)}</td>
+        <td>${f.personas}</td>
+        <td>${dec(f.horasAusencia, 1)}</td>
+        <td>${tag}</td>
+      </tr>`;
+    }).join('');
+
+    // La cobertura va en rojo y arriba, igual que en los otros indicadores:
+    // este porcentaje solo mide al personal que se programa en la app, que
+    // es una parte de la planta. Sin eso al lado, un 0,4% se lee como "casi
+    // nadie falta" cuando puede ser "casi nadie está medido".
+    const cob = document.getElementById('pr-aus-cobertura');
+    const ultimoCerrado = filas.find((f) => f.key !== mesActual) || filas[0];
+    if (cob && res.activos && ultimoCerrado) {
+      const pctCob = Math.round((ultimoCerrado.personas / res.activos) * 100);
+      cob.textContent = `Solo cubre al personal que se programa en la app: ${ultimoCerrado.personas} personas de ${res.activos} activos (${pctCob}%). `
+        + 'No es el ausentismo de toda la empresa.';
+      cob.classList.remove('hidden');
+    }
+
+    document.getElementById('pr-aus-nota').textContent =
+      `${res.definicion || ''} Como todavía no se registran las novedades (incapacidad, permiso, falta injustificada), `
+      + 'no se puede separar una incapacidad médica de una inasistencia. '
+      + 'El registro de asistencia arrancó en mayo de 2026: los primeros meses miden la puesta en marcha del sistema, no el ausentismo real.';
+  },
+
   _porMes(items) {
     const porMes = new Map();
     items.forEach((it) => {
@@ -441,6 +512,9 @@ Router.register('personal-rotacion', {
     sel.value = (seleccionPrevia === 'todos' || this._meses12.includes(seleccionPrevia)) ? seleccionPrevia : 'todos';
 
     this._renderIndicadores();
+    // Sin await: tarda mas que el resto (consulta otra fuente) y no tiene
+    // por que retrasar el pintado de lo que ya esta en memoria.
+    this._renderAusentismo();
     this._renderPeriodo();
   },
 

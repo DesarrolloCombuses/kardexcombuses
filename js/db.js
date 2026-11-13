@@ -865,6 +865,25 @@ const DB = {
     return data;
   },
 
+  // Ausentismo operativo por mes (indicador 2 de Gestión Humana). Lo calcula
+  // una Edge Function porque las tablas de turnos y asistencia son del
+  // sistema de flota y el cliente del ERP no las puede leer; de allá solo
+  // vuelve el agregado por mes, nunca quién faltó.
+  async consultarAusentismo(meses = 12) {
+    const { data, error } = await window.supabaseClient.functions.invoke('gh-ausentismo', {
+      body: { meses },
+    });
+    if (error) {
+      let mensaje = error.message;
+      try {
+        const body = await error.context?.json();
+        if (body?.message) mensaje = body.message;
+      } catch (_) {}
+      throw new Error(mensaje);
+    }
+    return data;
+  },
+
   // Llama a la Edge Function que CONSULTA si el conductor ya está registrado
   // en Sonar Telematics, buscando su cédula en todas las flotas de Combuses.
   // No lo da de alta: Sonar no expone ninguna operación para crear

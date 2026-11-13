@@ -1447,6 +1447,30 @@
             <p class="empty-note" id="pr-ind-nota"></p>
           </div>
 
+          <div class="panel-card chart-card" style="margin-bottom:1.25rem">
+            <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
+              <h2>2. Ausentismo operativo</h2>
+              <span class="muted" style="margin-left:auto">Turnos programados vs. asistencia registrada</span>
+            </div>
+            <p class="form-msg error hidden" id="pr-aus-cobertura"></p>
+            <p class="form-msg" id="pr-aus-msg">Consultando turnos y asistencia…</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th>Horas programadas</th>
+                    <th>Personas</th>
+                    <th>Horas de ausencia</th>
+                    <th>2. Ausentismo<br><span class="muted">meta &le; 3%</span></th>
+                  </tr>
+                </thead>
+                <tbody id="pr-aus-tbody"></tbody>
+              </table>
+            </div>
+            <p class="empty-note" id="pr-aus-nota"></p>
+          </div>
+
           <div class="section-heading" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap">
             <h2>Desglose</h2>
             <label class="filtro-inline" style="margin-left:auto">
