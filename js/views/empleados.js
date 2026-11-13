@@ -840,6 +840,21 @@ Router.register('empleados', {
 
     const sonarBtn = document.getElementById('empleado-sonar-btn');
     if (sonarBtn) sonarBtn.addEventListener('click', () => this._consultarSonarFicha(empleado));
+    const sonarRegBtn = document.getElementById('empleado-sonar-registrar-btn');
+    if (sonarRegBtn) {
+      sonarRegBtn.addEventListener('click', () => {
+        // Crear un conductor en Sonar se ve desde el visor de toda la flota
+        // y no se deshace desde el ERP, así que se pregunta antes. La
+        // función igual se niega si ya existe, pero eso el usuario no lo
+        // sabe mientras pulsa.
+        const ok = window.confirm(
+          `¿Registrar a ${empleado.nombre || 'este conductor'} en Sonar Telematics?
+
+`
+          + 'Primero se revisa si ya está en alguna flota; si aparece, no se crea nada.');
+        if (ok) this._consultarSonarFicha(empleado, true);
+      });
+    }
 
     const inactivarBtn = document.getElementById('empleado-inactivar-btn');
     if (inactivarBtn) {
@@ -1807,6 +1822,7 @@ Router.register('empleados', {
         <p class="view-intro" style="margin:0 0 0.6rem">Este conductor pertenece a una ruta (${escapeHtml(empleado.ruta || '')}) que también debe estar registrada en Sonar Telematics. El registro se crea en la plataforma de Sonar; desde aquí se consulta si ya está, en qué flota y si quedó habilitado.</p>
         <div id="empleado-sonar-badge" style="margin-bottom:0.6rem">${this._sonarBadgeHtml(empleado)}</div>
         <button type="button" id="empleado-sonar-btn" class="btn-secondary">Consultar en Sonar</button>
+        <button type="button" id="empleado-sonar-registrar-btn" class="btn-secondary">Registrar en Sonar</button>
         <p id="empleado-sonar-msg" class="form-msg"></p>
       </div>
     `;
@@ -1830,17 +1846,18 @@ Router.register('empleados', {
   // qué hacer en cada caso, así que se muestra tal cual en vez de
   // reescribirlo aquí: si no, el ERP tendría dos versiones de la misma
   // explicación y una de las dos envejecería mal.
-  async _consultarEnSonar(employeeId, msgEl) {
-    msgEl.textContent = 'Consultando Sonar…';
+  async _consultarEnSonar(employeeId, msgEl, registrar = false) {
+    const leyenda = registrar ? 'Registrando en Sonar…' : 'Consultando Sonar…';
+    msgEl.textContent = leyenda;
     msgEl.className = 'form-msg';
-    Loading.show('Consultando Sonar…');
+    Loading.show(leyenda);
     try {
-      const res = await DB.consultarConductorEnSonar(employeeId);
+      const res = await DB.consultarConductorEnSonar(employeeId, registrar);
       msgEl.textContent = res.ok ? `✓ ${res.message}` : res.message;
       msgEl.className = res.ok ? 'form-msg success' : 'form-msg error';
       return res;
     } catch (err) {
-      msgEl.textContent = 'No se pudo consultar Sonar: ' + err.message;
+      msgEl.textContent = (registrar ? 'No se pudo registrar en Sonar: ' : 'No se pudo consultar Sonar: ') + err.message;
       msgEl.className = 'form-msg error';
       return null;
     } finally {
@@ -1848,8 +1865,9 @@ Router.register('empleados', {
     }
   },
 
-  async _consultarSonarFicha(empleado) {
-    const res = await this._consultarEnSonar(empleado.id, document.getElementById('empleado-sonar-msg'));
+  async _consultarSonarFicha(empleado, registrar = false) {
+    const res = await this._consultarEnSonar(
+      empleado.id, document.getElementById('empleado-sonar-msg'), registrar);
     if (!res) return;
     if (res.ok) {
       empleado.sonar_synced_at = new Date().toISOString();

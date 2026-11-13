@@ -892,9 +892,12 @@ const DB = {
   // hace a mano en la plataforma de Sonar.
   // Las credenciales de Sonar viven como secrets de la función, nunca en el
   // cliente. Requiere sesión activa (auth: 'user').
-  async consultarConductorEnSonar(employeeId) {
+  // Con registrar=true además lo da de alta, pero solo si la consulta previa
+  // (que mira TODAS las flotas) confirma que no está en ninguna: así no se
+  // crea el duplicado que Sonar rechaza por cédula repetida.
+  async consultarConductorEnSonar(employeeId, registrar = false) {
     const { data, error } = await window.supabaseClient.functions.invoke('sonar-consultar-conductor', {
-      body: { employee_id: employeeId },
+      body: { employee_id: employeeId, registrar: !!registrar },
     });
     if (error) {
       let mensaje = error.message;
