@@ -1791,8 +1791,12 @@ Router.register('empleados', {
     const gerenteFirma = firmaGerente.dataUri;
     const coordAdminFirma = firmaCoordAdmin.dataUri;
     const coordGHFirma = firmaCoordGH.dataUri;
-    const imgFirma = (url, alto) => url
-      ? `<img src="${url}" alt="Firma" style="max-height:${alto}px;display:block;margin-bottom:4px" />`
+    // Se limita por ancho Y por alto. Solo por alto, una firma escaneada
+    // casi cuadrada (las hay: el recorte deja la rúbrica alta) salía
+    // diminuta al lado de la línea de 250px, como si no fuera una firma de
+    // verdad. El primero de los dos límites que se alcance manda.
+    const imgFirma = (url, alto, ancho) => url
+      ? `<img src="${url}" alt="Firma" style="max-height:${alto}px;max-width:${ancho}px;display:block;margin-bottom:2px" />`
       : '';
 
     // El espacio de firma, envuelto para que se pueda pulsar en la vista
@@ -1886,7 +1890,9 @@ Router.register('empleados', {
   <p class="parrafo">Por favor confirmar esta certificación únicamente escribiendo al correo <a href="mailto:vinculaciones@combuses.com.co">vinculaciones@combuses.com.co</a> o a la línea WhatsApp corporativa +57 300 6379301.</p>
 
   <div class="firma">
-    ${espacioFirma(coordGH, coordGHFirma ? imgFirma(coordGHFirma, 70) : '<span class="linea"></span>', !!coordGHFirma)}
+    ${/* La línea se deja SIEMPRE, con la firma encima: así se ve como una
+          firma sobre el renglón, igual que en papel, en vez de flotando. */''}
+    ${espacioFirma(coordGH, imgFirma(coordGHFirma, 92, 240) + '<span class="linea"></span>', !!coordGHFirma)}
     <span class="nombre">${coordGH ? coordGH.nombre : 'COORDINACIÓN DE GESTIÓN HUMANA'}</span><br>
     ${coordGH ? coordGH.cargo : 'Coordinador(a) Gestión Humana'}<br>
     COMPAÑÍA METROPOLITANA DE BUSES S.A.
@@ -1901,9 +1907,9 @@ Router.register('empleados', {
       <th>Aprobado por:</th>
     </tr>
     <tr>
-      <td>${espacioFirma(coordAdmin, imgFirma(coordAdminFirma, 36), !!coordAdminFirma)}${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
+      <td>${espacioFirma(coordAdmin, imgFirma(coordAdminFirma, 42, 150), !!coordAdminFirma)}${coordAdmin ? coordAdmin.nombre : 'COORDINACIÓN ADMINISTRATIVA'}<br>${coordAdmin ? coordAdmin.cargo : 'Coordinador(a) Administrativo'}</td>
       <td>Bravo Restrepo Abogados<br>Asesoría legal y jurídica</td>
-      <td>${espacioFirma(gerente, imgFirma(gerenteFirma, 36), !!gerenteFirma)}${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
+      <td>${espacioFirma(gerente, imgFirma(gerenteFirma, 42, 150), !!gerenteFirma)}${gerente ? gerente.nombre : 'GERENCIA GENERAL'}<br>${gerente ? gerente.cargo : 'Gerente General'}</td>
     </tr>
     <tr>
       <td>Fecha: 13/04/2026</td>
