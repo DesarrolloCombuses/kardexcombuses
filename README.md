@@ -115,6 +115,7 @@ js/router.js                Navegación por hash entre vistas
 js/pwa-update.js            Aviso de nueva versión disponible
 js/pwa-install.js            Botón "Instalar app" (evento beforeinstallprompt)
 js/app.js                    Bootstrap
+js/firma-imagen.js           Deja una firma escaneada lista para estampar (le quita el fondo y la recorta) — la usa "Agregar firma" en Empleados
 js/sonar-barrido.js          Barrido masivo de conductores contra Sonar (dos pasos: consultar y luego registrar los que falten)
 js/views/*.js                 Lógica de cada vista (dashboard, inventario, inventario histórico, estadísticas, agregar prenda, entrada, salida, aspirantes —selección de personal—, empleados —incluye el perfil sociodemográfico—, historial, facturas, ayuda)
 supabase/functions/gh-ausentismo   Edge Function: ausentismo operativo por mes (indicador 2 de GH). Lee las tablas de turnos y asistencia del sistema de flota con el service role y devuelve solo el agregado por mes

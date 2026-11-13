@@ -1515,7 +1515,22 @@ Router.register('empleados', {
         ${firmaActualHtml}
       </div>
       <div class="modal-section">
-        <h3 class="modal-section-title">${empleado.firma_url ? 'Reemplazar firma' : 'Dibujar firma'}</h3>
+        <h3 class="modal-section-title">Subir una firma escaneada</h3>
+        <p class="view-intro" style="margin:0 0 0.6rem">
+          Una foto o un escaneo de la firma sobre papel blanco. Se le quita el fondo y se recorta sola,
+          para que al imprimirla no quede un recuadro blanco encima del texto.
+        </p>
+        <input type="file" id="firma-archivo" accept="image/*" />
+        <div id="firma-preview-wrap" class="hidden" style="margin-top:0.7rem">
+          <p class="empty-note" style="margin:0 0 0.4rem">Así va a quedar impresa:</p>
+          <img id="firma-preview" alt="Firma preparada" style="max-height:110px;background:#fff;border:1px solid var(--slate-200,#e5e7eb);border-radius:6px;padding:6px" />
+          <div style="margin-top:0.6rem">
+            <button type="button" id="firma-subir-btn">Guardar esta firma</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <h3 class="modal-section-title">${empleado.firma_url ? 'O dibujarla aquí' : 'O dibujarla aquí'}</h3>
         <p class="view-intro" style="margin:0 0 0.6rem">Dibuja con el mouse o el dedo, tal como quieres que salga impresa.</p>
         <canvas id="firma-canvas" class="signature-canvas"></canvas>
         <div style="display:flex;gap:0.5rem;margin-top:0.7rem;flex-wrap:wrap">
@@ -1527,20 +1542,36 @@ Router.register('empleados', {
       </div>
     `;
 
-    const pad = new SignaturePad(document.getElementById('firma-canvas'));
-    document.getElementById('firma-limpiar-btn').addEventListener('click', () => pad.clear());
-    document.getElementById('firma-cancelar-btn').addEventListener('click', () => this._verDetalle(empleado));
-    document.getElementById('firma-guardar-btn').addEventListener('click', async () => {
+    // Subir una imagen: se limpia al elegirla (no al guardar) para que se
+    // vea ANTES de confirmar como va a quedar impresa.
+    let firmaSubida = null;
+    const archivoInput = document.getElementById('firma-archivo');
+    archivoInput?.addEventListener('change', async () => {
       const msg = document.getElementById('firma-msg');
-      if (pad.isEmpty()) {
-        msg.textContent = 'Dibuja la firma antes de guardar.';
+      const wrap = document.getElementById('firma-preview-wrap');
+      const file = archivoInput.files && archivoInput.files[0];
+      firmaSubida = null;
+      wrap.classList.add('hidden');
+      if (!file) return;
+      msg.textContent = 'Preparando la imagen…';
+      msg.className = 'form-msg';
+      try {
+        const limpia = await FirmaImagen.limpiar(file);
+        firmaSubida = limpia.blob;
+        document.getElementById('firma-preview').src = limpia.dataUrl;
+        wrap.classList.remove('hidden');
+        msg.textContent = `Lista: ${limpia.ancho}×${limpia.alto} píxeles, sin fondo.`;
+        msg.className = 'form-msg success';
+      } catch (err) {
+        msg.textContent = err.message;
         msg.className = 'form-msg error';
-        return;
       }
+    });
+
+    const guardarBlob = async (blob) => {
+      const msg = document.getElementById('firma-msg');
       Loading.show('Guardando firma…');
       try {
-        const blob = await pad.toBlob();
-        if (!blob) throw new Error('No se pudo capturar la firma, inténtalo de nuevo.');
         const path = await DB.uploadToBucket('firmas', blob, 'png', 'certificados');
         await DB.updateEmployee(empleado.id, { firma_url: path });
         await this._load();
@@ -1552,6 +1583,29 @@ Router.register('empleados', {
       } finally {
         Loading.hide();
       }
+    };
+
+    document.getElementById('firma-subir-btn')?.addEventListener('click', () => {
+      if (firmaSubida) guardarBlob(firmaSubida);
+    });
+
+    const pad = new SignaturePad(document.getElementById('firma-canvas'));
+    document.getElementById('firma-limpiar-btn').addEventListener('click', () => pad.clear());
+    document.getElementById('firma-cancelar-btn').addEventListener('click', () => this._verDetalle(empleado));
+    document.getElementById('firma-guardar-btn').addEventListener('click', async () => {
+      const msg = document.getElementById('firma-msg');
+      if (pad.isEmpty()) {
+        msg.textContent = 'Dibuja la firma antes de guardar.';
+        msg.className = 'form-msg error';
+        return;
+      }
+      const blob = await pad.toBlob();
+      if (!blob) {
+        msg.textContent = 'No se pudo capturar la firma, inténtalo de nuevo.';
+        msg.className = 'form-msg error';
+        return;
+      }
+      await guardarBlob(blob);
     });
   },
 
