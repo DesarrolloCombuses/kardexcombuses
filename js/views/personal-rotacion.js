@@ -475,9 +475,119 @@ Router.register('personal-rotacion', {
     }
 
     document.getElementById('pr-aus-nota').textContent =
-      `${res.definicion || ''} Como todavía no se registran las novedades (incapacidad, permiso, falta injustificada), `
-      + 'no se puede separar una incapacidad médica de una inasistencia. '
+      `${res.definicion || ''} Este número NO distingue incapacidad, permiso ni falta injustificada: `
+      + 'solo dice que había turno y no hubo marcación. La parte con soporte médico se mide aparte, en el indicador 2b de abajo. '
       + 'El registro de asistencia arrancó en mayo de 2026: los primeros meses miden la puesta en marcha del sistema, no el ausentismo real.';
+  },
+
+  // Indicador 2b: ausentismo por INCAPACIDAD MEDICA.
+  //
+  // Es distinto del 2 de arriba y los dos tienen que convivir. El 2 mide
+  // turnos programados contra asistencia registrada: solo cubre al personal
+  // que se programa en la app (cerca de un tercio de la planta) y no
+  // distingue una incapacidad de una falta. Este mide dias de incapacidad
+  // con soporte, de TODA la planta, desde la base que lleva Gestion Humana
+  // (ver js/views/incapacidades.js). Ninguno de los dos sustituye al otro:
+  // uno dice cuanto turno se dejo de cubrir, el otro cuanta ausencia estaba
+  // justificada medicamente.
+  //
+  // La formula es la de siempre en Gestion Humana:
+  //   dias perdidos / (planta promedio x dias del mes) x 100
+  // Se usa la planta promedio del mismo mes, que ya se calcula para los
+  // demas indicadores, en vez de la planta de hoy: con una planta que
+  // cambia, dividir todos los meses por el numero actual desplaza la serie
+  // entera.
+  async _renderAusentismoIncapacidad() {
+    const tbody = document.getElementById('pr-inc-tbody');
+    const msg = document.getElementById('pr-inc-msg');
+    if (!tbody || !msg) return;
+
+    let filas;
+    try {
+      filas = await DB.getIncapacidadesPorMes();
+    } catch (err) {
+      // Que falte el permiso no es un error que haya que arreglar: es que a
+      // esta cuenta no le toca. Se dice distinto.
+      msg.textContent = /42501|permiso/i.test(err.message || '')
+        ? 'Tu cuenta no tiene permiso para ver el ausentismo por incapacidad.'
+        : 'No se pudo consultar el ausentismo por incapacidad: ' + err.message;
+      msg.className = 'form-msg error';
+      return;
+    }
+
+    if (!filas.length) {
+      msg.textContent = 'Todavía no hay incapacidades sincronizadas.';
+      msg.className = 'form-msg';
+      tbody.innerHTML = '';
+      return;
+    }
+    msg.className = 'form-msg hidden';
+
+    // Lo que llega viene partido por tipo de evento (EG, AT, ...). Se junta
+    // por mes conservando el desglose, que es la pregunta que de verdad se
+    // hace Gestion Humana: cuanto de esto es accidente de trabajo.
+    const porMes = new Map();
+    filas.forEach((f) => {
+      if (!porMes.has(f.mes)) {
+        porMes.set(f.mes, { eventos: 0, dias: 0, personas: 0, porTipo: {} });
+      }
+      const m = porMes.get(f.mes);
+      m.eventos += Number(f.eventos) || 0;
+      m.dias += Number(f.dias) || 0;
+      // personas viene contada por tipo; sumarlas contaria dos veces a quien
+      // tuvo una incapacidad de cada tipo en el mismo mes. Se guarda el
+      // mayor, que es la cota baja honesta, y se dice en la nota.
+      m.personas = Math.max(m.personas, Number(f.personas) || 0);
+      m.porTipo[f.tipo_evento] = (m.porTipo[f.tipo_evento] || 0) + (Number(f.dias) || 0);
+    });
+
+    const mesActual = new Date().toISOString().slice(0, 7);
+    const dec = (v, n) => (v === null || v === undefined ? '—' : Number(v).toFixed(n).replace('.', ','));
+
+    const renglones = this._meses12.map((k) => {
+      const m = porMes.get(k);
+      if (!m) return { key: k, vacio: true };
+      const ind = this._indicadoresDe(k);
+      const diasDelMes = new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)), 0).getDate();
+      const disponibles = ind.plantaProm * diasDelMes;
+      return {
+        key: k,
+        plantaProm: ind.plantaProm,
+        eventos: m.eventos,
+        personas: m.personas,
+        dias: m.dias,
+        eg: m.porTipo.EG || 0,
+        at: m.porTipo.AT || 0,
+        pct: disponibles > 0 ? (m.dias / disponibles) * 100 : null,
+      };
+    });
+
+    tbody.innerHTML = renglones.map((f) => {
+      if (f.vacio) {
+        return `<tr><td>${prEscapeHtml(prEtiquetaMesLarga(f.key))}</td>`
+          + '<td colspan="5" class="muted">Sin incapacidades registradas</td></tr>';
+      }
+      const enCurso = f.key === mesActual;
+      const ok = f.pct !== null && f.pct <= 3;
+      const tag = f.pct === null
+        ? '<span class="muted">—</span>'
+        : `<span class="tag ${ok ? 'activo' : 'pendiente'}">${dec(f.pct, 2)}%</span>`;
+      return `
+      <tr>
+        <td>${prEscapeHtml(prEtiquetaMesLarga(f.key))}${enCurso ? ' <span class="muted">(en curso)</span>' : ''}</td>
+        <td>${dec(f.plantaProm, 1)}</td>
+        <td>${f.eventos}</td>
+        <td>${f.personas}</td>
+        <td>${f.dias} <span class="muted">(${f.eg} / ${f.at})</span></td>
+        <td>${tag}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('pr-inc-nota').textContent =
+      'Días de incapacidad ÷ (planta promedio × días del mes). Cubre a toda la planta, no solo al personal programado. '
+      + 'El desglose entre paréntesis es enfermedad general / accidente de trabajo. '
+      + 'Las incapacidades que cruzan de un mes a otro se cuentan enteras en el mes en que empezaron. '
+      + 'La columna Personas es la cota baja: viene contada por tipo de evento, así que quien tuvo una EG y un AT el mismo mes cuenta una sola vez.';
   },
 
   _porMes(items) {
@@ -539,6 +649,7 @@ Router.register('personal-rotacion', {
     // Sin await: tarda mas que el resto (consulta otra fuente) y no tiene
     // por que retrasar el pintado de lo que ya esta en memoria.
     this._renderAusentismo();
+    this._renderAusentismoIncapacidad();
     this._renderPeriodo();
   },
 

@@ -28,7 +28,7 @@
     // el dominio de Personal (ver kardex_es_gestion_humana()), así que
     // también ve esas vistas.
     const extra = window.APP_GRUPO === 'GESTION HUMANA' ? [
-      'permisos-vacaciones', 'aspirantes', 'empleados',
+      'permisos-vacaciones', 'aspirantes', 'empleados', 'incapacidades',
       'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion',
       'actividades',
     ] : [];

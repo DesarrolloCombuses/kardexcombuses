@@ -35,6 +35,7 @@ const SECCIONES_PERMISOS = [
     { key: 'personal-perfil', label: 'Perfil sociodemográfico' },
     { key: 'personal-rotacion', label: 'Rotación de personal' },
     { key: 'permisos-vacaciones', label: 'Permisos y vacaciones' },
+    { key: 'incapacidades', label: 'Incapacidades (el diagnostico solo lo ve Gestion Humana)' },
     { key: 'informes-disciplinarios', label: 'Informes disciplinarios' },
     { key: 'procesos-disciplinarios', label: 'Procesos disciplinarios' },
   ] },

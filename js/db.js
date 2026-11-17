@@ -865,6 +865,58 @@ const DB = {
     return data;
   },
 
+  // ---- Incapacidades -------------------------------------------------------
+  // Ver sql/incapacidades_2026-11-16.sql. La tabla kardex_incapacidades NO se
+  // puede consultar directo -- no tiene policy de lectura, a propósito: trae
+  // el diagnóstico de cada persona, que es dato de salud. La única puerta es
+  // esta función, que arma la respuesta SIN las claves del diagnóstico salvo
+  // que quien pregunte sea admin o esté en el grupo GESTION HUMANA.
+  //
+  // Por eso el cliente NUNCA decide si muestra el diagnóstico: si la clave no
+  // vino, es que no le corresponde verla. Esconderlo acá no serviría -- el
+  // dato ya habría viajado y se vería en la pestaña de red del navegador.
+  async getIncapacidades({ desde = null, hasta = null } = {}) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_incapacidades_listar', { p_desde: desde, p_hasta: hasta });
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Solo conteos por mes: ni nombres, ni cédulas, ni diagnósticos. Es lo que
+  // alimenta el ausentismo del Informe de Gestión.
+  async getIncapacidadesPorMes({ desde = null, hasta = null } = {}) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_incapacidades_por_mes', { p_desde: desde, p_hasta: hasta });
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Se pregunta al servidor en vez de deducirlo del rol en el navegador: la
+  // respuesta tiene que venir de quien de verdad decide.
+  async puedeVerDiagnostico() {
+    const { data, error } = await window.supabaseClient.rpc('kardex_puede_ver_diagnostico');
+    if (error) return false;
+    return !!data;
+  },
+
+  // Vuelve a bajar el Google Sheet de incapacidades. Igual que el botón
+  // "Actualizar ahora" de Siniestros: si el sheet falla, la copia guardada se
+  // queda como estaba en vez de borrarse.
+  async sincronizarIncapacidades() {
+    const { data, error } = await window.supabaseClient.functions
+      .invoke('sync-incapacidades', { body: {} });
+    if (error) {
+      let mensaje = error.message;
+      try {
+        const body = await error.context?.json();
+        if (body?.message) mensaje = body.message;
+      } catch (_) {}
+      throw new Error(mensaje);
+    }
+    if (data && data.ok === false) throw new Error(data.message || 'No se pudo sincronizar.');
+    return data;
+  },
+
   // Ausentismo operativo por mes (indicador 2 de Gestión Humana). Lo calcula
   // una Edge Function porque las tablas de turnos y asistencia son del
   // sistema de flota y el cliente del ERP no las puede leer; de allá solo

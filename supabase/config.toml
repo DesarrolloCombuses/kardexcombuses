@@ -440,3 +440,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/sync-siniestros/deno.json"
 entrypoint = "./functions/sync-siniestros/index.ts"
+
+# verify_jwt = false por lo mismo que sync-siniestros: la llama el cron cada
+# hora sin JWT, con el header x-cron-secret, y la propia funcion comprueba
+# quien llama (ver autorizarLlamada en index.ts).
+[functions.sync-incapacidades]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-incapacidades/deno.json"
+entrypoint = "./functions/sync-incapacidades/index.ts"

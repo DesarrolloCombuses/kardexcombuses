@@ -1851,3 +1851,9 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
 .brand-mark.brand-mark--logo img {
   width: auto; height: 22px; max-width: 154px; object-fit: contain;
 }
+
+/* --- Incapacidades: filas que hay que ir a corregir en el sheet ---------- */
+/* El aviso de arriba dice CUANTAS hay; esto dice CUALES. Sin la marca, el
+   aviso obliga a repasar la tabla entera a mano. */
+tr[data-revisar="fechas"] { background: #fef6e7; }
+tr[data-revisar="fechas"] td:first-child { box-shadow: inset 3px 0 0 #e0a106; }
