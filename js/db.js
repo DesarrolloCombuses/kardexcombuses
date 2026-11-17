@@ -891,12 +891,42 @@ const DB = {
     return data || [];
   },
 
-  // Se pregunta al servidor en vez de deducirlo del rol en el navegador: la
-  // respuesta tiene que venir de quien de verdad decide.
-  async puedeVerDiagnostico() {
-    const { data, error } = await window.supabaseClient.rpc('kardex_puede_ver_diagnostico');
-    if (error) return false;
-    return !!data;
+  // Qué puede hacer esta cuenta en Incapacidades. Se pregunta al servidor en
+  // vez de deducirlo del rol en el navegador: la respuesta tiene que venir
+  // de quien de verdad decide.
+  //
+  // Esto SOLO sirve para pintar u ocultar botones. Quien de verdad manda son
+  // kardex_incapacidad_guardar/borrar, que vuelven a comprobarlo -- esconder
+  // un botón no protege nada, cualquiera puede llamar a la API a mano.
+  //
+  // Si falla, se devuelve todo en false: ante la duda, la pantalla se queda
+  // en modo consulta en vez de ofrecer botones que luego van a fallar.
+  async getIncapacidadesPermisos() {
+    const vacio = { ver: false, registrar: false, editar: false, borrar: false, diagnostico: false };
+    try {
+      const { data, error } = await window.supabaseClient.rpc('kardex_incapacidades_permisos');
+      if (error) return vacio;
+      return { ...vacio, ...(data || {}) };
+    } catch (_) {
+      return vacio;
+    }
+  },
+
+  // Registrar una incapacidad nueva, o corregir una registrada en Kardex.
+  // Los días NO se mandan: los calcula el servidor a partir de las fechas
+  // (ver sql/incapacidades_registro_2026-11-17.sql). Mandarlos sería repetir
+  // el error del sheet, donde se escriben a mano y a veces salen negativos.
+  async guardarIncapacidad(datos) {
+    const { data, error } = await window.supabaseClient
+      .rpc('kardex_incapacidad_guardar', { p_datos: datos });
+    if (error) throw new Error(error.message || 'No se pudo guardar la incapacidad.');
+    return data;
+  },
+
+  async borrarIncapacidad(id) {
+    const { error } = await window.supabaseClient
+      .rpc('kardex_incapacidad_borrar', { p_id: id });
+    if (error) throw new Error(error.message || 'No se pudo borrar la incapacidad.');
   },
 
   // Vuelve a bajar el Google Sheet de incapacidades. Igual que el botón

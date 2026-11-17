@@ -215,6 +215,10 @@ Deno.serve(async (req) => {
         if (nombre && !ocultasEnDatos.has(i)) datos[nombre] = (r[i] || "").trim();
       });
       return {
+        // Marca de origen. Es lo que separa estas filas de las que Gestión
+        // Humana registra dentro de Kardex: el borrado de abajo solo toca
+        // las que dicen SHEET.
+        origen: "SHEET",
         sheet_key: iKey >= 0 ? texto(r[iKey]) : null,
         cedula: soloDigitos(r[iCedula]),
         nombre: iNombre >= 0 ? texto(r[iNombre]) : null,
@@ -251,10 +255,16 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const syncedAt = new Date().toISOString();
 
-  // Reemplazo completo, igual que siniestros: así la copia queda idéntica al
-  // sheet actual, incluidas las filas que hayan borrado allá. Solo se llega
-  // acá si la descarga y el parseo salieron bien.
-  const { error: delError } = await admin.from("kardex_incapacidades").delete().gte("id", 0);
+  // Reemplazo completo DE LO QUE VINO DEL SHEET, igual que siniestros: así
+  // esa parte de la copia queda idéntica al sheet actual, incluidas las
+  // filas que hayan borrado allá. Solo se llega acá si la descarga y el
+  // parseo salieron bien.
+  //
+  // El eq("origen","SHEET") no es un detalle: sin él, cada sincronización
+  // borraría también las incapacidades registradas dentro de Kardex, sin
+  // error y sin aviso. Ver sql/incapacidades_registro_2026-11-17.sql.
+  const { error: delError } = await admin
+    .from("kardex_incapacidades").delete().eq("origen", "SHEET");
   if (delError) return json({ ok: false, message: "No se pudo limpiar la tabla: " + delError.message }, 500);
 
   const CHUNK = 500;

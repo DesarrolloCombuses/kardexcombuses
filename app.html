@@ -1593,16 +1593,37 @@
 
         <!-- ================= INCAPACIDADES ================= -->
         <section data-view="incapacidades" class="view">
-          <p class="view-intro">Incapacidades médicas del personal, sincronizadas cada hora desde el Google Sheet que mantiene Gestión Humana. <strong>El diagnóstico solo lo ve Gestión Humana</strong>: para las demás cuentas el servidor ni siquiera lo envía.</p>
+          <p class="view-intro">Registra aquí las incapacidades del personal: quedan guardadas en Kardex y nada las borra. Las que ya venían del Google Sheet de Gestión Humana se siguen trayendo con <strong>Traer del sheet</strong> y se corrigen allá, no aquí. <strong>El diagnóstico solo lo ven Gestión Humana y los administradores</strong>: a las demás cuentas el servidor ni siquiera se lo envía.</p>
 
-          <div class="toolbar">
-            <label class="toolbar-field">Desde
+          <!-- Barra de acciones arriba y filtros en su propia caja abajo.
+               Antes era un solo .toolbar con todo revuelto: el buscador se
+               iba de ancho completo (es input[type=search], que lleva
+               width:100%) y empujaba los botones a una tercera linea. -->
+          <div class="inc-acciones">
+            <button type="button" id="inc-nueva-btn" class="hidden">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 4.5v11M4.5 10h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Registrar incapacidad
+            </button>
+            <span class="inc-acciones-sep"></span>
+            <span class="muted" id="inc-sync-estado"></span>
+            <button type="button" id="inc-export-btn" class="btn-secondary" title="Baja a Excel exactamente lo que está filtrado en pantalla.">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              Descargar Excel
+            </button>
+            <button type="button" id="inc-actualizar-btn" class="btn-secondary" title="Vuelve a bajar el Google Sheet ahora mismo, sin esperar a la sincronización automática. No toca las incapacidades registradas en Kardex.">
+              <svg viewBox="0 0 20 20" fill="none"><path d="M16 10a6 6 0 11-1.8-4.3M16 3.5V7h-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Traer del sheet
+            </button>
+          </div>
+
+          <div class="inc-filtros">
+            <label class="inc-campo">Desde
               <input type="date" id="inc-desde" />
             </label>
-            <label class="toolbar-field">Hasta
+            <label class="inc-campo">Hasta
               <input type="date" id="inc-hasta" />
             </label>
-            <label class="toolbar-field">Tipo de evento
+            <label class="inc-campo">Tipo de evento
               <select id="inc-tipo">
                 <option value="">Todos</option>
                 <option value="EG">EG — enfermedad general</option>
@@ -1610,16 +1631,20 @@
                 <option value="EL">EL — enfermedad laboral</option>
               </select>
             </label>
-            <label class="toolbar-field">Área
+            <label class="inc-campo">Área
               <select id="inc-area"><option value="">Todas</option></select>
             </label>
-            <input type="search" id="inc-buscar" placeholder="Buscar por nombre o cédula…" />
-            <button type="button" id="inc-actualizar-btn" class="btn-secondary" title="Vuelve a bajar el Google Sheet ahora mismo, sin esperar a la sincronización automática.">Actualizar ahora</button>
-            <button type="button" id="inc-export-btn" class="btn-secondary" title="Baja a Excel exactamente lo que esté filtrado en pantalla.">
-              <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-              Descargar Excel
-            </button>
-            <span class="muted" id="inc-sync-estado"></span>
+            <label class="inc-campo">Origen
+              <select id="inc-origen">
+                <option value="">Todos</option>
+                <option value="KARDEX">Registradas en Kardex</option>
+                <option value="SHEET">Traídas del sheet</option>
+              </select>
+            </label>
+            <label class="inc-campo inc-campo--ancho">Buscar
+              <input type="search" id="inc-buscar" placeholder="Nombre o cédula…" />
+            </label>
+            <button type="button" id="inc-limpiar-btn" class="btn-secondary inc-limpiar">Limpiar filtros</button>
           </div>
           <p id="inc-msg" class="form-msg hidden"></p>
 

@@ -158,6 +158,22 @@ h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
   min-width: 0;
 }
 
+/* Dos (o tres) campos en la misma linea dentro de un .form.
+   La clase se venia usando en js/contratos-alertas.js,
+   js/views/parque-automotor.js y js/views/incapacidades.js SIN que existiera
+   esta regla: los campos que debian ir uno al lado del otro quedaban
+   apilados, porque ".form" pone a sus hijos en columna. Es el mismo
+   descuido que tenia ".toolbar-field" en Incapacidades.
+
+   auto-fit + minmax y no "1fr 1fr": asi dos campos se ponen uno debajo del
+   otro cuando no caben, sin necesidad de una media query. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
 input, select, textarea, button {
   font: inherit;
 }
@@ -1857,3 +1873,89 @@ td.num.negativo { color: var(--danger-text); font-weight: 600; }
    aviso obliga a repasar la tabla entera a mano. */
 tr[data-revisar="fechas"] { background: #fef6e7; }
 tr[data-revisar="fechas"] td:first-child { box-shadow: inset 3px 0 0 #e0a106; }
+
+
+/* =====================================================================
+   Incapacidades: barra de acciones, filtros y registro
+   ===================================================================== */
+
+/* Acciones arriba: registrar a la izquierda (es la que se usa a diario) y
+   las de consulta a la derecha. El separador flexible es lo que las manda
+   a extremos opuestos cuando hay sitio, sin impedir que se envuelvan en
+   pantallas angostas. */
+.inc-acciones { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.9rem; }
+.inc-acciones-sep { flex: 1 1 auto; }
+.inc-acciones #inc-nueva-btn { display: inline-flex; align-items: center; gap: 0.5rem; }
+
+/* Los filtros, en su propia caja y en rejilla.
+   Antes iban sueltos dentro de un .toolbar en flex, con una clase
+   "toolbar-field" que NUNCA tuvo CSS. Como input[type=search] lleva
+   width:100%, el buscador se comía la fila entera y empujaba los botones a
+   una tercera línea. En rejilla el ancho lo decide la celda, no el input. */
+.inc-filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 0.8rem 1rem;
+  align-items: end;
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+.inc-campo {
+  display: flex; flex-direction: column; gap: 0.35rem; min-width: 0;
+  font-size: 0.72rem; font-weight: 600; color: var(--slate-500);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.inc-campo--ancho { grid-column: span 2; }
+.inc-limpiar { align-self: end; justify-self: start; white-space: nowrap; }
+
+/* De dónde viene cada fila. No es adorno: las del sheet son las únicas que
+   NO se pueden corregir desde aquí (la sincronización las devolvería como
+   estaban), así que hay que poder distinguirlas de un vistazo. */
+.inc-origen { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; padding: 0.15rem 0.45rem; border-radius: 999px; white-space: nowrap; }
+.inc-origen[data-origen="KARDEX"] { background: var(--blue-50); color: var(--blue-700); }
+.inc-origen[data-origen="SHEET"] { background: var(--slate-100); color: var(--slate-500); }
+
+.inc-fila-acciones { display: flex; gap: 0.35rem; }
+.inc-fila-acciones button { padding: 0.3rem 0.55rem; font-size: 0.78rem; background: var(--slate-100); color: var(--slate-700); }
+.inc-fila-acciones button:hover { background: var(--slate-200); }
+.inc-fila-acciones .inc-borrar { color: var(--danger-text); }
+
+/* El cálculo de días dentro del formulario. No es decoración: enseña la
+   regla que aplica el servidor (días = fin - inicio + 1, con el último día
+   incluido) ANTES de guardar, para que nadie tenga que adivinar si el día
+   final cuenta ni descubrirlo después en el total del mes. */
+.inc-dias-nota {
+  font-size: 0.85rem; font-weight: 600;
+  color: var(--blue-700); background: var(--blue-50);
+  border-radius: var(--radius-sm); padding: 0.55rem 0.8rem;
+}
+.inc-dias-nota.error { color: var(--danger-text); background: #fef2f2; }
+
+.inc-meta { font-size: 0.78rem; color: var(--slate-500); }
+
+@media (max-width: 640px) {
+  /* En una rejilla de una sola columna, "span 2" dejaría al buscador
+     ocupando dos filas vacías. */
+  .inc-campo--ancho { grid-column: span 1; }
+  .inc-acciones-sep { display: none; }
+}
+
+/* La columna de Corregir/Borrar, pegada al borde derecho.
+   La tabla lleva hasta doce columnas y se desplaza en horizontal; sin esto
+   los botones quedan fuera de la pantalla y hay que ir a buscarlos, que es
+   tanto como no tenerlos. El fondo es obligatorio: sin el, las celdas de
+   debajo se verian a traves al desplazar. */
+.inc-td-acciones {
+  position: sticky; right: 0; z-index: 1;
+  background: var(--white);
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.22);
+}
+th.inc-td-acciones { background: var(--slate-50); }
+tbody tr:hover .inc-td-acciones { background: var(--slate-50); }
+/* Las filas marcadas tienen su propio color: la celda pegada tiene que
+   llevarlo tambien o se ve un parche blanco al final del renglon. */
+tr[data-revisar="fechas"] .inc-td-acciones { background: #fef6e7; }
