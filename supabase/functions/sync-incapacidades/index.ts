@@ -150,8 +150,32 @@ function columna(header: string[], ...nombres: string[]): number {
   return -1;
 }
 
+// JUBILADA el 2026-11-17. Gestión Humana dejó de usar el Google Sheet: las
+// incapacidades se registran dentro de Kardex y no hay nada que sincronizar.
+//
+// La función se deja desplegada pero se niega a correr, en vez de borrarla.
+// Si alguien la llamara -- por costumbre, por un cron olvidado o por un
+// enlace guardado -- borraría las 553 filas históricas y volvería a cargar
+// el sheet encima de lo que ahora se mantiene aquí, pisando cada corrección
+// hecha en el ERP. Una respuesta clara cuesta menos que ese destrozo.
+//
+// Para revivirla: quitar este bloque. El resto del código sigue intacto y
+// sigue siendo el parser de referencia del sheet.
+// Ver sql/incapacidades_sin_sheet_2026-11-17.sql.
+const JUBILADA = true;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+
+  if (JUBILADA) {
+    return json({
+      ok: false,
+      message: "La sincronización con el Google Sheet está desactivada desde el"
+        + " 17/11/2026: las incapacidades se registran dentro de Kardex."
+        + " Volver a correrla sobrescribiría lo que se haya corregido allí.",
+    }, 410);
+  }
+
   if (req.method !== "POST") return json({ ok: false, message: "Método no permitido." }, 405);
 
   if (!(await autorizarLlamada(req))) {

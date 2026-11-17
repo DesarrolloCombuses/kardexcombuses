@@ -1593,7 +1593,7 @@
 
         <!-- ================= INCAPACIDADES ================= -->
         <section data-view="incapacidades" class="view">
-          <p class="view-intro">Registra aquí las incapacidades del personal: quedan guardadas en Kardex y nada las borra. Las que ya venían del Google Sheet de Gestión Humana se siguen trayendo con <strong>Traer del sheet</strong> y se corrigen allá, no aquí. <strong>El diagnóstico solo lo ven Gestión Humana y los administradores</strong>: a las demás cuentas el servidor ni siquiera se lo envía.</p>
+          <p class="view-intro">Las incapacidades del personal se registran y se corrigen aquí. <strong>El diagnóstico solo lo ven Gestión Humana y los administradores</strong>: a las demás cuentas el servidor ni siquiera se lo envía.</p>
 
           <!-- Barra de acciones arriba y filtros en su propia caja abajo.
                Antes era un solo .toolbar con todo revuelto: el buscador se
@@ -1605,14 +1605,9 @@
               Registrar incapacidad
             </button>
             <span class="inc-acciones-sep"></span>
-            <span class="muted" id="inc-sync-estado"></span>
             <button type="button" id="inc-export-btn" class="btn-secondary" title="Baja a Excel exactamente lo que está filtrado en pantalla.">
               <svg viewBox="0 0 20 20" fill="none"><path d="M10 3v9M10 12l-3.5-3.5M10 12l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               Descargar Excel
-            </button>
-            <button type="button" id="inc-actualizar-btn" class="btn-secondary" title="Vuelve a bajar el Google Sheet ahora mismo, sin esperar a la sincronización automática. No toca las incapacidades registradas en Kardex.">
-              <svg viewBox="0 0 20 20" fill="none"><path d="M16 10a6 6 0 11-1.8-4.3M16 3.5V7h-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Traer del sheet
             </button>
           </div>
 
@@ -1638,7 +1633,7 @@
               <select id="inc-origen">
                 <option value="">Todos</option>
                 <option value="KARDEX">Registradas en Kardex</option>
-                <option value="SHEET">Traídas del sheet</option>
+                <option value="SHEET">Históricas (del sheet)</option>
               </select>
             </label>
             <label class="inc-campo inc-campo--ancho">Buscar

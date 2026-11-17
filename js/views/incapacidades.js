@@ -1,21 +1,18 @@
 // Incapacidades médicas del personal.
 //
-// DOS ORÍGENES, UNA SOLA TABLA
-// -----------------------------
-// Las filas salen de kardex_incapacidades y pueden venir de dos lados:
+// Se registran y se corrigen aquí. Todas, incluidas las viejas.
 //
-//   SHEET  -- las trae una Edge Function desde el Google Sheet de Gestión
-//             Humana (supabase/functions/sync-incapacidades). Esa copia se
-//             reemplaza entera en cada sincronización, así que desde aquí
-//             NO se pueden corregir ni borrar: el cambio duraría hasta la
-//             próxima corrida y después volvería solo al valor viejo, que
-//             es peor que no poder hacerlo porque parece que funcionó.
+// Hasta el 2026-11-17 esta tabla era una copia de solo lectura de un Google
+// Sheet de Gestión Humana, y las filas que venían de allá estaban bloqueadas
+// a propósito: la sincronización las habría devuelto como estuvieran en el
+// sheet. Apagado el sheet, ese bloqueo se volvía una trampa -- las 553 filas
+// históricas quedarían congeladas para siempre, y entre ellas están las que
+// traen la fecha final antes de la inicial y las que tienen una cédula que
+// no cruza con Empleados. Se desbloquearon.
 //
-//   KARDEX -- las registra Gestión Humana en el formulario de esta vista.
-//             La sincronización no las toca (filtra por origen). Son las
-//             únicas que se pueden corregir o borrar acá.
-//
-// Ver sql/incapacidades_2026-11-16.sql y sql/incapacidades_registro_2026-11-17.sql.
+// La columna `origen` se conserva porque sigue siendo cierta: dice cuáles
+// nadie escribió aquí y por tanto traen la calidad que traía el sheet.
+// Ver sql/incapacidades_sin_sheet_2026-11-17.sql.
 //
 // EL DIAGNÓSTICO NO SE ESCONDE AQUÍ
 // ---------------------------------
@@ -114,8 +111,6 @@ Router.register('incapacidades', {
       document.getElementById('inc-buscar').addEventListener('input', () => this._render());
       document.getElementById('inc-limpiar-btn')
         .addEventListener('click', () => this._limpiarFiltros());
-      document.getElementById('inc-actualizar-btn')
-        .addEventListener('click', () => this._sincronizar());
       document.getElementById('inc-export-btn')
         .addEventListener('click', () => this._exportar());
       document.getElementById('inc-nueva-btn')
@@ -242,14 +237,16 @@ Router.register('incapacidades', {
     const alReves = filas.filter((f) => f.fecha_fin && f.fecha_inicio && f.fecha_fin < f.fecha_inicio);
     if (alReves.length) {
       avisos.push(`<strong>${alReves.length}</strong> incapacidad(es) tienen la fecha final ANTES de la inicial.`
-        + ' Sus días no se están sumando (saldrían negativos). Hay que corregirlas en el sheet.');
+        + ' Sus días no se están sumando (saldrían negativos). Están marcadas en ámbar abajo:'
+        + ' ábrelas con «Corregir» y pon la fecha buena.');
     }
 
     const fuera = filas.filter((f) => !f.en_nomina);
     if (fuera.length) {
       const cuantos = new Set(fuera.map((f) => f.cedula)).size;
       avisos.push(`<strong>${fuera.length}</strong> incapacidad(es) de <strong>${cuantos}</strong> cédula(s)`
-        + ' que no están en Empleados. O la cédula está mal escrita en el sheet, o esa persona nunca se cargó al sistema.');
+        + ' que no están en Empleados. O la cédula quedó mal escrita, o esa persona nunca se cargó'
+        + ' al sistema. Al abrirlas con «Corregir» se puede volver a elegir a la persona.');
     }
 
     cont.innerHTML = avisos.length
@@ -302,20 +299,25 @@ Router.register('incapacidades', {
       t: 'Origen',
       f: (f) => {
         const o = f.origen === 'KARDEX' ? 'KARDEX' : 'SHEET';
-        const texto = o === 'KARDEX' ? 'Kardex' : 'Sheet';
+        const texto = o === 'KARDEX' ? 'Kardex' : 'Histórica';
         const ayuda = o === 'KARDEX'
-          ? 'Registrada en Kardex. Se puede corregir o borrar desde aquí.'
-          : 'Vino del Google Sheet. Se corrige allá: la sincronización la vuelve a traer como esté en el sheet.';
+          ? 'Registrada en Kardex.'
+          : 'Venía del Google Sheet que Gestión Humana usó hasta el 17/11/2026.'
+            + ' Se corrige aquí, como cualquier otra.';
         return `<span class="inc-origen" data-origen="${o}" title="${incEscapeHtml(ayuda)}">${texto}</span>`;
       },
     });
     return cols;
   },
 
-  // Solo las registradas en Kardex se pueden tocar desde aquí. Ofrecer el
-  // botón en las del sheet sería ofrecer algo que el servidor va a rechazar.
-  _editable(f) {
-    return f.origen === 'KARDEX';
+  // Todas se pueden corregir, también las históricas.
+  //
+  // Hasta el 2026-11-17 las del sheet no se podían: la sincronización las
+  // devolvía como estuvieran allá. Apagado el sheet, mantener el bloqueo
+  // solo serviría para que los errores que trajo el sheet no se pudieran
+  // arreglar en ninguna parte.
+  _editable() {
+    return true;
   },
 
   _renderTabla(filas) {
@@ -344,7 +346,7 @@ Router.register('incapacidades', {
       let marca = '';
       if (alReves) {
         marca = ' data-revisar="fechas" title="La fecha final es anterior a la inicial:'
-          + ' sus días no se están sumando. Hay que corregirla en el sheet."';
+          + ' sus días no se están sumando. Corrígela con el botón Corregir."';
       } else if (!f.en_nomina) {
         marca = ' data-revisar="cedula" title="Esta cédula no está en Empleados."'
           + ' style="opacity:.72"';
@@ -446,6 +448,7 @@ Router.register('incapacidades', {
               <ul class="combobox-list hidden" id="inc-persona-lista"></ul>
             </div>
           </label>
+          ${(!esNueva && !fila.en_nomina) ? '<p class="empty-note">Esta cédula no está en Empleados: la incapacidad no le cuenta a nadie. Busca a la persona correcta y elígela de la lista.</p>' : ''}
 
           <div class="form-row">
             <label>${incReq('Tipo de evento')}
@@ -506,7 +509,7 @@ Router.register('incapacidades', {
       ? 'EG'
       : ((fila.tipo_evento || 'EG').trim().toUpperCase());
 
-    this._montarCombobox(esNueva);
+    this._montarCombobox(esNueva, fila);
 
     const inicio = document.getElementById('inc-f-inicio');
     const fin = document.getElementById('inc-f-fin');
@@ -566,7 +569,7 @@ Router.register('incapacidades', {
     nota.className = 'inc-dias-nota';
   },
 
-  _montarCombobox(esNueva) {
+  _montarCombobox(esNueva, fila) {
     const buscar = document.getElementById('inc-persona-buscar');
     const oculto = document.getElementById('inc-persona-cedula');
     const lista = document.getElementById('inc-persona-lista');
@@ -575,7 +578,13 @@ Router.register('incapacidades', {
     // Al corregir no se cambia de persona: eso sería otra incapacidad, de
     // otro expediente. Si se equivocaron de persona, se borra y se registra
     // bien, y así queda rastro de las dos cosas.
-    if (!esNueva) {
+    //
+    // La excepción son las filas cuya cédula no cruza con Empleados -- las
+    // que trajo el sheet mal escritas. Ahí elegir persona NO es cambiar de
+    // expediente: es decir por fin de quién era la incapacidad. Dejarlas
+    // bloqueadas las condenaría a no contarle a nadie para siempre.
+    const hayQueReasignar = !esNueva && fila && !fila.en_nomina;
+    if (!esNueva && !hayQueReasignar) {
       buscar.readOnly = true;
       return;
     }
@@ -673,23 +682,5 @@ Router.register('incapacidades', {
     aviso.textContent = texto;
     aviso.className = 'form-msg ' + tono;
     aviso.classList.remove('hidden');
-  },
-
-  async _sincronizar() {
-    const btn = document.getElementById('inc-actualizar-btn');
-    const estado = document.getElementById('inc-sync-estado');
-    btn.disabled = true;
-    estado.textContent = 'Bajando el sheet…';
-    try {
-      const res = await DB.sincronizarIncapacidades();
-      estado.textContent = `Actualizado: ${res.filas} fila(s) del sheet.`;
-      await this._load();
-    } catch (err) {
-      estado.textContent = '';
-      this._avisar('No se pudo actualizar: ' + err.message
-        + ' — lo que ves sigue siendo la última copia buena.', 'error');
-    } finally {
-      btn.disabled = false;
-    }
   },
 });

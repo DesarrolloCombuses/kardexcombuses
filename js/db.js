@@ -866,6 +866,11 @@ const DB = {
   },
 
   // ---- Incapacidades -------------------------------------------------------
+  // Se registran y se corrigen dentro de Kardex. Hasta el 2026-11-17 eran una
+  // copia de solo lectura de un Google Sheet de Gestión Humana; las 553 filas
+  // históricas siguen ahí, marcadas con origen = 'SHEET', y ya se pueden
+  // corregir como cualquier otra.
+  //
   // Ver sql/incapacidades_2026-11-16.sql. La tabla kardex_incapacidades NO se
   // puede consultar directo -- no tiene policy de lectura, a propósito: trae
   // el diagnóstico de cada persona, que es dato de salud. La única puerta es
@@ -929,23 +934,11 @@ const DB = {
     if (error) throw new Error(error.message || 'No se pudo borrar la incapacidad.');
   },
 
-  // Vuelve a bajar el Google Sheet de incapacidades. Igual que el botón
-  // "Actualizar ahora" de Siniestros: si el sheet falla, la copia guardada se
-  // queda como estaba en vez de borrarse.
-  async sincronizarIncapacidades() {
-    const { data, error } = await window.supabaseClient.functions
-      .invoke('sync-incapacidades', { body: {} });
-    if (error) {
-      let mensaje = error.message;
-      try {
-        const body = await error.context?.json();
-        if (body?.message) mensaje = body.message;
-      } catch (_) {}
-      throw new Error(mensaje);
-    }
-    if (data && data.ok === false) throw new Error(data.message || 'No se pudo sincronizar.');
-    return data;
-  },
+  // Aquí vivía sincronizarIncapacidades(), que volvía a bajar el Google
+  // Sheet. Se quitó el 2026-11-17: Gestión Humana dejó de usar el sheet y
+  // las incapacidades se registran dentro de Kardex. La Edge Function sigue
+  // desplegada pero responde 410 -- volver a correrla pisaría lo que se haya
+  // corregido aquí. Ver sql/incapacidades_sin_sheet_2026-11-17.sql.
 
   // Ausentismo operativo por mes (indicador 2 de Gestión Humana). Lo calcula
   // una Edge Function porque las tablas de turnos y asistencia son del
