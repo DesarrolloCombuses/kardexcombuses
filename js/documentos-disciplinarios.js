@@ -75,6 +75,13 @@
   .firmas-cit .fc-sp{height:56px;border-bottom:1px solid #000;margin:6px 0 4px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
   .firmas-cit .fc-sp img{max-height:54px;max-width:96%}
   h3.sec{font-size:10.5pt;font-weight:bold;text-transform:uppercase;text-align:left;margin:14px 0 4px;border-bottom:1px solid #999;padding-bottom:2px}
+  .anexo{page-break-before:always}
+  .anexo h2{text-align:center;font-size:11pt;text-transform:uppercase;margin:0 0 14px;font-weight:bold}
+  .anexo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px}
+  .anexo-item{margin:0;text-align:center;page-break-inside:avoid;break-inside:avoid}
+  .anexo-item img{max-width:100%;max-height:9.2cm;object-fit:contain;border:1px solid #ccc}
+  .anexo-item figcaption{font-size:8.5pt;margin-top:4px;line-height:1.25}
+  .anexo-otros{font-size:9pt;margin-top:14px}
   .firmas-sanc{display:flex;justify-content:space-between;gap:40px;margin-top:34px;page-break-inside:avoid}
   .firmas-sanc .fs-col{flex:1;text-align:center}
   .firmas-sanc .fs-col p{text-align:center;margin:3px 0}
@@ -110,18 +117,38 @@
     if (tipo === 'citacion') {
       titulo = 'CITACIÓN A DESCARGOS';
       const pruebasTxt = (p.pruebas && p.pruebas.trim()) ? esc(p.pruebas).replace(/\n/g, '<br>') : '';
+      // Anexo de evidencias, en pagina aparte y de tres por fila, como el
+      // formato que usa Gestion Humana. Nombrar la prueba sin mostrarla no
+      // es ponerla de presente: el trabajador tiene que poder verla para
+      // controvertirla, y eso es la mitad del derecho de defensa.
+      //
+      // `src` ya viene como data URI (lo arma la vista): un enlace firmado
+      // del bucket expira en una hora y el documento se quedaria sin
+      // evidencia al reabrirlo o al pasarlo a PDF.
+      const evid = (p.evidencias || []).filter((e) => e && e.src);
+      const noImagen = (p.evidenciasOtras || []).filter(Boolean);
+      const anexo = (evid.length || noImagen.length) ? `
+      <div class="anexo">
+        <h2>Anexo — Evidencias del informe disciplinario</h2>
+        ${evid.length ? `<div class="anexo-grid">${evid.map((e) => `
+          <figure class="anexo-item">
+            <img src="${e.src}" alt="Evidencia">
+            ${e.leyenda ? `<figcaption>${esc(e.leyenda)}</figcaption>` : ''}
+          </figure>`).join('')}</div>` : ''}
+        ${noImagen.length ? `<p class="anexo-otros"><strong>Otras pruebas que no son imagen</strong> (se ponen de presente en la diligencia): ${esc(noImagen.join(', '))}.</p>` : ''}
+      </div>` : '';
       cuerpo = `
       <p class="lugar2">${esc(cf.ciudad)}, ${hoy}</p>
       <p>Señor(a) <strong>${esc(p.nombre)}</strong><br>
          CC: ${esc(p.cc)}<br>
          ${p.celular ? `Celular: ${esc(p.celular)}<br>` : ''}${p.correoNotificacion ? `Correo: ${esc(p.correoNotificacion)}<br>` : ''}Ciudad: ${esc(cf.ciudad)}</p>
       <p><strong>ASUNTO: CITACIÓN A DESCARGOS</strong></p>
-      <p>Con el fin de dar cumplimiento al artículo 115 del Código Sustantivo del Trabajo y al artículo 106 del Reglamento Interno de Trabajo de ${esc(cf.empresa)}, se le informa la <strong>apertura de proceso disciplinario</strong> en su contra y se le cita a diligencia de descargos para el <strong>${fechaConDia(p.fechaCitacion)}</strong> a las <strong>${esc(p.horaCitacion || '____')}</strong> en las instalaciones de ${esc(cf.empresa)}, ante ${esc(cf.anteQuien || 'la Coordinación de Gestión Humana')}, con el fin de que rinda su versión sobre los hechos que tuvo conocimiento la empresa el pasado <strong>${fechaLarga(p.fechaHechos || p.fechaCitacion)}</strong> reportados por la empresa de la siguiente manera:</p>
+      <p>Con el fin de dar cumplimiento al artículo 115 del Código Sustantivo del Trabajo y al artículo 106 del Reglamento Interno de Trabajo de ${esc(cf.empresa)}, se le informa la <strong>apertura de proceso disciplinario</strong> en su contra y se le cita a diligencia de descargos para el <strong>${fechaConDia(p.fechaCitacion)}</strong> a las <strong>${esc(p.horaCitacion || '____')}</strong> en las instalaciones de ${esc(cf.empresa)}, ante ${esc(cf.anteQuien || 'la Coordinación de Gestión Humana')}, con el fin de que rinda su versión sobre los hechos que fueron puestos en conocimiento de la empresa el pasado <strong>${fechaLarga(p.fechaConocimiento || p.fechaHechos || p.fechaCitacion)}</strong>, reportados de la siguiente manera:</p>
       <p class="reporte">${esc(p.motivo || '____________').replace(/\n/g, '<br>')}</p>
       <p>Estas conductas presuntamente transgreden el Reglamento Interno de Trabajo, contrato de trabajo, manual de funciones y el Código Sustantivo del Trabajo, en los artículos:</p>
       <div class="reglamento">${esc(p.reglamento || '____________')}</div>
       <p>La empresa cuenta con las siguientes pruebas, que se le ponen de presente para que ejerza su derecho a la defensa.${pruebasTxt ? '<br>' + pruebasTxt : ''}</p>
-      <p>Se le informa que cuenta con <strong>cinco (5) días</strong> para controvertir o allegar las pruebas que considere pertinentes y conducentes para esclarecer los hechos, con el fin de que las mismas sean practicadas en la diligencia de descargos, conforme al numeral 2 del artículo 106 del Reglamento Interno de Trabajo.</p>
+      <p>Se le informa que cuenta con <strong>cinco (5) días hábiles</strong>, contados a partir del recibo de la presente citación, para controvertir o allegar las pruebas que considere pertinentes y conducentes para esclarecer los hechos, con el fin de que las mismas sean practicadas en la diligencia de descargos, conforme al numeral 2 del artículo 106 del Reglamento Interno de Trabajo.</p>
       <p>Recuerde que puede presentarse a la diligencia con dos personas quienes actuarán como testigos de los descargos, los cuales tienen el fin único de observar el cumplimiento de las garantías constitucionales y legales en el proceso disciplinario que actualmente se tramita. Los mismos no tendrán ni voz ni voto en la diligencia, salvo que vayan a rendir testimonios como pruebas para su defensa.</p>
       <p>La no comparecencia a los descargos constituye la renuncia a rendir las declaraciones sobre lo sucedido por parte del trabajador, entendiéndose así la renuncia a su derecho a la defensa.</p>
       <div class="firmas-cit">
@@ -129,8 +156,9 @@
           <div class="fc-sp">${cf.firmaImg ? `<img src="${cf.firmaImg}" alt="firma">` : ''}</div>
           <p>NOMBRE: ${esc(cf.nombreFirma || cf.responsable)}</p></div>
         <div class="fc-col"><p>Recibí:</p><div class="fc-sp">${p.firmaCitacion ? `<img src="${p.firmaCitacion}" alt="firma trabajador">` : ''}</div>
-          <p>C.C: ${esc(p.cc || '____________')}<br>NOMBRE: ${esc(p.nombre || '____________')}</p></div>
-      </div>`;
+          <p>C.C: ${esc(p.cc || '____________')}<br>NOMBRE: ${esc(p.nombre || '____________')}<br>Fecha de recibido: ____________</p></div>
+      </div>
+      ${anexo}`;
       showTitle = false;
 
     } else if (tipo === 'acta') {

@@ -135,6 +135,15 @@ function pdVezPorFalta(p, todos) {
   };
 }
 
+// Que extensiones se pueden incrustar en el anexo de la citacion. Un PDF o
+// un video quedan nombrados, no dibujados: el documento se imprime y se
+// firma en papel.
+const PD_IMG_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+function pdEsImagen(nombreOPath) {
+  const ext = String(nombreOPath || '').split('.').pop().toLowerCase();
+  return PD_IMG_EXT.indexOf(ext) !== -1;
+}
+
 function pdFechaISO(v) {
   const s = String(v ?? '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -182,30 +191,52 @@ function pdAvisosPlazos(p, hoyIso) {
   const desc = p.fecha_descargos || '';
 
   // 1. La citacion sale dentro de los 5 dias habiles siguientes a los hechos,
-  //    o de los 4 siguientes a que la empresa se entere (art. 106 num. 2).
-  //    Kardex no guarda la fecha de conocimiento, asi que solo se puede medir
-  //    contra los hechos -- y hay que decirlo, o el aviso acusa de mas.
+  //    O de los 4 siguientes a que la empresa se entere (art. 106 num. 2).
+  //    Son dos ramas alternativas, no acumulativas: basta cumplir una.
+  //
+  //    Si hay fecha de conocimiento se mide contra ella, que es la rama que
+  //    de verdad aplica cuando la empresa se entera tarde. Si no la hay
+  //    -- los 443 procesos importados no la traen -- se mide contra los
+  //    hechos y el aviso lo dice, para no acusar de algo que no se sabe.
+  const conoc = p.fecha_conocimiento || '';
+  if (conoc && cit) {
+    if (cit < conoc) {
+      avisos.push('La citación (' + cit + ') es anterior a la fecha en que la empresa se enteró (' + conoc + '). Una de las dos está mal.');
+    } else {
+      const h = pdHabilesEntre(conoc, cit);
+      if (h !== null && h > 4) {
+        avisos.push('Desde que la empresa se enteró hasta la citación pasaron ' + h + ' días hábiles. El Art. 106 del RIT da 4 hábiles contados desde el conocimiento.');
+      }
+    }
+  }
+
   if (hechos && cit) {
     if (cit < hechos) {
       avisos.push('La citación (' + cit + ') tiene fecha anterior a los hechos (' + hechos + '). Una de las dos está mal.');
-    } else {
+    } else if (!conoc) {
       const h = pdHabilesEntre(hechos, cit);
       if (h !== null && h > 5) {
-        avisos.push('Entre los hechos y la citación pasaron ' + h + ' días hábiles. El Art. 106 del RIT da 5 hábiles desde los hechos, o 4 desde que la empresa se entera. Si la empresa se enteró después, déjalo dicho en los antecedentes.');
+        avisos.push('Entre los hechos y la citación pasaron ' + h + ' días hábiles. El Art. 106 del RIT da 5 hábiles desde los hechos, o 4 desde que la empresa se entera. Si la empresa se enteró después, ponlo en «Se enteró la empresa» y este aviso se recalcula.');
       }
     }
   }
 
   // 2. Los descargos se rinden "finalizados los (5) dias" que el trabajador
-  //    tiene para allegar pruebas (art. 106 num. 2 y 3). Dias corridos: el
-  //    RIT dice "habiles" cuando lo son, y en este no lo dice.
+  //    tiene para allegar pruebas (art. 106 num. 2 y 3).
+  //
+  //    OJO: el RIT escribe ahi "(5) dias", sin "habiles", y en otros
+  //    numerales si lo dice. Aun asi se cuentan HABILES, por decision del
+  //    2026-11-18: la citacion que salio ese dia ya prometio habiles, y los
+  //    dos documentos tienen que prometer lo mismo. Pendiente de que
+  //    juridica lo confirme; si dice corridos, esto y el texto de la
+  //    citacion en js/documentos-disciplinarios.js cambian juntos.
   if (cit && desc) {
     if (desc < cit) {
       avisos.push('Los descargos (' + desc + ') quedaron antes de la citación (' + cit + '). Una de las dos fechas está mal.');
     } else {
-      const c = pdCorridosEntre(cit, desc);
+      const c = pdHabilesEntre(cit, desc);
       if (c !== null && c < 5) {
-        avisos.push('Entre la citación y los descargos pasaron ' + c + ' día(s). El Art. 106 del RIT dice que los descargos se rinden finalizados los 5 días que el trabajador tiene para allegar pruebas.');
+        avisos.push('Entre la citación y los descargos pasaron ' + c + ' día(s) hábil(es). El Art. 106 del RIT dice que los descargos se rinden finalizados los 5 días hábiles que el trabajador tiene para allegar pruebas.');
       }
     }
   }
@@ -912,6 +943,7 @@ Router.register('procesos-disciplinarios', {
       pruebas: p.pruebas_texto || '',
       falta: p.falta || '',
       fechaHechos: p.fecha_hechos || '',
+      fechaConocimiento: p.fecha_conocimiento || '',
       fechaCitacion: p.fecha_citacion || '',
       horaCitacion: pdHora(p.hora_citacion),
       asistencia: p.asistencia || '',
@@ -978,6 +1010,45 @@ Router.register('procesos-disciplinarios', {
     };
 
     const datos = this._aProcesoDoc(p, {});
+
+    // El anexo de evidencias, solo en la citación: es ahí donde las pruebas
+    // se "ponen de presente" para que el trabajador pueda controvertirlas
+    // (art. 106 del RIT). Nombrarlas sin mostrarlas no es ponerlas de
+    // presente.
+    //
+    // Van incrustadas como data URI y no como enlace al bucket: el enlace
+    // firmado expira en una hora y el documento se quedaba sin evidencia al
+    // reabrirlo, y html2canvas deja en blanco lo que venga de otro dominio.
+    if (tipo === 'citacion') {
+      const adjuntos = p.pruebas || [];
+      const imagenes = adjuntos.filter((a) => pdEsImagen(a.archivo_nombre || a.archivo_url));
+      datos.evidencias = [];
+      datos.evidenciasOtras = adjuntos
+        .filter((a) => !pdEsImagen(a.archivo_nombre || a.archivo_url))
+        .map((a) => a.archivo_nombre || a.archivo_url);
+      let hechas = 0;
+      if (imagenes.length) Loading.show(`Preparando evidencia… 1 de ${imagenes.length}`);
+      try {
+        for (const a of imagenes) {
+          Loading.setMessage(`Preparando evidencia… ${hechas + 1} de ${imagenes.length}`);
+          try {
+            const url = await DB.getSignedUrl('procesos-disciplinarios', a.archivo_url);
+            datos.evidencias.push({
+              src: await imagenComoDataUri(url),
+              leyenda: a.archivo_nombre || '',
+            });
+          } catch {
+            // Una prueba que no se pudo leer no bota la citación: se nombra
+            // entre las que no son imagen y el documento sale con las demás.
+            datos.evidenciasOtras.push((a.archivo_nombre || a.archivo_url) + ' (no se pudo incrustar)');
+          }
+          hechas += 1;
+        }
+      } finally {
+        if (imagenes.length) Loading.hide();
+      }
+    }
+
     const { titulo, cuerpo, showTitle } = window.PD_DOCS.construir(tipo, datos, cf);
 
     // Los márgenes del documento viven en el @page de PRINT_CSS, y la hoja de
@@ -991,7 +1062,10 @@ Router.register('procesos-disciplinarios', {
     const html = paginaImprimible({
       titulo,
       estilos,
-      cuerpoHtml: `<div class="doc-wrap">${showTitle ? `<h1>${pdEsc(titulo)}</h1>` : ''}${cuerpo}</div>`,
+      // El membrete va acá y no en documentoInner porque esta ruta arma su
+      // propia hoja para paginaImprimible. Sin esta línea cf.logo viajaba
+      // hasta la plantilla y nadie lo pintaba.
+      cuerpoHtml: `<div class="doc-wrap">${cf.logo ? `<div class="doc-header"><img src="${cf.logo}" alt="logo"></div>` : ''}${showTitle ? `<h1>${pdEsc(titulo)}</h1>` : ''}${cuerpo}</div>`,
       archivo: `${slugArchivo(titulo)}-${slugArchivo(p.empleado_nombre || p.empleado_cedula)}.pdf`,
     });
 
@@ -1118,6 +1192,7 @@ Router.register('procesos-disciplinarios', {
     set('pd-empleado-input', `${p.empleado_nombre || ''} — CC ${p.empleado_cedula}`);
     set('pd-empleado-id', p.employee_id || '');
     set('pd-fecha-hechos', (p.fecha_hechos || '').slice(0, 10));
+    set('pd-fecha-conocimiento', (p.fecha_conocimiento || '').slice(0, 10));
     set('pd-motivo', p.motivo);
     set('pd-normas', p.normas);
     set('pd-pruebas-texto', p.pruebas_texto);
@@ -1164,6 +1239,7 @@ Router.register('procesos-disciplinarios', {
 
     const employeeId = document.getElementById('pd-empleado-id').value;
     const fechaHechos = document.getElementById('pd-fecha-hechos').value;
+    const fechaConoc = document.getElementById('pd-fecha-conocimiento').value;
     const motivo = document.getElementById('pd-motivo').value.trim();
     const fechaCitacion = document.getElementById('pd-fecha-citacion').value;
 
@@ -1175,6 +1251,10 @@ Router.register('procesos-disciplinarios', {
     if (fechaHechos && fechaCitacion < fechaHechos) {
       return fallar('No se puede citar a descargos antes de que ocurran los hechos — revisa las dos fechas.');
     }
+    if (fechaConoc && fechaConoc > hoy) return fallar('La empresa no puede haberse enterado en una fecha futura.');
+    if (fechaConoc && fechaHechos && fechaConoc < fechaHechos) {
+      return fallar('La empresa no pudo enterarse antes de que ocurrieran los hechos — revisa las dos fechas.');
+    }
 
     const faltaN = Number(document.getElementById('pd-falta').value);
     const falta = (window.CATALOGO_FALTAS || []).find((f) => f.n === faltaN);
@@ -1182,6 +1262,7 @@ Router.register('procesos-disciplinarios', {
 
     const campos = {
       fecha_hechos: fechaHechos || null,
+      fecha_conocimiento: fechaConoc || null,
       motivo,
       normas: document.getElementById('pd-normas').value.trim() || null,
       pruebas_texto: document.getElementById('pd-pruebas-texto').value.trim() || null,

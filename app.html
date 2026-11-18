@@ -2049,8 +2049,14 @@
                    sanción corresponde según la escala del RIT. -->
               <div id="pd-datos-empleado" class="hidden"></div>
 
+              <!-- "Se enteró la empresa" no es lo mismo que "ocurrió": el
+                   Art. 106 del RIT da 5 días hábiles desde los hechos O 4
+                   desde que la empresa se entera, y sin la segunda fecha el
+                   aviso de plazo acusa de más justo cuando el plazo sí se
+                   cumplió. Es opcional: los procesos importados no la traen. -->
               <div class="fieldset-grid">
                 <label>Fecha de los hechos<input type="date" id="pd-fecha-hechos" /></label>
+                <label>Se enteró la empresa <span class="pd-pista">(si se deja vacía, el plazo se cuenta desde los hechos)</span><input type="date" id="pd-fecha-conocimiento" /></label>
                 <label>Fecha de citación <span class="req-star">*</span><input type="date" id="pd-fecha-citacion" required /></label>
                 <label>Hora de citación<input type="time" id="pd-hora-citacion" /></label>
               </div>
