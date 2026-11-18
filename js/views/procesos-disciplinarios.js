@@ -956,6 +956,17 @@ Router.register('procesos-disciplinarios', {
       }
     }
 
+    // El membrete. Todos los formatos que usa Gestion Humana salen en hoja
+    // membreteada; estos salian en blanco porque la plantilla ya sabia
+    // pintarlo (cf.logo) pero nadie se lo pasaba. Si todavia no hay logo
+    // subido, dataUri() devuelve null y el documento sale como hasta hoy.
+    let logoUri = null;
+    try {
+      if (typeof LogoEmpresa !== 'undefined') logoUri = await LogoEmpresa.dataUri();
+    } catch {
+      logoUri = null;
+    }
+
     const cf = {
       empresa: PD_EMPRESA,
       ciudad: PD_CIUDAD,
@@ -963,6 +974,7 @@ Router.register('procesos-disciplinarios', {
       nombreFirma: firmante ? firmante.nombre : '',
       cargoFirma: firmante ? firmante.cargo : PD_CARGO_FIRMA,
       firmaImg,
+      logo: logoUri,
     };
 
     const datos = this._aProcesoDoc(p, {});
