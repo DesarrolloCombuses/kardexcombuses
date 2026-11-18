@@ -1,0 +1,118 @@
+{
+  "_nota": "EJEMPLO INVENTADO. Ni el nombre, ni la cédula, ni los hechos corresponden a nadie: este archivo está en un repositorio público y solo sirve para mostrar la estructura. Los textos de los artículos sí son los del RIT de COMBUSES S.A., que también están en js/catalogo-rit.js y js/catalogo-faltas.js de este repositorio.",
+
+  "fecha_citacion": "3 de marzo de 2027",
+  "trabajador": {
+    "tratamiento": "Señor",
+    "nombre": "Juan Esteban Ramírez Londoño",
+    "cedula": "1.000.000.001",
+    "cargo": "Conductor",
+    "ciudad": "Medellín"
+  },
+  "fecha_descargos": "jueves 11 de marzo de 2027",
+  "hora_descargos": "11:00 a. m.",
+  "lugar": "las instalaciones de COMBUSES S.A., ante la Coordinación de Gestión Humana",
+  "fecha_conocimiento": "2 de marzo de 2027",
+  "origen_informe": "mediante informe técnico disciplinario (formato FO-GH-06) remitido por el área de Gestión y Control de Flota",
+
+  "hechos": [
+    {
+      "titulo": "Presunta conducción hablando por teléfono celular (28/02/2027)",
+      "texto": "Según el informe, durante el recorrido de la ruta 700, siendo aproximadamente las 14:20 horas, usted presuntamente operó el vehículo interno 999 sosteniendo una conversación telefónica con el equipo en la mano, con pasajeros a bordo. La conducta habría sido advertida por el gestor de movilidad del punto de control y registrada en el reporte operativo del día."
+    },
+    {
+      "titulo": "Presunta omisión del chequeo preoperacional (28/02/2027)",
+      "texto": "De acuerdo con el mismo informe, en la fecha señalada no se encontró registro del chequeo preoperacional del vehículo interno 999 en la plataforma dispuesta por la empresa, pese a que el vehículo salió a operación. Usted presuntamente inició el recorrido sin verificar dirección, frenos, luces, estado de llantas y nivel de combustible, ni dejar constancia de ello."
+    }
+  ],
+
+  "contrato": [],
+
+  "normas": [
+    {
+      "titulo": "REGLAMENTO INTERNO DE TRABAJO",
+      "secciones": [
+        {
+          "capitulo": "CAPÍTULO XIII – PRESCRIPCIONES DE ORDEN",
+          "encabezado": "ARTÍCULO 96. LOS TRABAJADORES TIENEN COMO DEBERES GENERALES LOS SIGUIENTES:",
+          "items": [
+            { "num": "1.", "texto": "Dar estricto cumplimiento al presente reglamento, a las prescripciones especiales de los contratos individuales de trabajo y a los reglamentos especiales que tengan establecidos o que establezca COMBUSES S.A." },
+            { "num": "9.", "texto": "Recibir y acatar las órdenes, instrucciones y correcciones relacionadas con el trabajo, el orden y con la conducta en general, con su verdadera intención, que es la de encaminar y perfeccionar los esfuerzos en provecho propio y de la empresa en general." },
+            { "num": "12.", "texto": "Observar rigurosamente las medidas y precauciones que le indique su respectivo jefe para el manejo de sus instrumentos de trabajo." }
+          ]
+        },
+        {
+          "encabezado": "CAPÍTULO XIV – ARTÍCULO 98. OBLIGACIONES ESPECIALES DEL TRABAJADOR.",
+          "items": [
+            { "num": "2.", "texto": "Recibir y acatar las órdenes, instrucciones y correcciones relacionadas con el trabajo, el orden y la conducta en general, con su verdadera intención, que será en todo caso la de encaminar y perfeccionar los esfuerzos en provecho propio y de COMBUSES S.A." },
+            { "num": "15.", "texto": "Acatar estrictamente las instrucciones reglamentos y determinaciones de prevención de riesgos adoptados en forma general o específica, que se encuentren dentro del Sistema de gestión de seguridad y Salud en el trabajo de la empresa y se lo hayan comunicado por escrito." }
+          ]
+        },
+        {
+          "encabezado": "CAPÍTULO XV – ARTÍCULO 100. SE PROHÍBE A LOS TRABAJADORES.",
+          "items": [
+            { "num": "4.", "texto": "Ejecutar cualquier acto que ponga en peligro su seguridad, la de sus compañeros, la de sus superiores o la de los terceros, o que amenacen o perjudiquen las máquinas, los elementos, los edificios, o el propio lugar donde labora." },
+            { "num": "19.", "texto": "Ejecutar defectuosa o negligentemente el trabajo encomendado." }
+          ]
+        },
+        {
+          "capitulo": "CAPÍTULO XVII – SANCIONES Y ESCALA DE FALTAS",
+          "encabezado": "ARTÍCULO 108. Se establecen las siguientes clases de faltas y sus sanciones disciplinarias:",
+          "items": [
+            { "num": "13-", "texto": "NO REALIZAR LA REVISION DIARIA DE LOS DOCUMENTOS DEL VEHICULO Y PREOPERACIONAL." },
+            { "num": "41-", "texto": "CONDUCIR HABLANDO POR CELULAR." },
+            { "num": "44-", "texto": "NO REALIZAR LA INSPECCION DIARIA DEL VEHICULO DE LOS SISTEMAS DE DIRECCION, FRENOS, LUCES, ESTADO DE LLANTAS, COMBUSTIBLE ENTRE OTROS." },
+            { "num": "51-", "texto": "INCUMPLIR CON LAS NORMAS ESTABLECIDAS DE EL MANUAL DE FUNCIONES." },
+            { "num": "108-", "texto": "INCUMPLIR CON EL PERFIL DE CARGOS Y FUNCIONES, NO REALIZAR LAS FUNCIONES ASIGNADAS POR SU JEFE O SUPERIOR O CUALQUIER REPRESENTANTE DEL EMPLEADOR EN LOS TERMINOS ESTIPULADOS Y TIEMPOS ASIGNADOS PARA ELLO." }
+          ]
+        },
+        {
+          "capitulo": "CAPÍTULO XVIII – FALTAS GRAVES DEL EMPLEADO",
+          "encabezado": "ARTÍCULO 112. Serán consideradas como faltas graves del empleado las siguientes conductas, que darán lugar a la terminación del contrato de trabajo por parte del empleador en términos de ley:",
+          "items": [
+            { "num": "6.", "texto": "Incumplir con las normas, procedimientos y estándares de higiene y seguridad en el trabajo." },
+            { "num": "7.", "texto": "Incumplir con las normas de tránsito y seguridad vial." }
+          ]
+        }
+      ],
+      "nota": "Para la valoración de la gravedad de la conducta se tendrán en cuenta, entre otros, los criterios del artículo 103 del Reglamento Interno de Trabajo, en especial el numeral 9 (la reiteración de la conducta)."
+    },
+    {
+      "titulo": "CÓDIGO SUSTANTIVO DEL TRABAJO",
+      "secciones": [
+        {
+          "encabezado": "ARTÍCULO 58. OBLIGACIONES ESPECIALES DEL TRABAJADOR.",
+          "items": [
+            { "num": "1.", "texto": "Realizar personalmente la labor, en los términos estipulados; observar los preceptos del reglamento y acatar y cumplir las órdenes e instrucciones que de modo particular le impartan el empleador o sus representantes, según el orden jerárquico establecido." }
+          ]
+        },
+        {
+          "encabezado": "ARTÍCULO 62. TERMINACIÓN DEL CONTRATO POR JUSTA CAUSA. A) POR PARTE DEL EMPLEADOR:",
+          "items": [
+            { "num": "6.", "texto": "Cualquier violación grave de las obligaciones o prohibiciones especiales que incumben al trabajador de acuerdo con los artículos 58 y 60 del Código Sustantivo del Trabajo, o cualquier falta grave calificada como tal en pactos o convenciones colectivas, fallos arbitrales, contratos individuales o reglamentos."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "pruebas": [
+    "Informe técnico disciplinario, formato FO-GH-06, remitido por el área de Gestión y Control de Flota.",
+    "Reporte operativo del punto de control del 28/02/2027.",
+    "Consulta de la plataforma de chequeos preoperacionales del vehículo interno 999, sin registro para esa fecha.",
+    "Captura del grupo de despacho con la novedad reportada por el gestor de movilidad."
+  ],
+
+  "evidencias": [
+    { "archivo": "evidencias/evidencia_1.png", "leyenda": "b) Reporte del gestor de movilidad, 28/02/2027" },
+    { "archivo": "evidencias/evidencia_2.png", "leyenda": "c) Plataforma de preoperacionales, interno 999" },
+    { "archivo": "evidencias/evidencia_3.png", "leyenda": "d) Grupo de despacho, novedad del 28/02/2027" }
+  ],
+
+  "firmante": {
+    "_nota": "En esta máquina el firmante real sale de firmante.local.json, que no se versiona.",
+    "nombre": "Nombre de quien firma",
+    "cedula": "00.000.000"
+  }
+}

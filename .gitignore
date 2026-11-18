@@ -1,4 +1,16 @@
-.claude/
+# De .claude solo viaja la carpeta de skills: settings.local.json guarda
+# permisos y rutas de esta maquina.
+.claude/*
+!.claude/skills/
+
+# Dentro de las skills, lo que NO va a un repositorio publico:
+#  - assets/: el RIT completo y la hoja membrete en blanco. La membreteada
+#    en blanco permitiria armar un documento que parezca de Combuses.
+#  - *.local.json: datos de personas reales (quien firma, con su cedula).
+# El texto de los articulos del RIT si esta en el repo, en
+# js/catalogo-rit.js y js/catalogo-faltas.js.
+.claude/skills/*/assets/
+.claude/skills/*/*.local.json
 *.log
 .DS_Store
 Thumbs.db
