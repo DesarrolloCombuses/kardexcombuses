@@ -54,6 +54,87 @@ function pdMensajeError(err) {
   return texto || 'Error desconocido.';
 }
 
+/* ---- La escala del Art. 108 del RIT -------------------------------------
+   El catálogo escribe la escala en palabras ("Llamado de atención por
+   escrito", "Suspensión de 8 días", "Falta grave y justa causa..."). Para
+   poder contrastarla con la decisión que eligió Gestión Humana hay que
+   traducirla a los mismos valores que guarda tipo_decision.
+-------------------------------------------------------------------------- */
+
+// De menos a más grave. Sirve para decir si la sanción elegida se pasa o se
+// queda corta frente a lo que prevé el reglamento.
+const PD_GRAVEDAD = { invitacion: 0, llamado: 1, suspension: 2, terminacion: 3 };
+
+function pdNorm(v) {
+  return String(v ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function pdDecisionDeEscala(texto) {
+  const t = pdNorm(texto).trim();
+  if (!t) return null;
+  if (t.includes('justa causa') || t.includes('falta grave')) return { tipo: 'terminacion', dias: null };
+  if (t.includes('suspension')) {
+    const m = t.match(/(\d+)/);
+    return { tipo: 'suspension', dias: m ? Number(m[1]) : null };
+  }
+  if (t.includes('llamado')) return { tipo: 'llamado', dias: null };
+  return null;
+}
+
+// Número de la falta dentro del Art. 108. `falta` se guarda como texto
+// ("12. No reportar las novedades…") porque así venía del programa anterior.
+function pdNumeroFalta(texto) {
+  const t = String(texto ?? '').trim();
+  if (!t) return null;
+  const m = t.match(/^(\d+)\s*[.\-)]/);
+  if (m) return Number(m[1]);
+  const porTexto = (window.CATALOGO_FALTAS || []).find((f) => pdNorm(f.d) === pdNorm(t));
+  return porTexto ? porTexto.n : null;
+}
+
+// La escala que le aplica a ESTE proceso.
+//
+// Se prefiere la copia que se guardó al crearlo (sancion_primera..cuarta):
+// es la que estaba vigente ese día, y el RIT puede cambiar. Solo si no hay
+// copia -- los 443 procesos importados no la traen -- se va al catálogo.
+function pdEscalaDe(p) {
+  const copia = [p.sancion_primera, p.sancion_segunda, p.sancion_tercera, p.sancion_cuarta];
+  if (copia.some((s) => s && String(s).trim())) return copia.map((s) => s || '');
+  const falta = (window.CATALOGO_FALTAS || []).find((f) => f.n === pdNumeroFalta(p.falta));
+  return falta ? falta.s.slice() : null;
+}
+
+// Qué vez le corresponde a esta persona POR ESTA MISMA FALTA.
+//
+// La escala del Art. 108 va por falta, no por total de procesos: alguien con
+// tres procesos de faltas distintas que comete la falta 1 por primera vez va
+// por primera vez -- llamado de atención -- y no por tercera con suspensión
+// de 8 días. Contar el total es lo que produce una sanción mal escalada.
+//
+// Solo cuentan los ANTERIORES por fecha de citación: un proceso no se escala
+// a sí mismo ni con lo que vino después.
+//
+// `sinClasificar` no es un detalle de adorno: 386 de los 443 procesos
+// importados no dicen en qué falta se fundaron, así que el conteo puede
+// quedarse corto. Decirlo en voz alta es lo que evita aplicar una primera
+// vez donde en realidad iba una tercera.
+function pdVezPorFalta(p, todos) {
+  const cedula = p.empleado_cedula;
+  if (!cedula) return null;
+  const n = pdNumeroFalta(p.falta);
+  const otros = (todos || []).filter((x) => x.empleado_cedula === cedula
+    && x.id !== p.id
+    && (!p.fecha_citacion || !x.fecha_citacion || x.fecha_citacion < p.fecha_citacion));
+  const mismos = n ? otros.filter((x) => pdNumeroFalta(x.falta) === n) : [];
+  return {
+    falta: n,
+    vez: mismos.length + 1,
+    anteriores: mismos.length,
+    otros: otros.length,
+    sinClasificar: otros.filter((x) => !pdNumeroFalta(x.falta)).length,
+  };
+}
+
 Router.register('procesos-disciplinarios', {
   title: 'Procesos disciplinarios',
 
@@ -63,6 +144,8 @@ Router.register('procesos-disciplinarios', {
     if (!this._bound) {
       document.getElementById('pd-form').addEventListener('submit', (e) => this._submit(e));
       document.getElementById('pd-falta').addEventListener('change', () => this._pintarEscala());
+      // La fecha de citación decide qué procesos cuentan como anteriores.
+      document.getElementById('pd-fecha-citacion').addEventListener('change', () => this._pintarEscala());
       document.getElementById('pd-articulo').addEventListener('change', () => this._agregarArticulo());
       document.getElementById('pd-cancelar-edicion').addEventListener('click', () => this._salirDeEdicion());
       document.getElementById('pd-search').addEventListener('input', () => this._render());
@@ -119,13 +202,61 @@ Router.register('procesos-disciplinarios', {
       caja.innerHTML = '';
       return;
     }
+
+    // Cuál de las cuatro columnas le toca a ESTA persona por ESTA falta.
+    // Antes la pantalla mostraba las cuatro y el total de procesos por
+    // separado, y dejaba que quien decide las juntara de cabeza. Juntarlas
+    // mal es escalar de más, que es lo que después se discute en un juzgado.
+    const emp = this._empleadoElegido;
+    const conteo = emp ? pdVezPorFalta({
+      empleado_cedula: emp.cedula,
+      falta: `${falta.n}. ${falta.d}`,
+      // Al corregir un proceso ya guardado hay que excluirlo: si no, se
+      // cuenta a sí mismo como antecedente y se escala una vez de más.
+      id: this._editandoId,
+      // La fecha de citación que se esté escribiendo. Sin ella cuentan
+      // todos los que ya existen, que es el lado prudente del error: de los
+      // dos, quedarse corto es el que deja una falta sin escalar.
+      fecha_citacion: (document.getElementById('pd-fecha-citacion') || {}).value || null,
+    }, this._procesos) : null;
+
+    const disponibles = falta.s.filter((s) => s && String(s).trim()).length;
+    const agotada = !!conteo && conteo.vez > disponibles;
+    const vez = conteo && !agotada ? conteo.vez : 0;
+
     const veces = ['Primera vez', 'Segunda vez', 'Tercera vez', 'Cuarta vez'];
     const filas = falta.s
-      .map((s, i) => (s ? `<div class="detalle-fact"><div class="detalle-fact-value">${pdEsc(s)}</div><div class="detalle-fact-label">${veces[i]}</div></div>` : ''))
+      .map((s, i) => (s
+        ? `<div class="detalle-fact${i + 1 === vez ? ' pd-vez-actual' : ''}">`
+          + `<div class="detalle-fact-value">${pdEsc(s)}</div>`
+          + `<div class="detalle-fact-label">${veces[i]}${i + 1 === vez ? ' · le corresponde' : ''}</div></div>`
+        : ''))
       .join('');
+
+    let nota;
+    let alarma = false;
+    if (!emp) {
+      nota = 'Elige primero a la persona y te digo qué vez le corresponde por esta falta.';
+    } else if (agotada) {
+      nota = `Esta persona ya tiene ${conteo.anteriores} proceso(s) por esta misma falta: la escala del Art. 108 no prevé otra vez más.`;
+      alarma = true;
+    } else {
+      nota = conteo.anteriores
+        ? `Tiene ${conteo.anteriores} proceso(s) anterior(es) por esta misma falta, así que le corresponde la ${veces[vez - 1].toLowerCase()}.`
+        : 'No tiene procesos anteriores por esta misma falta: le corresponde la primera vez.';
+      if (conteo.otros - conteo.anteriores > 0) {
+        nota += ` Tiene ${conteo.otros - conteo.anteriores} proceso(s) por otras faltas, que no cuentan para esta escala.`;
+      }
+      if (conteo.sinClasificar) {
+        nota += ` OJO: hay ${conteo.sinClasificar} proceso(s) suyo(s) sin clasificar, así que podría corresponderle una vez más alta.`;
+        alarma = true;
+      }
+    }
+
     caja.innerHTML = `
-      <p class="muted" style="margin:0 0 0.4rem">Escala del Art. 108 del RIT para esta falta. Elige la sanción según los antecedentes de la persona (abajo, en el historial, ves cuántos procesos lleva).</p>
-      <div class="detalle-facts">${filas}</div>`;
+      <p class="muted" style="margin:0 0 0.4rem">Escala del Art. 108 del RIT para esta falta.</p>
+      <div class="detalle-facts">${filas}</div>
+      <p class="${alarma ? 'form-msg error' : 'muted'}" style="margin:0.4rem 0 0">${pdEsc(nota)}</p>`;
     caja.classList.remove('hidden');
   },
 
@@ -186,13 +317,16 @@ Router.register('procesos-disciplinarios', {
 
   _pintarDatosEmpleado(empleado) {
     const caja = document.getElementById('pd-datos-empleado');
+    // Se guarda para que la escala del Art. 108 pueda decir qué vez le
+    // corresponde: hace falta saber la persona Y la falta a la vez, y cada
+    // una se elige en un campo distinto.
+    this._empleadoElegido = empleado || null;
+    this._pintarEscala();
     if (!empleado) {
       caja.classList.add('hidden');
       caja.innerHTML = '';
       return;
     }
-    // Cuántos procesos lleva ya: es el dato que decide si la sanción va por
-    // primera, segunda o tercera vez. Antes había que buscarlo a mano.
     const previos = (this._procesos || []).filter((p) => p.empleado_cedula === empleado.cedula);
     const fichas = [
       ['Nombre', empleado.nombre],
@@ -204,9 +338,10 @@ Router.register('procesos-disciplinarios', {
     ].map(([l, v]) => `<div class="detalle-fact"><div class="detalle-fact-value">${pdEsc(v)}</div><div class="detalle-fact-label">${l}</div></div>`).join('');
     caja.innerHTML = `
       <div class="detalle-facts">${fichas}</div>
-      <p class="${previos.length ? 'form-msg error' : 'muted'}" style="margin:0.4rem 0 0">
+      <p class="muted" style="margin:0.4rem 0 0">
         ${previos.length
-          ? `Esta persona ya tiene ${previos.length} proceso(s) disciplinario(s). Revísalos antes de elegir la sanción: la escala del RIT cambia con la reincidencia.`
+          ? `Tiene ${previos.length} proceso(s) disciplinario(s) en total. El total NO decide la sanción:`
+            + ' la escala del Art. 108 va por falta, y abajo se dice cuántos hay por la que elijas.'
           : 'Sin procesos disciplinarios anteriores.'}
       </p>`;
     caja.classList.remove('hidden');
@@ -422,7 +557,14 @@ Router.register('procesos-disciplinarios', {
     document.getElementById('pd-borrar').addEventListener('click', () => this._borrar(p));
     document.getElementById('pd-paso-descargos').addEventListener('submit', (e) => this._guardarDescargos(e, p));
     document.getElementById('pd-paso-decision').addEventListener('submit', (e) => this._guardarDecision(e, p));
-    document.getElementById('pd-decision-tipo').addEventListener('change', () => this._toggleSuspension());
+    document.getElementById('pd-decision-tipo').addEventListener('change', () => {
+      this._toggleSuspension();
+      this._avisarEscala(p);
+    });
+    document.getElementById('pd-dias').addEventListener('input', () => this._avisarEscala(p));
+    // Y una vez al abrir la ficha: si la decisión ya estaba guardada fuera
+    // de la escala, hay que verlo sin tener que tocar nada.
+    this._avisarEscala(p);
     this._toggleSuspension();
     this._cargarAnexosOrigen(p);
   },
@@ -480,6 +622,31 @@ Router.register('procesos-disciplinarios', {
   _bloquePasos(p) {
     const sel = (valor, opciones) => opciones
       .map((o) => `<option value="${o.v}"${valor === o.v ? ' selected' : ''}>${o.t}</option>`).join('');
+
+    // El número de la falta ES el numeral del Art. 108 en que se funda la
+    // sanción: no hay por qué volver a escribirlo a mano. Se propone, no se
+    // impone -- una sanción puede fundarse en más de un numeral.
+    const nFalta = pdNumeroFalta(p.falta);
+    const numerales = p.numerales_sancion
+      || (nFalta ? `numeral ${nFalta} del artículo 108 del Reglamento Interno de Trabajo` : '');
+
+    // Los días de suspensión llegaban de la hoja como texto libre y vienen
+    // hechos un desorden: 394 dicen "1 días", otros "Dos", "2", "3 días", y
+    // uno dice "-23 días". El campo pasa a ser un número para no repetir el
+    // problema, pero lo que trajo la hoja no se tira: si no se puede leer
+    // como número se muestra aparte, porque es lo único que queda de lo que
+    // se decidió ese día.
+    const diasCrudo = String(p.dias_suspension ?? '').trim();
+    const diasNum = Number((diasCrudo.match(/-?\d+/) || [])[0]);
+    const diasOk = Number.isFinite(diasNum) && diasNum > 0 ? String(diasNum) : '';
+    // Dos cosas distintas: que lo de la hoja no se parezca a lo que queda en
+    // el campo ("1 días" -> 1), y que no se pueda leer en absoluto ("Dos",
+    // "-23 días"). La primera es un dato de contexto; la segunda hay que
+    // arreglarla antes de emitir la sanción, y decir "no se puede leer"
+    // cuando sí se pudo sería mentir.
+    const diasRaro = !!diasCrudo && diasCrudo !== diasOk;
+    const diasIlegible = !!diasCrudo && !diasOk;
+
     return `
       <div class="modal-section">
         <h3 class="modal-section-title">2. Diligencia de descargos</h3>
@@ -505,19 +672,24 @@ Router.register('procesos-disciplinarios', {
             <option value="">Sin decidir todavía…</option>
             ${PD_DECISIONES.map((d) => `<option value="${d.valor}"${p.tipo_decision === d.valor ? ' selected' : ''}>${d.label}</option>`).join('')}
           </select></label>
+          <!-- Contrasta la decisión con la escala del Art. 108 para la vez
+               que le corresponde a esta persona por esta falta. Avisa, no
+               bloquea: la sanción la decide Gestión Humana. -->
+          <p id="pd-escala-aviso" class="form-msg"></p>
           <label>Antecedentes<textarea id="pd-antecedentes" rows="3" placeholder="Si se deja vacío, el documento usa los hechos.">${pdEsc(p.antecedentes || '')}</textarea></label>
           <label>Resumen de los descargos del trabajador<textarea id="pd-resumen" rows="3">${pdEsc(p.resumen_descargos || '')}</textarea></label>
           <label>Consideraciones<textarea id="pd-consideraciones" rows="3" placeholder="Si se deja vacío, el documento trae el texto estándar.">${pdEsc(p.consideraciones || '')}</textarea></label>
           <label>Compromisos de mejora<textarea id="pd-compromisos" rows="2">${pdEsc(p.compromisos || '')}</textarea></label>
-          <label>Numerales del RIT en que se funda la sanción<input type="text" id="pd-numerales" value="${pdEsc(p.numerales_sancion || '')}" /></label>
+          <label>Numerales del RIT en que se funda la sanción<input type="text" id="pd-numerales" value="${pdEsc(numerales)}" /></label>
           <div id="pd-bloque-suspension" class="fieldset-grid hidden">
-            <label>Días de suspensión<input type="text" id="pd-dias" value="${pdEsc(p.dias_suspension || '')}" /></label>
+            <label>Días de suspensión<input type="number" id="pd-dias" min="1" max="90" step="1" value="${pdEsc(diasOk)}" /></label>
             <label>Inicio<input type="date" id="pd-ini-sancion" value="${p.fecha_inicio_sancion || ''}" /></label>
             <label>Fin<input type="date" id="pd-fin-sancion" value="${p.fecha_fin_sancion || ''}" /></label>
             <label>Reintegro<input type="date" id="pd-reintegro" value="${p.fecha_reintegro || ''}" /></label>
             <label>Recurso ante<input type="text" id="pd-recurso-ante" value="${pdEsc(p.recurso_ante || 'la Coordinación de SST')}" /></label>
             <label>Días para el recurso<input type="text" id="pd-recurso-dias" value="${pdEsc(p.recurso_dias || '1')}" /></label>
           </div>
+          ${diasRaro ? `<p class="form-msg${diasIlegible ? ' error' : ''}">El programa anterior traía «${pdEsc(diasCrudo)}» en los días de suspensión.${diasIlegible ? ' No se pudo leer como un número de días: escribe el correcto antes de emitir la sanción.' : ''}</p>` : ''}
           <label>Estado del proceso<select id="pd-estado">${sel(p.estado, [
             { v: 'citacion', t: 'Citación a descargos' }, { v: 'descargos', t: 'Descargos rendidos' },
             { v: 'decision', t: 'Con decisión' }, { v: 'finalizado', t: 'Finalizado' },
@@ -531,6 +703,71 @@ Router.register('procesos-disciplinarios', {
   _toggleSuspension() {
     const tipo = document.getElementById('pd-decision-tipo').value;
     document.getElementById('pd-bloque-suspension').classList.toggle('hidden', tipo !== 'suspension');
+  },
+
+  // Contrasta la decisión elegida con la escala del Art. 108 para la vez que
+  // le corresponde a esta persona POR ESTA FALTA.
+  //
+  // Avisa, no bloquea. La sanción la decide Gestión Humana con los
+  // antecedentes delante, y hay motivos legítimos para apartarse de la
+  // escala -- atenuantes, acuerdos, un hecho que no encaja del todo. Lo que
+  // no puede pasar es apartarse sin darse cuenta.
+  _avisarEscala(p) {
+    const caja = document.getElementById('pd-escala-aviso');
+    if (!caja) return;
+    const poner = (texto, clase) => { caja.textContent = texto; caja.className = 'form-msg ' + clase; };
+
+    const elegida = document.getElementById('pd-decision-tipo').value;
+    if (!elegida) { caja.textContent = ''; caja.className = 'form-msg'; return; }
+
+    const escala = pdEscalaDe(p);
+    const conteo = pdVezPorFalta(p, this._procesos);
+    if (!escala || !conteo || !conteo.falta) {
+      poner('Este proceso no dice en qué falta del Art. 108 se funda, así que no se puede'
+        + ' contrastar con la escala del RIT. Clasifícala con «Editar» para que el sistema pueda ayudarte.', '');
+      return;
+    }
+
+    const veces = ['primera', 'segunda', 'tercera', 'cuarta'];
+    const disponibles = escala.filter((s) => s && String(s).trim()).length;
+    const nombre = (v) => (PD_DECISIONES.find((d) => d.valor === v) || {}).label || v;
+    const coletilla = conteo.sinClasificar
+      ? ` (y ${conteo.sinClasificar} proceso(s) suyo(s) sin clasificar que no se pudieron contar)`
+      : '';
+    const base = `Es la ${veces[Math.min(conteo.vez, 4) - 1]} vez de esta persona por esta falta${coletilla}. `;
+
+    if (conteo.vez > disponibles) {
+      poner(base + 'La escala del Art. 108 no prevé otra vez más para esta falta: las anteriores'
+        + ' ya llegaban hasta la sanción máxima.', 'error');
+      return;
+    }
+
+    const texto = escala[conteo.vez - 1] || '';
+    const esperada = pdDecisionDeEscala(texto);
+    if (!esperada) {
+      poner(base + 'No se pudo leer qué sanción prevé la escala para esta vez.', '');
+      return;
+    }
+
+    const dif = PD_GRAVEDAD[elegida] - PD_GRAVEDAD[esperada.tipo];
+    if (dif > 0) {
+      poner(base + `El Art. 108 prevé «${texto}» y estás imponiendo ${nombre(elegida).toLowerCase()},`
+        + ' que es MÁS GRAVE. Si es a propósito, déjalo explicado en las consideraciones.', 'error');
+      return;
+    }
+    if (dif < 0) {
+      poner(base + `El Art. 108 prevé «${texto}» y estás imponiendo algo más leve. Se puede,`
+        + ' pero conviene que quede explicado en las consideraciones.', '');
+      return;
+    }
+    if (elegida === 'suspension' && esperada.dias) {
+      const puestos = Number(document.getElementById('pd-dias').value);
+      if (puestos && puestos !== esperada.dias) {
+        poner(base + `El Art. 108 prevé ${esperada.dias} día(s) de suspensión y pusiste ${puestos}.`, 'error');
+        return;
+      }
+    }
+    poner(base + `Coincide con lo que prevé el Art. 108: «${texto}».`, 'success');
   },
 
   // ---- Documentos --------------------------------------------------------
