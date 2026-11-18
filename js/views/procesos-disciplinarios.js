@@ -955,7 +955,26 @@ Router.register('procesos-disciplinarios', {
 
       // 2) La hoja.
       Loading.setMessage('Descargando la hoja…');
-      const { filas, descartadas } = await window.HOJA_PROCESOS.traer(url);
+      const { filas, descartadas, faltantes, desconocidas } = await window.HOJA_PROCESOS.traer(url);
+
+      // Si la hoja cambió de columnas, se pregunta ANTES de subir nada.
+      // Lo ya guardado no corre peligro (el RPC actualiza con coalesce y
+      // nunca pisa un valor con vacío), pero los procesos nuevos entrarían
+      // sin ese dato, y una columna vacía no se distingue después de un
+      // dato que nunca existió.
+      if (faltantes.length) {
+        Loading.hide();
+        const sigue = confirm(
+          'La hoja ya no trae estas columnas:\n\n  ' + faltantes.join('\n  ')
+          + '\n\nLo que ya está guardado no se toca, pero los procesos nuevos'
+          + ' entrarán sin esos datos.\n\n¿Traerlos de todas formas?');
+        if (!sigue) {
+          partes.push('No se trajo nada: la hoja cambió de columnas.');
+          alert(partes.join('\n'));
+          return;
+        }
+        Loading.show('Trayendo procesos…');
+      }
       const r = await DB.importarProcesosDeHoja(filas, (hechas, total) => {
         Loading.setMessage(`Subiendo procesos… ${hechas} de ${total}`);
       });
@@ -963,6 +982,10 @@ Router.register('procesos-disciplinarios', {
         `De la hoja: ${r.insertados} nuevo(s) y ${r.actualizados} completado(s).`
         + (r.respetados ? `\n${r.respetados} no se tocaron porque ya se editaron acá en el ERP.` : '')
         + (descartadas ? `\n${descartadas} fila(s) de la hoja se saltaron por no tener cédula o identificador.` : '')
+        + (faltantes.length ? `\nOJO: la hoja ya no trae ${faltantes.join(', ')}.` : '')
+        // No es un error: es que Gestión Humana está llevando información que
+        // el ERP todavía no guarda. Vale la pena saberlo.
+        + (desconocidas.length ? `\nLa hoja trae columnas que el ERP no usa: ${desconocidas.join(', ')}.` : '')
       );
 
       await this._load();

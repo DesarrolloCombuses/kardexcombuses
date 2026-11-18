@@ -103,6 +103,34 @@
   const REPETIDA = 'FECHA DILIGENCIAMIENTO DESCARGOS';
   const REPETIDA_CLAVES = ['fecha_registro', 'fecha_diligencia'];
 
+  // Lo que la hoja TIENE que traer.
+  //
+  // El mapeo de arriba va por nombre de encabezado: si allá renombran o
+  // quitan una columna, queda en null y esa información simplemente no
+  // llega. No corrompe lo ya guardado -- el RPC actualiza todo con
+  // coalesce(nuevo, viejo) y nunca pisa un valor con vacío -- pero los
+  // procesos NUEVOS entrarían sin ese dato y no habría forma de notarlo
+  // después, porque una columna vacía se ve igual que un dato que no existe.
+  //
+  // Por eso se compara el encabezado contra el mapa y se avisa ANTES de
+  // subir nada. Las columnas que la hoja trae de más también se dicen: son
+  // información que Gestión Humana está llevando y el ERP está ignorando.
+  function revisarEncabezado(encabezado) {
+    const vistos = (encabezado || []).map(norm);
+    const faltantes = Object.keys(MAPA).filter((h) => vistos.indexOf(h) === -1);
+    const desconocidas = [];
+    vistos.forEach((h) => {
+      if (!h || h === REPETIDA || MAPA[h]) return;
+      if (desconocidas.indexOf(h) === -1) desconocidas.push(h);
+    });
+    const repetida = vistos.filter((h) => h === REPETIDA).length;
+    if (repetida < REPETIDA_CLAVES.length) {
+      faltantes.push(REPETIDA + ' (tiene que venir ' + REPETIDA_CLAVES.length
+        + ' veces, viene ' + repetida + ')');
+    }
+    return { faltantes, desconocidas };
+  }
+
   function clavesPorColumna(encabezado) {
     let vistas = 0;
     return encabezado.map((h) => {
@@ -133,7 +161,8 @@
   // proceso, así que esas sí se descartan.
   function filasDeCSV(texto) {
     const rows = parseCSV(texto);
-    if (!rows.length) return { filas: [], descartadas: 0 };
+    if (!rows.length) return { filas: [], descartadas: 0, faltantes: [], desconocidas: [] };
+    const { faltantes, desconocidas } = revisarEncabezado(rows[0]);
     const claves = clavesPorColumna(rows[0]);
     const filas = [];
     let descartadas = 0;
@@ -151,7 +180,7 @@
       if (!o.key) o.key = llaveDerivada(o);
       filas.push(o);
     }
-    return { filas, descartadas };
+    return { filas, descartadas, faltantes, desconocidas };
   }
 
   async function descargar(url) {
@@ -172,10 +201,11 @@
   window.HOJA_PROCESOS = {
     parseCSV,
     filasDeCSV,
+    revisarEncabezado,
     async traer(url) {
-      const { filas, descartadas } = filasDeCSV(await descargar(url));
-      if (!filas.length) throw new Error('La hoja se descargó pero no trajo ningún proceso. ¿El enlace apunta a la hoja correcta?');
-      return { filas, descartadas };
+      const r = filasDeCSV(await descargar(url));
+      if (!r.filas.length) throw new Error('La hoja se descargó pero no trajo ningún proceso. ¿El enlace apunta a la hoja correcta?');
+      return r;
     },
   };
 })();
