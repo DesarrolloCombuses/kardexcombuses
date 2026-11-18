@@ -99,6 +99,12 @@
       <div class="fs-col"><div class="fs-sp"></div><p>Testigo 1<br>C.C. ____________</p></div>
       <div class="fs-col"><div class="fs-sp"></div><p>Testigo 2<br>C.C. ____________</p></div>
     </div>`;
+    // RIT art. 106 num. 10: la firma del trabajador es constancia de recibido
+    // y su negativa no invalida la notificacion, siempre que quede anotada.
+    // Sin esta linea, una negativa a firmar deja el documento sin explicar
+    // por que sigue valiendo.
+    const constanciaRecibido = `
+    <p style="font-size:9pt;margin-top:16px">El (la) trabajador(a) deberá firmar la presente notificación como constancia de recibido. En caso de negarse a hacerlo, se dejará la respectiva anotación en el documento, sin que ello afecte la validez de la notificación ni de la decisión, conforme al numeral 10 del artículo 106 del Reglamento Interno de Trabajo.</p>`;
     let titulo = '', cuerpo = '', showTitle = true;
 
     if (tipo === 'citacion') {
@@ -110,11 +116,12 @@
          CC: ${esc(p.cc)}<br>
          ${p.celular ? `Celular: ${esc(p.celular)}<br>` : ''}${p.correoNotificacion ? `Correo: ${esc(p.correoNotificacion)}<br>` : ''}Ciudad: ${esc(cf.ciudad)}</p>
       <p><strong>ASUNTO: CITACIÓN A DESCARGOS</strong></p>
-      <p>Con el fin de dar cumplimiento al artículo 115 del Código Sustantivo del Trabajo, se le cita a diligencia de descargos para el <strong>${fechaConDia(p.fechaCitacion)}</strong> a las <strong>${esc(p.horaCitacion || '____')}</strong> en las instalaciones de ${esc(cf.empresa)} con el fin de que rinda su versión sobre los hechos que tuvo conocimiento la empresa el pasado <strong>${fechaLarga(p.fechaHechos || p.fechaCitacion)}</strong> reportados por la empresa de la siguiente manera:</p>
+      <p>Con el fin de dar cumplimiento al artículo 115 del Código Sustantivo del Trabajo y al artículo 106 del Reglamento Interno de Trabajo de ${esc(cf.empresa)}, se le informa la <strong>apertura de proceso disciplinario</strong> en su contra y se le cita a diligencia de descargos para el <strong>${fechaConDia(p.fechaCitacion)}</strong> a las <strong>${esc(p.horaCitacion || '____')}</strong> en las instalaciones de ${esc(cf.empresa)}, ante ${esc(cf.anteQuien || 'la Coordinación de Gestión Humana')}, con el fin de que rinda su versión sobre los hechos que tuvo conocimiento la empresa el pasado <strong>${fechaLarga(p.fechaHechos || p.fechaCitacion)}</strong> reportados por la empresa de la siguiente manera:</p>
       <p class="reporte">${esc(p.motivo || '____________').replace(/\n/g, '<br>')}</p>
       <p>Estas conductas presuntamente transgreden el Reglamento Interno de Trabajo, contrato de trabajo, manual de funciones y el Código Sustantivo del Trabajo, en los artículos:</p>
       <div class="reglamento">${esc(p.reglamento || '____________')}</div>
       <p>La empresa cuenta con las siguientes pruebas, que se le ponen de presente para que ejerza su derecho a la defensa.${pruebasTxt ? '<br>' + pruebasTxt : ''}</p>
+      <p>Se le informa que cuenta con <strong>cinco (5) días</strong> para controvertir o allegar las pruebas que considere pertinentes y conducentes para esclarecer los hechos, con el fin de que las mismas sean practicadas en la diligencia de descargos, conforme al numeral 2 del artículo 106 del Reglamento Interno de Trabajo.</p>
       <p>Recuerde que puede presentarse a la diligencia con dos personas quienes actuarán como testigos de los descargos, los cuales tienen el fin único de observar el cumplimiento de las garantías constitucionales y legales en el proceso disciplinario que actualmente se tramita. Los mismos no tendrán ni voz ni voto en la diligencia, salvo que vayan a rendir testimonios como pruebas para su defensa.</p>
       <p>La no comparecencia a los descargos constituye la renuncia a rendir las declaraciones sobre lo sucedido por parte del trabajador, entendiéndose así la renuncia a su derecho a la defensa.</p>
       <div class="firmas-cit">
@@ -185,12 +192,27 @@
       const horaDesc = p.horaActaDescargos || p.horaCitacion || '';
       const cargoTxt = p.cargo || p.area || '';
       const participo = norm(p.asistencia) === 'no' ? 'usted no compareció' : 'usted participó';
+      // Los formatos que usa Gestion Humana identifican al conductor tambien
+      // por el vehiculo y la ruta: sin eso, dos actas del mismo dia no se
+      // distinguen al archivarlas. Solo salen cuando el empleado los tiene.
+      const lineaVehiculo = [
+        p.interno ? `Vehículo interno: ${esc(p.interno)}` : '',
+        p.ruta ? `Ruta: ${esc(p.ruta)}` : '',
+      ].filter(Boolean).join('<br>');
       const encabezado = `<p class="lugar2">${esc(cf.ciudad)}, ${hoy}</p>
-      <p>Señor(a)<br><strong>${esc(p.nombre)}</strong><br>C.C. ${esc(p.cc)}<br>Cargo: ${esc(cargoTxt)}<br>Ciudad</p>`;
+      <p>Señor(a)<br><strong>${esc(p.nombre)}</strong><br>C.C. ${esc(p.cc)}<br>Cargo: ${esc(cargoTxt)}<br>${lineaVehiculo ? lineaVehiculo + '<br>' : ''}Ciudad</p>`;
       const bloqueDescargos = (p.resumenDescargos && p.resumenDescargos.trim())
         ? `<h3 class="sec">DESCARGOS DEL TRABAJADOR</h3><p>${esc(p.resumenDescargos).replace(/\n/g, '<br>')}</p>` : '';
       const bloqueNormas = (p.reglamento && p.reglamento.trim())
         ? `<h3 class="sec">NORMAS VULNERADAS</h3><div class="reglamento">${esc(p.reglamento)}</div>` : '';
+      // En los formatos reales el compromiso lo declara el trabajador en
+      // primera persona y lo firma: "Yo, X, me comprometo a...". Escrito en
+      // tercera persona es una lista que redacto la empresa, y vale menos
+      // cuando hay que probar que el trabajador la asumio.
+      const bloqueCompromiso = (p.compromisos && p.compromisos.trim())
+        ? `<h3 class="sec">COMPROMISO DEL TRABAJADOR</h3>
+           <p>Yo, <strong>${esc(p.nombre)}</strong>, identificado(a) con C.C. No. ${esc(p.cc)}, me comprometo a:</p>
+           <div class="reglamento">${esc(p.compromisos)}</div>` : '';
 
       if (norm(p.tipoDecision).includes('invit')) {
         titulo = 'INVITACIÓN AL MEJORAMIENTO';
@@ -204,7 +226,7 @@
         <p>${esc(p.consideraciones || 'Analizados los hechos y los descargos rendidos por el trabajador, la empresa considera procedente, en esta oportunidad, realizar un llamado al mejoramiento en lugar de imponer una sanción disciplinaria, sin perjuicio de las acciones que correspondan ante una eventual reincidencia.').replace(/\n/g, '<br>')}</p>
         <h3 class="sec">INVITACIÓN AL MEJORAMIENTO</h3>
         <p>En consecuencia, la empresa lo (la) invita formalmente a mejorar su comportamiento y a dar estricto cumplimiento al Reglamento Interno de Trabajo, al contrato de trabajo, al manual de funciones y a las directrices de la empresa.</p>
-        ${p.compromisos && p.compromisos.trim() ? `<p><strong>Compromisos de mejora:</strong></p><div class="reglamento">${esc(p.compromisos)}</div>` : ''}
+        ${bloqueCompromiso}
         <p>Se le advierte que la reincidencia en este tipo de conductas podrá dar lugar a la imposición de sanciones disciplinarias más severas, conforme al procedimiento establecido en el Reglamento Interno de Trabajo y la ley.</p>
         <p>La presente invitación al mejoramiento se deja como constancia dentro de su historial laboral.</p>
         ${firmasSancion}`;
@@ -220,9 +242,10 @@
         <p>${esc(p.consideraciones || 'Analizados los hechos y los descargos rendidos por el trabajador, la empresa considera procedente realizar un llamado de atención escrito, dejando constancia de la conducta dentro de su historial laboral.').replace(/\n/g, '<br>')}</p>
         <h3 class="sec">LLAMADO DE ATENCIÓN</h3>
         <p>En consecuencia, la empresa le hace un <strong>LLAMADO DE ATENCIÓN ESCRITO</strong> y le exhorta a dar estricto cumplimiento al Reglamento Interno de Trabajo, al contrato de trabajo, al manual de funciones y a las directrices de la empresa.</p>
-        ${p.compromisos && p.compromisos.trim() ? `<p><strong>Compromisos de mejora:</strong></p><div class="reglamento">${esc(p.compromisos)}</div>` : ''}
+        ${bloqueCompromiso}
         <p>Se le advierte que la reincidencia en este tipo de conductas podrá dar lugar a la imposición de sanciones disciplinarias más severas, conforme al procedimiento establecido en el Reglamento Interno de Trabajo y la ley.</p>
         <p>El presente llamado de atención se deja como constancia dentro de su historial laboral.</p>
+        ${constanciaRecibido}
         ${firmasSancion}`;
       } else if (norm(p.tipoDecision).includes('terminacion') || norm(p.tipoDecision).includes('contrato')) {
         titulo = 'TERMINACIÓN DEL CONTRATO DE TRABAJO';
@@ -238,6 +261,7 @@
         <p>El proceso se adelantó en cumplimiento de las garantías del debido proceso, el derecho de defensa y contradicción; se realizó la debida citación y se pusieron en conocimiento las pruebas con las que contaba la empresa. En consecuencia, la empresa <strong>RESUELVE</strong>:</p>
         <p>Dar por <strong>terminado el contrato de trabajo</strong> del (de la) trabajador(a) <strong>${esc(p.nombre)}</strong>, C.C. ${esc(p.cc)}, <strong>por justa causa</strong>, de conformidad con el artículo 62 del Código Sustantivo del Trabajo y el Reglamento Interno de Trabajo${p.numeralesSancion && p.numeralesSancion.trim() ? `, ${esc(p.numeralesSancion)}` : ''}, a partir de la fecha de recibo de esta comunicación.</p>
         <p>La liquidación de las prestaciones sociales a que haya lugar se pondrá a su disposición conforme a la ley.</p>
+        ${constanciaRecibido}
         ${firmasSancion}`;
       } else {
         titulo = 'SUSPENSIÓN DISCIPLINARIA';
@@ -254,8 +278,9 @@
         <p>El proceso se adelantó en cumplimiento de las garantías del debido proceso, el derecho de defensa y contradicción; se realizó la debida citación y se pusieron en conocimiento las pruebas con las que contaba la empresa. En consecuencia, la empresa <strong>RESUELVE</strong>:</p>
         <p>Suspender al (a la) trabajador(a) <strong>${esc(p.nombre)}</strong>, C.C. ${esc(p.cc)}, por el término de <strong>${esc(dias)} día(s)</strong>${p.numeralesSancion && p.numeralesSancion.trim() ? `, por incurrir en las faltas previstas en el Reglamento Interno de Trabajo, ${esc(p.numeralesSancion)}` : ''}.</p>
         <h3 class="sec">RECURSO</h3>
-        <p>Frente a esta decisión procede el recurso de reposición, el cual debe interponerse ante ${esc(p.recursoAnte || 'la Coordinación de SST')} en el término de ${esc(p.recursoDias || '1')} día hábil siguiente al recibo de esta notificación.</p>
+        <p>Frente a esta decisión procede el recurso de reposición, el cual deberá presentarse ante ${esc(p.recursoAnte || cf.cargoFirma || 'la Coordinación de Procesos Disciplinarios')}, que es la misma área que le notifica la presente sanción, dentro del término máximo de ${esc(p.recursoDias || '1')} día contado a partir de la fecha de notificación de la sanción, conforme al numeral 9 del artículo 106 del Reglamento Interno de Trabajo.</p>
         <p>En caso de no impugnarse esta decisión, la suspensión se hará efectiva ${p.fechaInicioSancion ? `a partir del <strong>${fechaLarga(p.fechaInicioSancion)}</strong>` : '____________'}${p.fechaFinSancion ? ` hasta el <strong>${fechaLarga(p.fechaFinSancion)}</strong>` : ''}${p.fechaReintegro ? `, reintegrándose a laborar el día <strong>${fechaLarga(p.fechaReintegro)}</strong>` : ''}.</p>
+        ${constanciaRecibido}
         ${firmasSancion}`;
       }
       showTitle = true;

@@ -1972,3 +1972,25 @@ tr[data-revisar="fechas"] .inc-td-acciones { background: #fef6e7; }
   box-shadow: inset 0 0 0 1px var(--blue-600);
 }
 .detalle-fact.pd-vez-actual .detalle-fact-label { color: var(--blue-700); }
+
+/* Avisos de los plazos del Art. 106 del RIT dentro de la ficha del proceso.
+   Van en rojo porque un plazo vencido no se arregla despues: se discute. */
+.pd-plazos {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.pd-plazos li {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid #f5c2bc;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+/* Pista corta dentro de una etiqueta de formulario: dice donde termina
+   saliendo el dato, para no escribir algo que el documento no imprime. */
+.pd-pista { font-weight: 400; color: var(--slate-500); font-size: 0.82em; }

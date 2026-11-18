@@ -37,3 +37,8 @@ sql/import_ig_*.sql
 # Cualquier carga manual de datos reales (actividades, mediciones, perfiles):
 # nombres y cedulas de empleados no van a un repositorio publico.
 sql/import_*.sql
+
+# Carpeta de trabajo con los formatos reales de procesos disciplinarios: trae
+# el RIT, membretes con el logo y procesos firmados de personas con nombre
+# propio. Este repositorio es publico: la carpeta entera se queda local.
+/procesos disciplinarios/

@@ -135,6 +135,95 @@ function pdVezPorFalta(p, todos) {
   };
 }
 
+function pdFechaISO(v) {
+  const s = String(v ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  const f = new Date(y, m - 1, d);
+  return isNaN(f.getTime()) ? null : f;
+}
+
+// Dias habiles entre dos fechas, como los cuenta el RIT: "cinco (5) dias
+// habiles (entendida de lunes a viernes)" (art. 106 num. 7). NO descuenta
+// festivos, porque Kardex no tiene calendario de festivos. Eso hace que el
+// conteo salga por lo alto y el aviso pueda adelantarse un dia o dos; se
+// prefiere avisar de mas que dejar pasar un proceso vencido.
+function pdHabilesEntre(desdeIso, hastaIso) {
+  const a = pdFechaISO(desdeIso);
+  const b = pdFechaISO(hastaIso);
+  if (!a || !b || b < a) return null;
+  let n = 0;
+  const d = new Date(a.getTime());
+  while (d < b) {
+    d.setDate(d.getDate() + 1);
+    const dia = d.getDay();
+    if (dia !== 0 && dia !== 6) n += 1;
+  }
+  return n;
+}
+
+function pdCorridosEntre(desdeIso, hastaIso) {
+  const a = pdFechaISO(desdeIso);
+  const b = pdFechaISO(hastaIso);
+  if (!a || !b || b < a) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+// Los plazos del articulo 106 del RIT. Un proceso que se sale de ellos no se
+// cae en el momento: se cae despues, cuando alguien lo discute y ya no hay
+// como devolverse. Por eso se avisa mientras todavia se puede hacer algo.
+//
+// Avisa, no bloquea: el plazo puede estar justificado (la empresa se entero
+// tarde de los hechos) y el conteo de habiles no descuenta festivos.
+function pdAvisosPlazos(p, hoyIso) {
+  const avisos = [];
+  const hechos = p.fecha_hechos || '';
+  const cit = p.fecha_citacion || '';
+  const desc = p.fecha_descargos || '';
+
+  // 1. La citacion sale dentro de los 5 dias habiles siguientes a los hechos,
+  //    o de los 4 siguientes a que la empresa se entere (art. 106 num. 2).
+  //    Kardex no guarda la fecha de conocimiento, asi que solo se puede medir
+  //    contra los hechos -- y hay que decirlo, o el aviso acusa de mas.
+  if (hechos && cit) {
+    if (cit < hechos) {
+      avisos.push('La citación (' + cit + ') tiene fecha anterior a los hechos (' + hechos + '). Una de las dos está mal.');
+    } else {
+      const h = pdHabilesEntre(hechos, cit);
+      if (h !== null && h > 5) {
+        avisos.push('Entre los hechos y la citación pasaron ' + h + ' días hábiles. El Art. 106 del RIT da 5 hábiles desde los hechos, o 4 desde que la empresa se entera. Si la empresa se enteró después, déjalo dicho en los antecedentes.');
+      }
+    }
+  }
+
+  // 2. Los descargos se rinden "finalizados los (5) dias" que el trabajador
+  //    tiene para allegar pruebas (art. 106 num. 2 y 3). Dias corridos: el
+  //    RIT dice "habiles" cuando lo son, y en este no lo dice.
+  if (cit && desc) {
+    if (desc < cit) {
+      avisos.push('Los descargos (' + desc + ') quedaron antes de la citación (' + cit + '). Una de las dos fechas está mal.');
+    } else {
+      const c = pdCorridosEntre(cit, desc);
+      if (c !== null && c < 5) {
+        avisos.push('Entre la citación y los descargos pasaron ' + c + ' día(s). El Art. 106 del RIT dice que los descargos se rinden finalizados los 5 días que el trabajador tiene para allegar pruebas.');
+      }
+    }
+  }
+
+  // 3. La decision se toma dentro de los 5 dias habiles siguientes a los
+  //    descargos (art. 106 num. 7). Solo se mira mientras siga sin decidir:
+  //    de una decision ya tomada no guardamos en que fecha se tomo, y acusar
+  //    sin saberlo seria inventar.
+  if (desc && !p.tipo_decision && hoyIso) {
+    const h = pdHabilesEntre(desc, hoyIso);
+    if (h !== null && h > 5) {
+      avisos.push('Desde los descargos han pasado ' + h + ' días hábiles sin decisión. El Art. 106 del RIT da 5 hábiles para decidir, y pasarse debilita la inmediatez de la sanción.');
+    }
+  }
+
+  return avisos;
+}
+
 Router.register('procesos-disciplinarios', {
   title: 'Procesos disciplinarios',
 
@@ -647,7 +736,16 @@ Router.register('procesos-disciplinarios', {
     const diasRaro = !!diasCrudo && diasCrudo !== diasOk;
     const diasIlegible = !!diasCrudo && !diasOk;
 
+    const hoyIso = new Date().toISOString().slice(0, 10);
+    const plazos = pdAvisosPlazos(p, hoyIso);
+
     return `
+      ${plazos.length ? `<div class="modal-section">
+        <h3 class="modal-section-title">Plazos del Art. 106 del RIT</h3>
+        <ul class="pd-plazos">${plazos.map((t) => `<li>${pdEsc(t)}</li>`).join('')}</ul>
+        <p class="form-msg">Son avisos, no bloqueos: el plazo puede estar justificado, y los días hábiles se cuentan sin descontar festivos.</p>
+      </div>` : ''}
+
       <div class="modal-section">
         <h3 class="modal-section-title">2. Diligencia de descargos</h3>
         <form id="pd-paso-descargos" class="form">
@@ -679,15 +777,20 @@ Router.register('procesos-disciplinarios', {
           <label>Antecedentes<textarea id="pd-antecedentes" rows="3" placeholder="Si se deja vacío, el documento usa los hechos.">${pdEsc(p.antecedentes || '')}</textarea></label>
           <label>Resumen de los descargos del trabajador<textarea id="pd-resumen" rows="3">${pdEsc(p.resumen_descargos || '')}</textarea></label>
           <label>Consideraciones<textarea id="pd-consideraciones" rows="3" placeholder="Si se deja vacío, el documento trae el texto estándar.">${pdEsc(p.consideraciones || '')}</textarea></label>
-          <label>Compromisos de mejora<textarea id="pd-compromisos" rows="2">${pdEsc(p.compromisos || '')}</textarea></label>
+          <label>Compromisos de mejora <span class="pd-pista">(solo salen en la invitación al mejoramiento y en el llamado de atención)</span><textarea id="pd-compromisos" rows="2">${pdEsc(p.compromisos || '')}</textarea></label>
           <label>Numerales del RIT en que se funda la sanción<input type="text" id="pd-numerales" value="${pdEsc(numerales)}" /></label>
           <div id="pd-bloque-suspension" class="fieldset-grid hidden">
             <label>Días de suspensión<input type="number" id="pd-dias" min="1" max="90" step="1" value="${pdEsc(diasOk)}" /></label>
             <label>Inicio<input type="date" id="pd-ini-sancion" value="${p.fecha_inicio_sancion || ''}" /></label>
             <label>Fin<input type="date" id="pd-fin-sancion" value="${p.fecha_fin_sancion || ''}" /></label>
             <label>Reintegro<input type="date" id="pd-reintegro" value="${p.fecha_reintegro || ''}" /></label>
-            <label>Recurso ante<input type="text" id="pd-recurso-ante" value="${pdEsc(p.recurso_ante || 'la Coordinación de SST')}" /></label>
-            <label>Días para el recurso<input type="text" id="pd-recurso-dias" value="${pdEsc(p.recurso_dias || '1')}" /></label>
+            <!-- RIT art. 106 num. 9: el recurso se presenta "ante la misma
+                 area que notifico la sancion", que es la que firma el
+                 documento, y el termino es de 1 dia contado desde la
+                 notificacion -- dia corrido, no habil: el RIT dice "dias
+                 habiles" cuando lo son, y aca no lo dice. -->
+            <label>Recurso ante<input type="text" id="pd-recurso-ante" value="${pdEsc(p.recurso_ante || this._areaQueNotifica())}" /></label>
+            <label>Días para el recurso<input type="number" id="pd-recurso-dias" min="1" max="30" step="1" value="${pdEsc(p.recurso_dias || '1')}" /></label>
           </div>
           ${diasRaro ? `<p class="form-msg${diasIlegible ? ' error' : ''}">El programa anterior traía «${pdEsc(diasCrudo)}» en los días de suspensión.${diasIlegible ? ' No se pudo leer como un número de días: escribe el correcto antes de emitir la sanción.' : ''}</p>` : ''}
           <label>Estado del proceso<select id="pd-estado">${sel(p.estado, [
@@ -780,6 +883,14 @@ Router.register('procesos-disciplinarios', {
     return (this._empleados || []).find((e) => e.activo && /procesos?\s+disciplinarios?/i.test(e.cargo || ''))
       || (this._empleados || []).find((e) => e.activo && /gesti[oó]n\s+humana/i.test(e.cargo || ''))
       || null;
+  },
+
+  // El RIT no nombra un area fija para el recurso: dice "la misma area que
+  // notifico la sancion" (art. 106 num. 9). La que notifica es la que firma,
+  // asi que se propone el cargo del firmante y no una constante.
+  _areaQueNotifica() {
+    const f = this._firmante();
+    return (f && f.cargo) ? f.cargo : PD_CARGO_FIRMA;
   },
 
   // Traduce una fila del ERP al objeto que esperan las plantillas portadas
