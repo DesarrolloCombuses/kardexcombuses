@@ -2013,9 +2013,12 @@ const DB = {
   },
 
   // Estadística de procesos disciplinarios: solo conteos, por RPC y no
-  // consultando la tabla. El módulo está en marcha blanca, así que leerla
-  // directo le devolvería cero filas a Gestión Humana y a SST, y un tablero
-  // en cero se lee como "no hubo procesos" en vez de "no puedes ver esto".
+  // consultando la tabla. Así el tablero lo puede ver quien no tiene acceso
+  // al expediente -- antes eran Gestión Humana y SST, que entraron al módulo
+  // el 2026-11-23, y mañana será cualquier jefatura a la que se le quiera
+  // dar el número sin darle los nombres. Leer la tabla directo le devolvería
+  // cero filas, y un tablero en cero se lee como "no hubo procesos" en vez
+  // de "no puedes ver esto".
   // La función exige su propio permiso y no devuelve ningún nombre
   // (ver sql/procesos_disciplinarios_estadistica_2026-10-13.sql).
   //

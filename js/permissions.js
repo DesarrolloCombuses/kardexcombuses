@@ -34,9 +34,12 @@ const GRUPO_EXTRA_VIEWS = {
     'aspirantes', 'empleados',
     'personal-cumpleanos', 'personal-alertas', 'personal-conductores', 'personal-perfil', 'personal-rotacion',
     'actividades',
-    // Los dos tableros de estadistica disciplinaria SI los ve Gestion
-    // Humana, aunque el modulo de expedientes siga en marcha blanca: lo que
-    // muestran son conteos, sin un solo nombre. El servidor piensa igual
+    // Los dos tableros de estadistica disciplinaria van aparte del modulo de
+    // expedientes: muestran conteos, sin un solo nombre, asi que los puede
+    // ver quien no deba abrir un expediente. Mientras el modulo estuvo en
+    // marcha blanca fue la unica forma de que Gestion Humana viera algo; hoy
+    // ya entra al modulo, y la separacion se queda porque sirve para dar el
+    // numero sin dar los nombres. El servidor piensa igual
     // (kardex_pd_estadistica_puede_ver), no es solo un enlace visible.
     'procesos-disciplinarios-gh', 'procesos-disciplinarios-historico',
   ],
@@ -54,9 +57,13 @@ const GRUPO_EXTRA_VIEWS = {
 // Para abrir un módulo: quitarlo de acá Y cambiar el correo por null en
 // kardex_pd_marcha_blanca(). Si solo se quita acá, el enlace aparece pero la
 // pantalla sale vacía.
-const VISTAS_EN_MARCHA_BLANCA = {
-  'procesos-disciplinarios': ['desarrollotecnologico@combuses.com.co'],
-};
+// Vacío desde el 2026-11-23: Procesos disciplinarios salió de marcha blanca
+// y lo ve Gestión Humana (va por GRUPO_EXTRA_VIEWS, que ya lo incluía). El
+// mecanismo se queda para el próximo módulo que entre a medio revisar.
+//
+// Para devolverlo: reponer acá el correo Y volver a poner ese mismo correo
+// en kardex_pd_marcha_blanca() -- ver sql/procesos_disc_abrir_2026-11-23.sql.
+const VISTAS_EN_MARCHA_BLANCA = {};
 
 window.Permissions = {
   VISTAS_EN_MARCHA_BLANCA,
