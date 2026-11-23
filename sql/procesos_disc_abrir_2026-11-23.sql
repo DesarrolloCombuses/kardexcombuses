@@ -1,9 +1,9 @@
 -- Procesos disciplinarios: se levanta la marcha blanca.
 --
--- Desde el 2026-10-07 el modulo lo veia una sola cuenta
--- (desarrollotecnologico@combuses.com.co) porque eran datos disciplinarios a
--- medio revisar, traidos del programa anterior. Ya estan revisados y el
--- modulo esta probado, asi que entra Gestion Humana a usarlo.
+-- Desde el 2026-10-07 el modulo lo veia una sola cuenta, la de desarrollo
+-- tecnologico, porque eran datos disciplinarios a medio revisar traidos del
+-- programa anterior. Ya estan revisados y el modulo esta probado, asi que
+-- entra Gestion Humana a usarlo.
 --
 -- REQUISITO: aplicar ANTES sql/procesos_disc_guardian_2026-11-23.sql. Sin
 -- eso, al levantar la marcha blanca el acceso cae en
